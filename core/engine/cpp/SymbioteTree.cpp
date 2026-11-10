@@ -1,6 +1,7 @@
 #include "SymbioteTree.h"
 
 #include "SymbioteContainerQuery.h"
+#include "SymbioteDebug.h"
 #include "SymbioteFabricProps.h"
 #include "SymbioteGlobalVariables.h"
 #include "SymbioteRegisteredProperties.h"
@@ -120,15 +121,15 @@ constexpr int32_t kKindVoid = 3;
 // Fabric value meaning "reset to the default", and a merge-based clone needs the two distinguished.
 constexpr int32_t kNoValue = -1;
 
-// The one position-dependent view name. A text element inside another text element commits as a
-// virtual span — and the flag is STICKY, so `<Text><View><Text>` is virtual too. That is
-// `commit.ts:964`'s `node.isText || hasTextAncestor`, and it is the reason the name is resolved
-// while the child set is built rather than when a node is inserted: an insert cannot see the whole
-// chain, and a reparent would have to rewrite a subtree.
+// The one position-dependent view name: a text inside a text is a virtual span, a view ends it.
+// Resolved while the child set is built, since an insert cannot see the chain and a reparent
+// would rewrite a subtree
 // A `std::string` and not a `const char *` so `materialize` can bind a REFERENCE to either this or
 // the node's own name. As a `const char *` the ternary there has no common type but `std::string`,
 // so every call constructed one — see there.
 const std::string kVirtualTextViewName = "RCTVirtualText";
+// The one view that ends a text context, see `materialize`
+const std::string kViewViewName = "RCTView";
 
 // Tags identify a node to Fabric and must not collide with a surface's root tag. The JS side used to
 // allocate them; there is no reason for that to cross a boundary, so the counter lives here. The
@@ -144,23 +145,8 @@ int32_t allocateTag() {
 // above anything real: the widest style bag on the benchmark row is ~30 keys.
 constexpr size_t kMaxDynamicEntries = 10000;
 
-// `jsi::dynamicFromValue`, bounded. Call this; never the raw one.
-//
-// The raw walk uses an EXPLICIT STACK and keeps no visited set (JSIDynamic.cpp), so a CYCLIC value
-// is not a stack overflow — it is an endless `while (!stack.empty())` allocating one
-// `folly::dynamic` entry per turn. The JS thread never returns from `applyOps` and the heap grows
-// without bound. Measured 2026-09-09 on `examples/solid`: one press on an Animated control, 15 GB,
-// JS thread dead. Every JS-side counter read zero throughout — a saturated thread delivers no
-// console line, so the silence was the instrument, not the finding.
-//
-// An AnimatedNode graph is circular by construction (`leaf-lifecycle.ts` says so where it refuses
-// to deep-compare props), so one reaching a prop write is enough.
-//
-// `filterObjectKeys` is invoked once per key of every object the walk expands, which bounds it
-// without reimplementing it. Throwing names the value: a hang becomes a report.
-//
-// `describe` is a callable, so the message is composed only on the throw that almost never happens
-// A `const std::string &` made every prop write build it eagerly, 48.8% of the decode path
+// `jsi::dynamicFromValue`, bounded: the raw walk keeps no visited set, so a cyclic value never ends
+// `describe` is a callable, because composing the message eagerly cost half of the decode path
 template <typename Describe>
 folly::dynamic boundedDynamicFrom(
     jsi::Runtime &runtime,
@@ -204,9 +190,9 @@ enum class FoldProbe : uint8_t { unknown, absent, present };
 struct Node : jsi::NativeState {
   int32_t kind = kKindElement;
   bool isText = false;
-  // One bit per `press` listener name the app wired, which a platform rule reads
-  // `focusable` asks for `onPress` alone and the underlay for any of four, so one bool cannot serve
-  // both (TouchableOpacity.js:336-339, `_hasPressHandler` :296-302)
+  // One bit per press-related listener the app wired, since `focusable` asks for `onPress` alone
+  // while the underlay of TouchableHighlight reacts to any of four names
+  // One bool per question cannot be kept right when a single name departs
   uint8_t pressListeners = 0;
   // TouchableHighlight's underlay is showing. Set by `kOpSetUnderlayShown`, read by
   // `foldTouchableHighlightUnderlay`. It LAGS the press: RN holds the underlay past release through
@@ -262,9 +248,9 @@ struct Node : jsi::NativeState {
   // names.
   std::optional<jsi::WeakObject> handle;
 
-  // The same placeholder again, STRONG, held while a parent holds this node
-  // JS asks the parent for children it no longer names (Vue, Solid), so the parent must pin them
-  // The cycle through `NativeState` is broken by the tree: a removed node and `~Node` drop this
+  // The same placeholder, STRONG, held while a parent holds this node, so a structural read still
+  // finds a child that JS no longer names (Vue's `setElementText` drops the raw text it appended)
+  // The cycle it makes is broken by the tree: a removed node and `~Node` of each child drop it
   std::optional<jsi::Object> attachedHandle;
 
   // ── Commit state ───────────────────────────────────────────────────────────────────────────────
@@ -282,9 +268,8 @@ struct Node : jsi::NativeState {
   // still need rebuilding, which is why this is checked apart from the dirty pair. Raw, and safe:
   // it is only ever compared for identity, never dereferenced.
   const Node *committedParent = nullptr;
-  // Fabric FAMILIES minted by this node, and the parent generation it was last attached under
-  // A rebuilt node keeps its tag, so `committedParent` misses the new family (`setParent` asserts)
-  // Both rest at 0, so a node with no Fabric parent is never rebuilt for this
+  // Fabric families this node has minted, and the parent generation it was last attached under
+  // `committedParent` cannot tell: a rebuilt parent keeps its tag, so a child would reuse into it
   unsigned familyGeneration = 0;
   unsigned committedUnderGeneration = 0;
   // The text ancestry and the surface this node last committed UNDER — context taken ABOVE it that
@@ -294,8 +279,8 @@ struct Node : jsi::NativeState {
   // `committedParent == nullptr` on both sides, so the surface id is the only thing separating them.
   bool committedTextAncestor = false;
   react::SurfaceId committedSurfaceId = 0;
-  // Fabric children last handed over, so an identical rebuild can decline to clone
-  // Dirty means an op named the node, not that anything changed, so identity guards stay on
+  // The Fabric children last handed over, so a rebuild with the same list can decline to clone
+  // An op naming a node is not a change: a re-render writes a fresh object for an unchanged style
   ChildSet committedChildren;
   // A SURFACE only: the root child set it last handed to `completeSurface`, so a commit that
   // rebuilds the identical list can decline to complete the root at all. Empty on every other node.
@@ -322,11 +307,8 @@ struct Node : jsi::NativeState {
   //
   // The reference applier has no such window (a JS child's `parent` reference keeps the parent
   // alive), so nothing headless can reach this and there is no test to write for it.
-  /**
-   * How many nodes this process is holding, right now
-   * Turns "the C++ half went with the JS half" from an inference into a reading (reanimated#10527)
-   * Not atomic: the commit walk is single-threaded and only tests read it
-   */
+  // How many nodes this process is holding, which tests read to see that a root is not kept alive
+  // Not atomic, as a commit walk is single-threaded and nothing acts on the number
   static inline int64_t live = 0;
 
   Node() { live += 1; }
@@ -361,10 +343,7 @@ struct Node : jsi::NativeState {
 // distinct type for `dynamic_pointer_cast` to fail on when a handle carries somebody else's state,
 // and casting to `Node` fails exactly as well.
 
-/**
- * The node a placeholder owns
- * `hasNativeState` goes first: reading state from an object that has none is not defined by JSI
- */
+// The node a placeholder owns, asked with `hasNativeState` first as JSI promises nothing otherwise
 NodePtr nodeFrom(jsi::Runtime &runtime, const jsi::Object &handle, const char *what) {
   if (!handle.hasNativeState(runtime)) {
     throw jsi::JSError(
@@ -458,11 +437,8 @@ const int32_t *int32ArrayData(jsi::Runtime &runtime, const jsi::Value &value, si
 
 // ── DIRTY MARKING ────────────────────────────────────────────────────────────────────────────────
 
-/**
- * Mark a node changed and raise `pathDirty` up to the first ancestor already marked
- * Every structural op marks the PARENT, which repairs the invariant a reparent could break
- * The early stop needs `appendRenderable` to clear anchors too, or edits inside `{#if}` are dropped
- */
+// Mark a node changed and raise `pathDirty` to the root, stopping at the first ancestor marked
+// The stop holds only if every walked node clears its flags, so `appendRenderable` clears anchors
 void markDirty(Node &node) {
   node.selfDirty = true;
   for (Node *at = &node; at != nullptr && !at->pathDirty; at = at->parent) {
@@ -743,8 +719,7 @@ void detachFromParent(const NodePtr &child) {
   Node *parent = child->parent;
   if (parent == nullptr) return;
   auto &siblings = parent->children;
-  // O(1) through the hint, validated before it is believed
-  // The scan below is only the safety net for a path that moved a child and forgot to set it
+  // O(1) through the hint, validated before it is believed, with a scan as the safety net
   const size_t hinted = child->slotInParent;
   if (hinted < siblings.size() && siblings[hinted] == child) {
     siblings[hinted] = nullptr;
@@ -772,19 +747,7 @@ bool sameNodes(const ChildSet &previous, const ChildSet &next) {
   return true;
 }
 
-/**
- * Whether a changed child list can be applied one slot at a time instead of handed over whole
- * A JS renderer cannot: `nativeFabricUIManager` has no `replaceChild`, so it hands over all 1 000
- * Needs the same length, something moved, and view culling off (upstream skips a call)
- */
-/**
- * How many positions moved, or `kWidthChanged` when the list is not the same length.
- *
- * ONE pass, and it answers both questions the clone branch asks. It first did not: `sameNodes` said
- * whether anything moved and `canReplaceInPlace` then walked the same vector again to ask how much —
- * a second O(width) pass added by the very change that removes O(width) work. Caught by reading this
- * file the way it asks everything else to be read.
- */
+// How many positions moved, or `kWidthChanged` when the list is not the same length, in one pass
 constexpr size_t kWidthChanged = static_cast<size_t>(-1);
 
 size_t countChangedPositions(const ChildSet &previous, const ChildSet &next) {
@@ -847,11 +810,8 @@ bool replacementsAreLayoutClean(const ChildSet &previous, const ChildSet &next) 
   return true;
 }
 
-/**
- * No replacement may be a node this parent already holds, as a list swap emits
- * `replaceChild` asserts a null yoga owner (`YogaLayoutableShadowNode.cpp:303`), Release corrupts
- * `recorded` says WHICH slots moved, `standing` what the parent HOLDS (`liveChildrenOf`)
- */
+// No replacement may be a node this parent already holds, a reorder would trip Yoga's owner assert
+// `recorded` decides which slots moved and `standing` what the parent holds, see `liveChildrenOf`
 bool replacementsAreFresh(
     const ChildSet &recorded,
     const ChildSet &standing,
@@ -876,16 +836,12 @@ const ChildSet &liveChildrenOf(const Node &node) {
   return node.committed == nullptr ? kNone : node.committed->getChildren();
 }
 
-/**
- * How many parents took the targeted path since this was last read, process-wide and zeroed on read
- * A liveness counter: every correctness test stays green with the path off, and this shows a zero
- */
+// How many parents took the targeted path since the last read, to show the path still runs
+// Process-wide and zeroed on read, like the counters of `readCommitProfile` in JS
 size_t targetedReplaces_ = 0;
 
-/**
- * `materialize`'s own stopwatch, because the walk is invisible to every clock React Native owns
- * Nanoseconds accumulated across the walk and zeroed on read, at most five clock reads per node
- */
+// The stopwatch of `materialize`, which runs before `completeSurface` and so sits in no RN clock
+// Nanoseconds, accumulated across the whole walk and zeroed when read
 struct IWalkCost {
   double walkNs = 0;
   double propsNs = 0;
@@ -897,8 +853,8 @@ struct IWalkCost {
   double foldToJsNs = 0;
   double foldCallNs = 0;
   double foldFromJsNs = 0;
-  // The two `kOpSetProp` early exits, counted apart: an ABSENT delete leaves before the conversion
-  // An UNCHANGED write leaves after it, so the adapter already paid the JSI crossing for nothing
+  // The two `kOpSetProp` early exits, counted apart: a delete of an absent key is a hash lookup
+  // A write of an unchanged value has already paid the JSI conversion, which is the costly one
   size_t deletesOfAbsent = 0;
   size_t writesOfUnchanged = 0;
   double rawPropsNs = 0;
@@ -908,20 +864,18 @@ struct IWalkCost {
   size_t created = 0;
   size_t cloned = 0;
   size_t reused = 0;
-  // `applyOps`' own half: what OUR decode charges per op, beside what Fabric charges per node
+  // The half of `applyOps` that asks what our own decode costs per op, apart from Fabric's cost
   double decodeNs = 0;
   double instanceHandleNs = 0;
   double publishNs = 0;
   double nativeStateNs = 0;
   size_t decoded = 0;
-  // `kOpSetProp` and, inside it, the JS value -> `folly::dynamic` conversion
-  // The cheap early exits are not counted, so this under-counts; `propConvertNs` has no hole
+  // `kOpSetProp`, with the JS value conversion inside it, not counted on the two early exits
+  // `propConvertNs` has no such hole
   double setPropNs = 0;
   double propConvertNs = 0;
   size_t setProps = 0;
-  // How well the interning actually worked: entries in the batch's value table against conversions
-  // performed. `setProps` / `valueEntries` is the dedup the buffer achieved, and
-  // `valueConversions` / `valueEntries` says how much of the table the ops even reached.
+  // How well interning worked: entries in a batch's value table against conversions performed
   size_t valueEntries = 0;
   size_t valueConversions = 0;
   // The rest of `applyOps`, so the phase's books close. `applyNs` is the whole call; the string
@@ -929,11 +883,11 @@ struct IWalkCost {
   double applyNs = 0;
   double stringDecodeNs = 0;
   double structureNs = 0;
-  // BATCHED HOST READS, timed though off the commit path: the teardown sweep hands back a handle
-  // per node of every removed subtree, 10 000 on a 1 000-row clear
+  // The batched host reads: the teardown sweep gets a handle for every node of a removed subtree
+  // The time says whether the crossing or the JS loop above it is the cost
   double hostReadNs = 0;
   size_t hostReadHandles = 0;
-  // `applyOps` entries: tables are interned per batch, so small batches repeat values
+  // How many times `applyOps` was entered, as string and value tables are interned per batch
   size_t applyCalls = 0;
   // Inside `structureNs`: promoting a node's WEAK handle reference to a strong one when it acquires
   // a parent. One `jsi::WeakObject::lock` plus one `jsi::Object` per node, i.e. real JSI work on an
@@ -954,53 +908,60 @@ bool canReplaceInPlace(
     const ChildSet &next,
     size_t changed,
     bool indicesAlign) {
-  // Rewrites only the moved slots, so a one-row change no longer costs the width of the list
-  // The old child is read off the parent, as layout may substitute children behind our record
-  // Measured 405 ms off against 3 ms on, 4 000 wide, in `create-append-phase-split.itest.ts`
+  // Rewrites moved slots, not the whole list: 3 ms against 405 ms for one row of a list 4 000 wide
+  // The old child is read off the parent, as layout replaces children in place behind our record
   if (react::ReactNativeFeatureFlags::enableViewCulling()) return false;
   if (changed == kWidthChanged || node.committedChildren.empty()) return false;
-  // `standing` is read from Fabric, so position is a key only if both lists agree on width
+  // Position is a key between the two lists only when their widths agree
   if (standing.size() != node.committedChildren.size()) return false;
-  // A props change of our OWN can dirty us through `updateYogaProps`, and a dirty parent is what
-  // sends the layout pass into the children this path declined to re-adopt. The clone is checked
-  // again after it exists, because `completeClone` dirties a measurable node whatever its props did.
+  // A props change of our own dirties the parent, and the clone is checked again after it exists
   if (node.selfDirty) return false;
-  // A leaf Yoga node (`Paragraph`) builds its state from its children during layout
-  // Swapping one slot dirties nothing, so stale state hides the text change from the differ
-  // Measured in `react-state-reaches-the-screen.itest.tsx`
+  // A leaf parent such as a paragraph derives its state from its children, so a silent swap of a
+  // slot leaves the screen stale (`react-state-reaches-the-screen.itest.tsx`)
   if (node.committed->getTraits().check(
           react::ShadowNodeTraits::Trait::LeafYogaNode)) {
     return false;
   }
   if (!replacementsAreLayoutClean(node.committedChildren, next)) return false;
   if (!replacementsAreFresh(node.committedChildren, standing, next)) return false;
-  // Indices align, so every `replaceChild` is O(1) however many of them there are, and the bound
-  // below has nothing left to protect.
+  // Aligned indices make every `replaceChild` O(1)
   if (indicesAlign) return changed > 0;
-  // A mixed parent cannot trust `suggestedIndex`, so cap the moved share of the width
-  // A select on 1 000 rows moves 2 and saves 500x, while moving every child measures 1.7x
+  // A mixed parent bounds the moved share, so k replacements cannot become O(N*k)
   return changed > 0 && changed * 2 <= next.size();
 }
 
-// There is no append path: an append changes the child count, so the parent is always dirty
-// Layout then clones every standing child and `replaceChild` finds none (F-51), so no case is safe
-// The withdrawn version is recorded in `core/engine/bench/append-child-equivalence.cpp`
+// No append path here: an append dirties the parent, so layout clones the standing children
+// behind our record and the next `replaceChild` cannot find the child it was told to replace
 
-/**
- * Rewrite every moved slot of `parent`, leaving the rest of its children untouched
- * No dirtying here, since `canReplaceInPlace` refuses any replacement that moves layout
- * Measured in `core/engine/bench/replace-child-layout-clones.cpp`
- */
+// Rewrites every moved slot of `parent`, leaving the rest of its children untouched
+// It never dirties the parent, as `canReplaceInPlace` refuses a replacement that moves layout
 void replacedChangedChildren(
     react::ShadowNode &parent,
     const ChildSet &recorded,
     const ChildSet &next) {
-  // `recorded` decides which slot moved, but may name a node layout replaced in place
-  // Naming it aborts with "Child to replace was not found", so the old child is read off the parent
+  // The old child is read off the parent, as our record can name a node layout replaced in place
   const ChildSet &standing = parent.getChildren();
   for (size_t at = 0; at < next.size() && at < standing.size(); at += 1) {
     if (recorded[at] == next[at]) continue;
     parent.replaceChild(*standing[at], next[at], at);
+  }
+}
+
+// A slot holding another node than before is a reorder, a new revision keeps its family
+bool hasReorderedChildren(const ChildSet &recorded, const ChildSet &next) {
+  if (recorded.size() != next.size()) return false;
+  for (size_t at = 0; at < next.size(); at += 1) {
+    if (recorded[at] != next[at] && &recorded[at]->getFamily() != &next[at]->getFamily()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Yoga reads a reordered list of equal-style children as clean and keeps every old frame
+void dirtyLayoutOf(react::ShadowNode &node) {
+  if (auto *layoutable = dynamic_cast<react::LayoutableShadowNode *>(&node)) {
+    layoutable->dirtyLayout();
   }
 }
 
@@ -1021,10 +982,8 @@ bool isEmptyRawText(const Node &node) {
   return text == nullptr || !text->isString() || text->asString().empty();
 }
 
-/**
- * Minimal payload for a CLONE: a dropped key goes as `null`, an unchanged key is not sent
- * Re-sending re-invokes the native setter, and `styleAttr` rebuilds the whole progress bar
- */
+// The minimal payload for a clone: a removed key goes as `null`, an unchanged key is not sent
+// Re-sending a key re-invokes its native setter, and some of them rebuild the whole view
 folly::dynamic diffProps(const folly::dynamic &previous, const folly::dynamic &next) {
   folly::dynamic out = folly::dynamic::object();
   for (const auto &pair : next.items()) {
@@ -1045,40 +1004,8 @@ std::shared_ptr<const react::ShadowNode> materialize(
     react::SurfaceId surfaceId,
     const Node *fabricParent);
 
-/**
- * The node's own payload fold, reached through the JS handle it is published on.
- *
- * Empty for the ~all of them that carry none, and the PROBE is what that costs: a `WeakObject` lock
- * plus a property read, on the commit path. So the answer is cached — `foldProbe` — and the
- * assumption that makes caching sound is that a fold is assigned before the node's first commit.
- * Every one is: `attachHostBehavior` writes `node.payloadFold` immediately after `createElement`,
- * and the per-node folds a behavior builds itself (`stickyFold`, `contentFold`) are written in
- * `attach` / `buildStructure`, which run there too. A fold assigned after the first commit is
- * ignored, silently — the reason this paragraph exists rather than a shorter one.
- *
- * The returned closure captures `runtime` and the handle by value; it lives only for the duration of
- * one `fabricProps` call, so nothing here outlives the commit that made it. Deliberately NOT stored
- * on the Node: the closure names the handle, the handle owns the Node through `NativeState`, and a
- * `Node -> Function -> handle -> Node` edge is the GC-boundary cycle this file's header refuses.
- */
-/**
- * The nearest ANCESTOR carrying `tag`, for `IAncestorLookup`. Never the node itself.
- *
- * `ownerProps` answers "my parent", which is what almost every derived rule wants. Button's label is
- * the exception: its style is a function of the BUTTON's `color` and `disabled`, and the button is
- * its grandparent on iOS (`button -> view -> text`) and its parent on Android. Asking for "two up"
- * would encode one platform's tree shape into a rule; asking for the nearest button is the same
- * question a CSS ancestor selector asks and is true on both.
- *
- * Unbounded in principle and short in practice: the one rule that uses it looks one or two hops up,
- * and a MISS walks to the root. That is affordable because nothing calls this per node — it is
- * reached only from inside a tag rule that has already matched.
- */
-/**
- * The parent as `IOwner`: its props, tag and press bit
- * The tag lets a rule match a descendant of an anchor whose child carries no tag of its own
- * A root answers with a default `IOwner`, same as a nameless parent
- */
+// The parent as `IOwner`: its props, its tag and its press bit, so a rule can be a descendant rule
+// The nearest ancestor carrying a tag is `ancestorPropsOf`, as Button's label sits at varying depth
 IOwner ownerOf(const Node &node) {
   if (node.parent == nullptr) return {};
   return IOwner{
@@ -1089,21 +1016,20 @@ IOwner ownerOf(const Node &node) {
       (node.parent->pressListeners & kPressListenerMask) != 0};
 }
 
-/** The node's own non-prop bits, unpacked from the mask the ops maintain. See `ISelf`. */
-ISelf selfOf(const Node &node) {
+/** The node's own non-prop bits, unpacked from the ops' mask (see `ISelf`) */
+ISelf selfOf(const Node &node, bool hasTextAncestor) {
   return ISelf{
       (node.pressListeners & kPressListenerPress) != 0,
       (node.pressListeners & kPressListenerMask) != 0,
       node.underlayShown,
       (node.pressListeners & kMomentumListenerMask) != 0,
       (node.pressListeners & kTextPressMask) != 0,
-      (node.pressListeners & kStartShouldSetResponder) != 0};
+      (node.pressListeners & kStartShouldSetResponder) != 0,
+      node.isText && hasTextAncestor};
 }
 
-/**
- * The first child as `IFirstChild`, the mirror of `ownerOf` and the only read that goes DOWN
- * Skips null holes, so a rule does not depend on the caller having run `compactChildren`
- */
+// The first child as `IFirstChild`, the mirror of `ownerOf` and the only read that goes down
+// It skips holes instead of assuming compaction, so a rule does not depend on the caller's order
 IFirstChild firstChildOf(const Node &node) {
   for (const auto &child : node.children) {
     if (child == nullptr) continue;
@@ -1214,25 +1140,10 @@ void appendRenderable(
   if (node.kind == kKindRawText) owners.rawTexts += 1;
 }
 
-// Take back the children Fabric actually kept, because it does NOT always keep the ones it was
-// given.
-//
-// `YogaLayoutableShadowNode::adoptYogaChild` clones a child that is still owned by its previous
-// parent's yoga node and swaps the clone into the list with `replaceChild` — RN's own comment there
-// says "At this point, React has wrong reference to the node. (T138668036)". So after a clone or an
-// append loop, our `Node::committed` can name a node that is NOT in the committed tree.
-//
-// Left uncorrected, that costs the whole commit: `updateMountedFlag` (`updateMountedFlag.cpp:57`)
-// and `progressState` (`ShadowTree.cpp:135`) both skip a subtree only when the child pointer is
-// IDENTICAL between revisions. Handing back the orphan makes every child differ on the next commit,
-// so both walks — and the differ behind them — descend the entire tree for a one-row change.
-//
+// Take back the children Fabric kept, as `adoptYogaChild` swaps in clones behind our `committed`
+// An orphan would make every child differ on the next commit, so the walks descend the whole tree
 void adoptLandedChildren(Node &node, const std::vector<Node *> &owners) {
-  // The generation every owner is now attached under. Its own loop, over ALL of them rather than
-  // the min below: a child Fabric did not keep is still a child we handed over, and leaving it on a
-  // stale generation would rebuild it forever. Recorded here rather than at the append, because the
-  // clone paths never append at all and their children are attached just the same — and `owners`
-  // is what carries anchors' hoisted children.
+  // The generation every owner is attached under, for all of them as clone paths never append
   for (Node *owner : owners) owner->committedUnderGeneration = node.familyGeneration;
   const ChildSet &landed = node.committed->getChildren();
   const size_t count = std::min(owners.size(), landed.size());
@@ -1262,13 +1173,11 @@ void collectRenderableOwners(Node &node, std::vector<Node *> &owners) {
   }
 }
 
-// Re-point the retained tree at the nodes Fabric actually committed, after the commit
-// Fabric substitutes clones inside it, so the originals we held stayed dirty and were re-measured
-// O(changed): an identical pointer means an identical subtree and the descent stops there
+// Re-point the retained tree at the nodes Fabric committed, as it swaps in clones in the commit
+// O(changed): an identical pointer means an identical subtree, so the descent stops there
 void adoptCommitted(Node &node, const std::shared_ptr<const react::ShadowNode> &landed) {
   if (node.committed == nullptr || landed == nullptr) return;
-  // A stranger is not adopted: a cancelled commit leaves the registry on the PREVIOUS revision
-  // Walking it would drag our pointers backwards, and family identity tells the two apart
+  // A stranger is not adopted: a cancelled commit leaves the previous revision
   if (!react::ShadowNode::sameFamily(*node.committed, *landed)) return;
   if (node.committed == landed) return;
 
@@ -1339,9 +1248,9 @@ std::shared_ptr<const react::ShadowNode> materialize(
 
   auto children = std::make_shared<ChildSet>();
   IOwnerTally owners;
-  // STICKY, per `commit.ts:964` — once inside a text element everything below is virtual, including
-  // through a non-text element in between.
-  const bool childHasTextAncestor = hasTextAncestor || node.isText;
+  // Текстовый контекст липкий, кроме вью: у RN `View.js` отдаёт детям `TextAncestorContext` false
+  const bool childHasTextAncestor =
+      node.isText || (hasTextAncestor && node.viewName != kViewViewName);
   // BUMPED BEFORE THE CHILDREN ARE WALKED, which is the whole trick: the create branch below has
   // not run yet, so a child asking about its parent's family has to be told what it is ABOUT to be.
   // Same condition that branch tests — a node with no committed form is minting its first family,
@@ -1375,7 +1284,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
         node.props,
         fold,
         ownerOf(node),
-        selfOf(node),
+        selfOf(node, hasTextAncestor),
         IAncestorLookup{&ancestorPropsOf, &node},
         firstChildOf(node),
         recordingLookup(node, surfaceId, varReads));
@@ -1432,7 +1341,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
           node.props,
           fold,
           ownerOf(node),
-          selfOf(node),
+          selfOf(node, hasTextAncestor),
           IAncestorLookup{&ancestorPropsOf, &node},
           firstChildOf(node),
           recordingLookup(node, surfaceId, varReads));
@@ -1447,11 +1356,11 @@ std::shared_ptr<const react::ShadowNode> materialize(
     const bool childrenHeld = changedPositions == 0;
     const bool sendsNothing = payload.empty() && childrenHeld;
     if (!sendsNothing) {
-      // Hand the child list over only when it changed, since reading `fragment.children`
-      // forces `updateYogaChildren()`, which re-clones every child on each props-only commit
-      // A changed list still need not go whole, see `replacedChangedChildren`
-      auto rawProps =
-          node.selfDirty ? react::RawProps(std::move(payload)) : react::RawProps();
+      // A child list is not a free argument: handing it over re-adopts and re-clones every child
+      // An empty object is not an empty `RawProps`, it re-parses props and makes the differ emit
+      // an `Update`
+      auto rawProps = node.selfDirty && !payload.empty() ? react::RawProps(std::move(payload))
+                                                         : react::RawProps();
       if (canReplaceInPlace(
               node,
               liveChildrenOf(node),
@@ -1466,8 +1375,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
         // which is what lets the fallback below re-clone from the original without rebuilding it.
         auto cloned = uiManager.cloneNode(
             *node.committed, react::ShadowNodeFragment::childrenPlaceholder(), std::move(rawProps));
-        // The last guard: `completeClone` dirties a measurable node whatever its props did (F-51)
-        // A dirty parent sends layout into the children this path declined to re-adopt
+        // The last guard needs the clone, as `completeClone` dirties a measurable node
         const auto *layoutable =
             dynamic_cast<const react::LayoutableShadowNode *>(cloned.get());
         if (layoutable == nullptr || layoutable->getIsLayoutClean()) {
@@ -1482,8 +1390,9 @@ std::shared_ptr<const react::ShadowNode> materialize(
         std::shared_ptr<const ChildSet> handedChildren =
             react::ShadowNodeFragment::childrenPlaceholder();
         if (!childrenHeld) handedChildren = children;
-        node.committed =
-            uiManager.cloneNode(*node.committed, handedChildren, std::move(rawProps));
+        auto cloned = uiManager.cloneNode(*node.committed, handedChildren, std::move(rawProps));
+        if (hasReorderedChildren(node.committedChildren, *children)) dirtyLayoutOf(*cloned);
+        node.committed = std::move(cloned);
       }
     }
     if (node.selfDirty) node.committedProps = std::move(next);
@@ -1602,7 +1511,10 @@ std::optional<ContainerSize> laidOutSize(const Node &node, const react::RootShad
   const auto &[parent, index] = ancestors.back();
   const auto *layoutable = dynamic_cast<const react::LayoutableShadowNode *>(
       parent.get().getChildren().at(static_cast<size_t>(index)).get());
-  if (layoutable == nullptr) return std::nullopt;
+  if (layoutable == nullptr) {
+    SYMBIOTE_DLOG(std::string("container consumer has no layout: ") + node.committed->getComponentName());
+    return std::nullopt;
+  }
   const react::Size size = layoutable->getLayoutMetrics().frame.size;
   return ContainerSize{size.width, size.height};
 }
@@ -1648,7 +1560,7 @@ folly::dynamic payloadOf(jsi::Runtime &runtime, Node &node, react::SurfaceId sur
       node.props,
       fold,
       ownerOf(node),
-      selfOf(node),
+      selfOf(node, node.committedTextAncestor),
       IAncestorLookup{&ancestorPropsOf, &node},
       firstChildOf(node),
       recordingLookup(node, surfaceId, varReads));
@@ -2338,8 +2250,7 @@ jsi::Value Tree::childrenOf(jsi::Runtime &runtime, const jsi::Value *arguments, 
   return out;
 }
 
-// A node whose handle is gone contributes neither itself nor its descendants
-// Same as the JS recursion this replaced, so the sweep never tears down more than before
+// A node whose handle is gone contributes neither itself nor its descendants, as the JS walk did
 void collectSubtree(jsi::Runtime &runtime, const NodePtr &node, std::vector<jsi::Value> &into) {
   auto handle = handleOf(runtime, *node);
   if (handle.isUndefined()) return;
@@ -2348,9 +2259,8 @@ void collectSubtree(jsi::Runtime &runtime, const NodePtr &node, std::vector<jsi:
   for (const auto &child : node->children) collectSubtree(runtime, child, into);
 }
 
-// The same walk, narrowed to what a teardown touches: a root, a tagged or release-marked node
-// and the path between them, since the framework may re-insert an interior node alone
-// Returns whether the node stayed; its slot is reserved before recursing and dropped if unwanted
+// The same walk narrowed to a root, a tagged node or an ancestor of one, as only those tear down
+// Returns whether the node earned its place, so its parent keeps its own
 bool collectTeardownSubtree(
     jsi::Runtime &runtime,
     const NodePtr &node,
@@ -2472,19 +2382,32 @@ jsi::Value Tree::committedRecordOf(
     throw jsi::JSError(runtime, "symbiote engine: expected committedRecordOf(handle)");
   }
   const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "committedRecordOf");
-  // `undefined` before the first commit is the ordinary answer, as lifecycle calls can run earlier
+  // `undefined` before the first commit is an ordinary answer: an adapter wiring an imperative call
+  // at lifecycle time runs before the commit, and every caller defers or logs
   if (node->committed == nullptr) return jsi::Value::undefined();
 
   auto record = jsi::Object(runtime);
-  // The PLACEHOLDER, not the `ShadowNode`. The reference applier answers with its fake Fabric node
-  // because that is what its slot's imperative calls accept; here the imperative five below accept
-  // this object, so it is the same field playing the same role. There is no JS value for a
-  // `shared_ptr<const ShadowNode>` that anything downstream could use.
+  // The PLACEHOLDER, not the `ShadowNode`: the imperative five below accept this object, a wrapper
+  // over the node itself comes from `shadowNodeWrapperOf`
   record.setProperty(runtime, "handle", jsi::Value(runtime, arguments[0]));
   record.setProperty(runtime, "tag", jsi::Value(static_cast<double>(node->tag)));
   record.setProperty(
       runtime, "rootTag", jsi::Value(static_cast<double>(node->committedSurfaceId)));
+  record.setProperty(
+      runtime, "familyGeneration", jsi::Value(static_cast<double>(node->familyGeneration)));
   return record;
+}
+
+jsi::Value Tree::shadowNodeOf(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 1) {
+    throw jsi::JSError(runtime, "symbiote engine: expected shadowNodeOf(handle)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "shadowNodeOf");
+  if (node->committed == nullptr) return jsi::Value::undefined();
+  return react::valueFromShadowNode(runtime, node->committed);
 }
 
 jsi::Value Tree::committedPayloadOf(

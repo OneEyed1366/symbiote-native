@@ -189,6 +189,28 @@ export type ISymbioteNode = {
   scrollTo(options?: { x?: number; y?: number; animated?: boolean }): void;
   scrollToEnd(options?: { animated?: boolean }): void;
   flashScrollIndicators(): void;
+  // The rest of RN's ScrollView ref surface (`ScrollView.js:856-1021`). The node is its own
+  // responder and native ref, and the inner view is the content node a tag builds
+  getScrollResponder(): ISymbioteNode;
+  getScrollableNode(): ISymbioteNode;
+  getNativeScrollRef(): ISymbioteNode;
+  getInnerViewRef(): ISymbioteNode | undefined;
+  getInnerViewNode(): ISymbioteNode | undefined;
+  scrollResponderZoomTo(
+    rect: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      animated?: boolean;
+    },
+    animated?: boolean,
+  ): void;
+  scrollResponderScrollNativeHandleToKeyboard(
+    target: ISymbioteNode | number,
+    additionalOffset?: number,
+    preventNegativeScrollOffset?: boolean,
+  ): void;
 };
 
 // `instanceHandle` round-trips through Fabric unchanged and comes back as the event target, so our

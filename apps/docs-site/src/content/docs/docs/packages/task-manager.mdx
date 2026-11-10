@@ -20,19 +20,6 @@ push delivery) is each consumer package's own job:
 Every export is a plain function or a one-time module-load side effect — no hook/composable/
 service to wrap, so every adapter's entry point is a plain re-export of the same core.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ------------------ | ------- |
-| React              | ✅ live |
-| Vue                | ✅ live |
-| Angular            | ✅ live |
-| Svelte             | ✅ live |
-| Solid              | ✅ live |
-
 ## Installation
 
 ```sh
@@ -62,8 +49,8 @@ meta-package to your project.
 
 ## Usage
 
-`defineTask` must run at the top of the JS bundle, outside any component — the app can be
-launched headlessly to run a background task, with no views mounted, so a task defined inside a
+`defineTask` must run at the top of the JS bundle, outside any component. The app can be
+launched headlessly to run a background task, with no views mounted. So a task defined inside a
 component lifecycle method would never register on that launch.
 
 ```ts
@@ -143,9 +130,9 @@ that needs the task, never by task-manager itself.
 </Aside>
 
 - **A defined task that native fires but nobody registered still gets acked and unregistered.**
-  If `defineTask` for a given name was renamed or deleted from the bundle after the task was
-  registered, the dangling native registration is cleaned up automatically instead of leaking a
-  wakelock forever.
+  Say `defineTask` for a given name was renamed or deleted from the bundle after the task was
+  registered. The dangling native registration is then cleaned up automatically instead of leaking
+  a wakelock forever.
 - **A task executor that throws still acks native.** The failure is logged, but the completion ack
   always fires, so a bug in one task's executor can't leave the OS believing the task never
   completed.
@@ -174,9 +161,11 @@ iOS Simulator does not support the iOS background task scheduler.
 **How do I debug a task?** Log at the top of the executor and inside the `error` branch, and call
 `getRegisteredTasksAsync()` to see what native has registered.
 
-Sources: [Expo docs: BackgroundTask](https://docs.expo.dev/versions/latest/sdk/background-task/),
-[Expo docs: BackgroundFetch](https://docs.expo.dev/versions/latest/sdk/background-fetch/),
-[expo/expo#9570 Expo keeps stopping when the app is killed during background location](https://github.com/expo/expo/issues/9570),
-[expo/expo#3535 background geolocation task disappears when the app is killed on Android](https://github.com/expo/expo/issues/3535),
-[expo/expo#14076 task does not fire after 5 to 10 minutes on Android](https://github.com/expo/expo/issues/14076),
-[expo/expo#26717 task is not defined, define it before registering](https://github.com/expo/expo/issues/26717).
+Sources:
+
+- [Expo docs: BackgroundTask](https://docs.expo.dev/versions/latest/sdk/background-task/)
+- [Expo docs: BackgroundFetch](https://docs.expo.dev/versions/latest/sdk/background-fetch/)
+- [expo/expo#9570 Expo keeps stopping when the app is killed during background location](https://github.com/expo/expo/issues/9570)
+- [expo/expo#3535 background geolocation task disappears when the app is killed on Android](https://github.com/expo/expo/issues/3535)
+- [expo/expo#14076 task does not fire after 5 to 10 minutes on Android](https://github.com/expo/expo/issues/14076)
+- [expo/expo#26717 task is not defined, define it before registering](https://github.com/expo/expo/issues/26717)

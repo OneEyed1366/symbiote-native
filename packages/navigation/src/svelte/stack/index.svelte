@@ -21,22 +21,23 @@
     mergeScreenOptions,
     navigatorReducer,
     reconcileStackRoutes,
+    resolveNativeContainerProps,
   } from '../../core';
   import type { INavigatorAction, INavigatorState, IRoute } from '../../core';
   import { hostProps } from '../attachments';
   import { getNavigationScope } from '../navigation-context';
   import { SCREEN_REGISTRY_HOST_PROPS } from '../registry-host';
-  import {
-    setScreenCollector,
-    toRegistry,
-    withoutScreen,
-  } from '../screen-registry';
-  import type { IRegisteredScreen } from '../screen-registry';
+  import { useScreenCollection } from '../screen-collection.svelte';
   import type { IScreenProps, ISvelteScreenOptions } from '../screen-props';
   import StackScreen from './stack-screen.svelte';
   import type { IStackProps } from './stack-props';
 
-  let { initialRouteName, screenOptions, children }: IStackProps = $props();
+  let {
+    initialRouteName,
+    screenOptions,
+    nativeContainerStyle,
+    children,
+  }: IStackProps = $props();
 
   // Read BEFORE this Stack sets its own scope, as it becomes the `parent` of its screens
   // Kept as the box, so every later read sees the current value
@@ -44,19 +45,8 @@
 
   const routeIdPrefix = `stack-${(stackInstanceCounter += 1)}`;
 
-  // `$state.raw`, as an entry holds a component behind live getters that a deep proxy would wrap
-  let screens = $state.raw<IRegisteredScreen<IScreenProps['options']>[]>([]);
-  setScreenCollector<IScreenProps['options']>({
-    kind: 'stack',
-    register: screen => {
-      screens = [...screens, screen];
-    },
-    unregister: screen => {
-      screens = withoutScreen(screens, screen);
-    },
-  });
-
-  const registry = $derived(toRegistry(screens));
+  const collection = useScreenCollection<IScreenProps['options']>('stack');
+  const registry = $derived(collection.registry);
   const createRoute = createRouteFactory(routeIdPrefix);
   const { emitterFor, broadcastState } = createEmitterStore();
 
@@ -115,7 +105,10 @@
     broadcastState(state);
   });
 
-  const stackProps = buildStackHostProps();
+  const stackProps = $derived({
+    ...buildStackHostProps(),
+    ...resolveNativeContainerProps(nativeContainerStyle),
+  });
 
   function optionsFor(route: IRoute<unknown>): ISvelteScreenOptions {
     return mergeScreenOptions(

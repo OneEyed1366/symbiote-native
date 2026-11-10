@@ -17,7 +17,6 @@ import {
   createSurface,
   listenerFor,
   propOf,
-  registerRules,
   removeChild,
   routeProp,
   type IListener,
@@ -28,7 +27,7 @@ import { PRESSABLE_TAG, registerPressableBehavior } from './pressable';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
-let nextRootTag = 5000;
+let nextRootTag = 5_000;
 
 // A pressable resolves to a plain view — there is no native pressable component. Which is exactly
 // why the registry cannot be keyed by Fabric name: it would attach the press machine to every
@@ -63,11 +62,11 @@ function makePressable(): ISymbioteNode {
   return createElement(PRESSABLE_VIEW_NAME, false, PRESSABLE_TAG);
 }
 
-// Slot 0 of the published `[classStyle, explicitStyle]` pair, read back out of the HOST — the
-// engine keeps no props, so `propOf` is what a node's own style slot is now.
-function classStyleOf(node: ISymbioteNode): unknown {
+// Slot 1 of the published `[classStyle, explicitStyle]` pair, read back out of the host
+// The pressed variant swaps this slot, and the engine keeps no props of its own
+function explicitStyleOf(node: ISymbioteNode): unknown {
   const style = propOf(node, 'style');
-  return Array.isArray(style) ? style[0] : undefined;
+  return Array.isArray(style) ? style[1] : undefined;
 }
 
 // By testID, never by viewName: a pressable's is `RCTView` like every plain view. Reads the
@@ -124,31 +123,18 @@ describe('pressable host behavior', () => {
     expect(onPressIn).toHaveBeenCalledTimes(1);
   });
 
-  it('drives the :active style through the registry, never through the framework', () => {
-    registerRules([
-      {
-        tokens: ['btn'],
-        specificity: [0, 1, 0],
-        order: 0,
-        style: { opacity: 1 },
-      },
-      {
-        tokens: ['btn', ':active'],
-        specificity: [0, 2, 0],
-        order: 1,
-        style: { opacity: 0.6 },
-      },
-    ]);
+  it('drives the pressed style through the engine, never through the framework', () => {
     registerPressableBehavior();
     const node = makePressable();
-    routeProp(node, 'class', 'btn');
+    routeProp(node, 'style', { opacity: 1 });
+    routeProp(node, 'activeStyle', { opacity: 0.6 });
     mount(node);
 
-    expect(classStyleOf(node)).toEqual({ opacity: 1 });
+    expect(explicitStyleOf(node)).toEqual({ opacity: 1 });
 
     press(node);
 
-    expect(classStyleOf(node)).toEqual({ opacity: 0.6 });
+    expect(explicitStyleOf(node)).toEqual({ opacity: 0.6 });
   });
 
   // `node.listeners` is a single-slot Map: without `ownedListeners` the app's own `onPressIn`
@@ -188,25 +174,18 @@ describe('pressable host behavior', () => {
   // difference: the machine also drives the pressed style, which a bare listener callback cannot.
   // Both must move together, on the engine's real pressIn-before-responder-claim sequence.
   it('moves the app callback and the pressed style together', () => {
-    registerRules([
-      {
-        tokens: ['btn', ':active'],
-        specificity: [0, 2, 0],
-        order: 0,
-        style: { opacity: 0.6 },
-      },
-    ]);
     registerPressableBehavior();
     const onPressIn = vi.fn();
     const node = makePressable();
-    routeProp(node, 'class', 'btn');
+    routeProp(node, 'activeStyle', { opacity: 0.6 });
+    routeProp(node, 'style', { opacity: 1 });
     routeProp(node, 'onPressIn', onPressIn);
     mount(node);
 
     touchWithoutClaiming(node);
 
     expect(onPressIn).toHaveBeenCalledTimes(1);
-    expect(classStyleOf(node)).toEqual({ opacity: 0.6 });
+    expect(explicitStyleOf(node)).toEqual({ opacity: 0.6 });
   });
 
   // The other half of the gesture-open flag: it has to be CLEARED at the end, or the second gesture
@@ -238,17 +217,10 @@ describe('pressable host behavior', () => {
   // Dirtying is not publishing: a press arrives outside every renderer mutation path, so unless
   // the behavior asks for a commit, the screen keeps the unpressed style regardless.
   it('commits the pressed style, not just dirties the node', async () => {
-    registerRules([
-      {
-        tokens: ['btn', ':active'],
-        specificity: [0, 2, 0],
-        order: 0,
-        style: { opacity: 0.6 },
-      },
-    ]);
     registerPressableBehavior();
     const node = makePressable();
-    routeProp(node, 'class', 'btn');
+    routeProp(node, 'style', { opacity: 1 });
+    routeProp(node, 'activeStyle', { opacity: 0.6 });
     routeProp(node, 'testID', TEST_ID);
     mount(node);
 
@@ -263,9 +235,8 @@ describe('pressable host behavior', () => {
   // The focusable pair moved to `core/engine/cpp/tests/js/pressable-payload.itest.ts`:
   // `foldPressableProps` in C++ owns it now, invisible to this harness's TypeScript payload.
 
-  // The other half of keying by tag, and the reason the fix is not "register under the Fabric
-  // name": a pressable IS an RCTView, so a Fabric-keyed registry would give the press machine to
-  // every plain View in the app — 9 000 of them on a benchmark create.
+  // The other half of keying by tag: a pressable IS an RCTView
+  // A registry keyed by the Fabric name would give the press machine to every plain View in the app
   it('leaves a plain view of the same Fabric name alone', () => {
     registerPressableBehavior();
     const plain = createElement(PRESSABLE_VIEW_NAME);
@@ -355,6 +326,25 @@ describe('pressable host behavior', () => {
 
     press(node);
     vi.advanceTimersByTime(499);
+    expect(onLongPress).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(1);
+    expect(onLongPress).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  // Минимум в 10ms из `Pressability-test`, нулевая задержка не стреляет сразу
+  it('floors delayLongPress at 10ms', () => {
+    vi.useFakeTimers();
+    registerPressableBehavior();
+    const onLongPress = vi.fn();
+    const node = makePressable();
+    routeProp(node, 'onLongPress', onLongPress);
+    routeProp(node, 'delayLongPress', 0);
+    mount(node);
+
+    press(node);
+    vi.advanceTimersByTime(9);
     expect(onLongPress).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(1);

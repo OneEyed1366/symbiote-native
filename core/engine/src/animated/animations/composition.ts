@@ -2,8 +2,7 @@
 // AnimatedImplementation.js, JS orchestration only. `timing` /
 // `spring` / `decay` wrap a value with a fresh driver and return a
 // CompositeAnimation; `parallel` / `sequence` / `stagger` / `loop` / `delay`
-// orchestrate those. Vector (XY/Color) handling, tracking, AnimatedEvent and
-// every native-loop branch are dropped.
+// orchestrate those. XY and Color values fan out into one animation per channel
 
 import type { IEndCallback, IEndResult } from '../animation';
 import { dlog } from '../../debug';
@@ -14,11 +13,20 @@ import { AnimatedTracking } from './tracking';
 import { TimingAnimation, type ITimingAnimationConfig } from './timing';
 import { SpringAnimation, type ISpringAnimationConfig } from './spring';
 import { DecayAnimation, type IDecayAnimationConfig } from './decay';
+import {
+  hasScalarTarget,
+  hasScalarVelocity,
+  splitChannels,
+  type IChannelPart,
+  type IVectorNumbers,
+  type IVectorTarget,
+  type IVectorValue,
+} from './vector';
 
 // A started animation that can be stopped or reset. `start` takes an optional
 // completion callback; `isLooping` is threaded through sequences so an inner
 // timing knows it is part of an infinite loop.
-export interface ICompositeAnimation {
+export type ICompositeAnimation = {
   start(callback?: IEndCallback, isLooping?: boolean): void;
   stop(): void;
   reset(): void;
@@ -28,7 +36,7 @@ export interface ICompositeAnimation {
   // offload (a single timing/spring). A sequence/parallel has no native loop, so
   // loop() falls back to JS restart. Internal (loop()'s use only).
   _nativeLoop?(iterations: number, callback?: IEndCallback): boolean;
-}
+};
 
 // A loop offloads to native only when the driver was asked for the native path AND
 // the module is present; otherwise the JS-restart loop must run (a JS timing runs
@@ -37,9 +45,9 @@ function canOffloadLoop(config: { useNativeDriver?: boolean }): boolean {
   return config.useNativeDriver === true && isNativeAnimatedAvailable();
 }
 
-interface IWithOnComplete {
+type IWithOnComplete = {
   onComplete?: IEndCallback;
-}
+};
 
 // Fold a config's onComplete into the caller's callback so both fire. Mirrors
 // RN's _combineCallbacks.
@@ -68,7 +76,69 @@ export type ISpringConfig = Omit<ISpringAnimationConfig, 'toValue'> & {
 } & IWithOnComplete;
 export type IDecayConfig = IDecayAnimationConfig & IWithOnComplete;
 
+export type IVectorTimingConfig = Omit<ITimingConfig, 'toValue'> & {
+  toValue: IVectorTarget;
+};
+export type IVectorSpringConfig = Omit<ISpringConfig, 'toValue'> & {
+  toValue: IVectorTarget;
+};
+export type IVectorDecayConfig = Omit<IDecayConfig, 'velocity'> & {
+  velocity: IVectorNumbers;
+};
+
+export const isTimingConfig = (
+  candidate: unknown,
+): candidate is ITimingConfig => hasScalarTarget(candidate);
+export const isSpringConfig = (
+  candidate: unknown,
+): candidate is ISpringConfig => hasScalarTarget(candidate);
+const isDecayConfig = (candidate: unknown): candidate is IDecayConfig =>
+  hasScalarVelocity(candidate);
+
+// XY и Color идут по одной анимации на канал, скаляр - напрямую
+function animateValue<TConfig>(
+  value: AnimatedValue | IVectorValue,
+  config: object,
+  isScalarConfig: (candidate: unknown) => candidate is TConfig,
+  make: (value: AnimatedValue, config: TConfig) => ICompositeAnimation,
+): ICompositeAnimation {
+  if (value instanceof AnimatedValue) {
+    if (!isScalarConfig(config)) throw new Error(VECTOR_FOR_SCALAR_MESSAGE);
+    return make(value, config);
+  }
+  return acrossChannels(splitChannels(value, config, isScalarConfig), make);
+}
+
+// Без `stopTogether: false` при tracking второй канал остановят раньше, чем он обновится
+function acrossChannels<TConfig>(
+  parts: readonly IChannelPart<TConfig>[],
+  make: (value: AnimatedValue, config: TConfig) => ICompositeAnimation,
+): ICompositeAnimation {
+  return parallel(
+    parts.map(part => make(part.value, part.config)),
+    { stopTogether: false },
+  );
+}
+
+const VECTOR_FOR_SCALAR_MESSAGE =
+  'Animated: a single value cannot animate toward a vector';
+
 export function timing(
+  value: AnimatedValue,
+  config: ITimingConfig,
+): ICompositeAnimation;
+export function timing(
+  value: IVectorValue,
+  config: IVectorTimingConfig,
+): ICompositeAnimation;
+export function timing(
+  value: AnimatedValue | IVectorValue,
+  config: ITimingConfig | IVectorTimingConfig,
+): ICompositeAnimation {
+  return animateValue(value, config, isTimingConfig, scalarTiming);
+}
+
+function scalarTiming(
   value: AnimatedValue,
   config: ITimingConfig,
 ): ICompositeAnimation {
@@ -76,6 +146,7 @@ export function timing(
     start(callback?: IEndCallback): void {
       const onEnd = combineCallbacks(callback, config);
       const target = config.toValue;
+      value.stopTracking();
       if (target instanceof AnimatedNode) {
         value.track(
           new AnimatedTracking(
@@ -116,11 +187,27 @@ export function timing(
 export function spring(
   value: AnimatedValue,
   config: ISpringConfig,
+): ICompositeAnimation;
+export function spring(
+  value: IVectorValue,
+  config: IVectorSpringConfig,
+): ICompositeAnimation;
+export function spring(
+  value: AnimatedValue | IVectorValue,
+  config: ISpringConfig | IVectorSpringConfig,
+): ICompositeAnimation {
+  return animateValue(value, config, isSpringConfig, scalarSpring);
+}
+
+function scalarSpring(
+  value: AnimatedValue,
+  config: ISpringConfig,
 ): ICompositeAnimation {
   return {
     start(callback?: IEndCallback): void {
       const onEnd = combineCallbacks(callback, config);
       const target = config.toValue;
+      value.stopTracking();
       if (target instanceof AnimatedNode) {
         value.track(
           new AnimatedTracking(
@@ -159,13 +246,37 @@ export function spring(
 export function decay(
   value: AnimatedValue,
   config: IDecayConfig,
+): ICompositeAnimation;
+export function decay(
+  value: IVectorValue,
+  config: IVectorDecayConfig,
+): ICompositeAnimation;
+export function decay(
+  value: AnimatedValue | IVectorValue,
+  config: IDecayConfig | IVectorDecayConfig,
+): ICompositeAnimation {
+  return animateValue(value, config, isDecayConfig, scalarDecay);
+}
+
+function scalarDecay(
+  value: AnimatedValue,
+  config: IDecayConfig,
 ): ICompositeAnimation {
   return {
     start(callback?: IEndCallback): void {
+      value.stopTracking();
       value.animate(
         new DecayAnimation(config),
         combineCallbacks(callback, config),
       );
+    },
+    _nativeLoop(iterations: number, callback?: IEndCallback): boolean {
+      if (!canOffloadLoop(config)) return false;
+      value.animate(
+        new DecayAnimation({ ...config, iterations }),
+        combineCallbacks(callback, config),
+      );
+      return true;
     },
     stop(): void {
       value.stopAnimation();
@@ -176,10 +287,10 @@ export function decay(
   };
 }
 
-export interface IParallelConfig {
+export type IParallelConfig = {
   // If one animation is stopped, stop all of them. Default: true.
   stopTogether?: boolean;
-}
+};
 
 export function parallel(
   // `| undefined` entries: `AnimatedImplementation.js`'s `parallelImpl` treats a falsy array
@@ -190,7 +301,7 @@ export function parallel(
   let doneCount = 0;
   // Track per-animation completion so stop() calls each at most once.
   const hasEnded: Record<number, boolean> = {};
-  const stopTogether = !(config !== undefined && config.stopTogether === false);
+  const shouldStopTogether = config?.stopTogether !== false;
 
   const result: ICompositeAnimation = {
     start(callback?: IEndCallback, isLooping?: boolean): void {
@@ -208,7 +319,7 @@ export function parallel(
             callback?.(endResult);
             return;
           }
-          if (!endResult.finished && stopTogether) {
+          if (!endResult.finished && shouldStopTogether) {
             result.stop();
           }
         };
@@ -299,10 +410,10 @@ export function stagger(
   );
 }
 
-export interface ILoopAnimationConfig {
+export type ILoopAnimationConfig = {
   iterations?: number;
   resetBeforeIteration?: boolean;
-}
+};
 
 // TODO(rn-parity, low priority): vendor's `loopImpl`/`sequenceImpl`/`parallelImpl` each throw
 // ("Loops run using the native driver cannot contain Animated.X animations") from a

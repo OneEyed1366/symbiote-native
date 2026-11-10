@@ -146,25 +146,35 @@ It also runs in **lint-staged** (`lint-staged.config.js`) on any
   dedicated gotcha below) blocks an exotic (URL/git) dependency anywhere in a shared pnpm-workspace
   lockfile, which is exactly what re-adding it would risk.
 
-- **`blockExoticSubdeps` — a pnpm 10.26+ supply-chain guard that blocks URL/git deps ANYWHERE
-  in a shared workspace resolution, not just where you put one.** `.npmrc` key
-  `block-exotic-subdeps`, default `true`, **boolean-only — no per-package allowlist** (confirmed
-  by reading pnpm's own bundled source, `pnpm.mjs`, and its `blog/releases/10.26.md`). It allows
-  a **direct** dependency to use an exotic protocol (a tarball URL, `git+ssh:`, etc.) but blocks
-  any **transitive** one. The trap: a `pkg-pr-new`-published preview tarball's own internal
-  cross-package deps (e.g. `@symbiote-native/angular`'s dependency on `@symbiote-native/components`)
-  get rewritten to sibling pkg.pr.new URLs by the publish tool, since it can't emit
-  `workspace:*` into a published artifact — so installing ONE pkg.pr.new URL as a direct
-  dependency anywhere in a pnpm workspace can still fail with
-  `[ERR_PNPM_EXOTIC_SUBDEP] Exotic dependency "..." (resolved via url) is not allowed in
-  subdependencies`, and because pnpm resolves the WHOLE workspace in one lockfile pass, this
-  poisons every OTHER workspace project's install too — even ones that never touched a URL
-  dependency themselves. There's no scoped fix (no allowlist, and a nested `.npmrc` doesn't
-  isolate a workspace member from the shared resolution pass) — the only real fix is keeping
-  exotic-URL dependencies out of the pnpm workspace altogether (see `examples/*` above) or
-  disabling the guard repo-wide (`block-exotic-subdeps: false` — a real security-policy
-  tradeoff, don't flip it silently). The pkg.pr.new URLs that trigger this are produced by the
-  canary publish flow — see `symbiote-release-publishing` for how/when they're generated.
+- **`blockExoticSubdeps`: a pnpm 10.26+ supply-chain guard.** It blocks URL/git deps anywhere in a
+  shared workspace resolution, not just where you put one.
+  `.npmrc` key `block-exotic-subdeps`, default `true`, boolean-only, no per-package allowlist
+  (confirmed in pnpm's bundled source `pnpm.mjs` and `blog/releases/10.26.md`).
+  A **direct** dependency may use an exotic protocol (tarball URL, `git+ssh:`, etc.). Any **transitive** one is blocked.
+  The trap: the internal cross-package deps of a `pkg-pr-new` preview tarball
+  (e.g. `@symbiote-native/angular` on `@symbiote-native/components`) are rewritten to sibling pkg.pr.new URLs.
+  The publish tool can't emit `workspace:*` into a published artifact.
+  So installing ONE pkg.pr.new URL as a direct dependency anywhere in a pnpm workspace can still fail with
+  `[ERR_PNPM_EXOTIC_SUBDEP] Exotic dependency "..." (resolved via url) is not allowed in subdependencies`.
+  pnpm resolves the WHOLE workspace in one lockfile pass.
+  So this poisons every OTHER workspace project's install too, even ones that never touched a URL dependency.
+  There is no scoped fix: no allowlist, and a nested `.npmrc` doesn't isolate a member from the shared pass.
+  The real fix is keeping exotic-URL dependencies out of the pnpm workspace (see `examples/*` above).
+  The other option is disabling the guard repo-wide (`block-exotic-subdeps: false`).
+  That is a real security-policy tradeoff, so don't flip it silently.
+  The canary publish flow produces the pkg.pr.new URLs that trigger this; see `symbiote-release-publishing`.
+
+- **Never add an alias of a package that other packages peer on (`typescript7: npm:typescript@7`).**
+  The alias's real name is `typescript`, so pnpm feeds it into peer-resolution: `@react-native-community/cli`
+  becomes `(typescript@7.0.2)`, `react-native@0.86.0` forks into two `.pnpm` copies (`core/engine` on the
+  ts7 one, root on ts6), and the singleton invariant breaks. Symptom (2026-10-13): vitest
+  `layout-animation.test.ts > does nothing when the platform disables animations`, because the spy lands on
+  one `Platform` while `LayoutAnimation` reads the other. Check: `ls node_modules/.pnpm | grep -c '^react-native@'` must be 1.
+- **TypeScript 7 (native Go port) status, 2026-10-13: not adopted.** 7.0 has no programmatic API (due in 7.1),
+  so `ngc`, `typescript-eslint`, `svelte2tsx`, `vue-tsc` stay on `~6.0.0`. Measured: cold `tsc --build` 1.5 s vs
+  8.4 s, zero errors, `.d.ts` differ only in quote style, `prepublish-build` + `check:bundle-isolation` green.
+  Only the install shape is open: no alias in the dep graph (see above), and rewriting `typecheck` in the 74
+  package.json files trips the changeset gate (one patch changeset naming every package).
 
 ## Verify
 

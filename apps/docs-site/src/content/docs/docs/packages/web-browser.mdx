@@ -14,19 +14,6 @@ can reach it, not just React. Like [secure store](/docs/packages/secure-store/) 
 state, so the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
 `core`.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 ## Installation
 
 ```sh
@@ -38,16 +25,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --w
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-web-browser` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project (it
-bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-web-browser`'s native code is discovered by `expo-modules-autolinking`,
   a different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
   flow either, since this project never installs the `expo` meta-package. Follow
   [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -290,11 +277,12 @@ to the system browser. iOS resolves once the browser closes; Android resolves wi
 </Tabs>
 
 iOS uses `ASWebAuthenticationSession`, so the system asks the user whether your app may
-authenticate with that url, and the redirect URI registered with your authorization server has to
-use your app's own scheme (`myapp://`, not `https://`). Android has no equivalent native API, so it
-is polyfilled with a Custom Tab racing a `Linking` deep-link listener against an `AppState` return
-to the foreground. Adding your own `Linking` listener for the same redirect is unnecessary on both
-platforms, and on iOS can have side effects.
+authenticate with that url. The redirect URI registered with your authorization server has to
+use your app's own scheme (`myapp://`, not `https://`).
+
+Android has no equivalent native API, so it is polyfilled with a Custom Tab racing a `Linking`
+deep-link listener against an `AppState` return to the foreground. Adding your own `Linking`
+listener for the same redirect is unnecessary on both platforms, and on iOS can have side effects.
 
 ### Warming up the Custom Tabs service
 
@@ -379,8 +367,8 @@ reads only these two.
   with Safari, so the auth session is the one that sees the user's signed-in state.
 - **`getCustomTabsSupportingBrowsersAsync` throws on iOS rather than resolving empty.** iOS's
   native module registers its no-op stub as `getCustomTabsSupportingBrowsers`, without the `Async`
-  suffix, so the availability check fires before the "not Android, return an empty result" branch
-  is reached. `expo-web-browser` behaves identically — the guard order is kept deliberately so the
+  suffix. So the availability check fires before the "not Android, return an empty result" branch
+  is reached. `expo-web-browser` behaves identically. The guard order is kept deliberately so the
   two cannot drift. Branch on `Platform.OS === 'android'` yourself if you call it cross-platform.
 - **Android never reports that the browser closed.** `openBrowserAsync` resolves at launch. If you
   need to know when the user came back, that is exactly what `openAuthSessionAsync` polyfills, via
@@ -411,10 +399,12 @@ call `dismissBrowser` when it fires, then parse the redirect URL.
 share cookies with Safari, so use `openAuthSessionAsync` for login and `openBrowserAsync` only to
 show a page.
 
-Sources: [expo/expo#23781 auth session returns dismiss on redirect, Android only](https://github.com/expo/expo/issues/23781),
-[expo/expo#6289 openAuthSessionAsync returns dismiss after a successful login](https://github.com/expo/expo/issues/6289),
-[expo/expo#12044 dismiss on Android standalone app](https://github.com/expo/expo/issues/12044),
-[expo/expo#6679 dismiss before the browser opens](https://github.com/expo/expo/issues/6679).
+Sources:
+
+- [expo/expo#23781 auth session returns dismiss on redirect, Android only](https://github.com/expo/expo/issues/23781)
+- [expo/expo#6289 openAuthSessionAsync returns dismiss after a successful login](https://github.com/expo/expo/issues/6289)
+- [expo/expo#12044 dismiss on Android standalone app](https://github.com/expo/expo/issues/12044)
+- [expo/expo#6679 dismiss before the browser opens](https://github.com/expo/expo/issues/6679)
 
 ## Not ported
 
@@ -457,11 +447,13 @@ stateless enough (see `barrel-passthrough.md`) that `package.json`'s `exports` p
 subpath straight at `./src/core/index.ts` rather than a real re-export file. `./angular` is the
 one exception, keeping its own `src/angular/index.ts` and ngc/AOT build as always.
 
-Same shape as [secure store](/docs/packages/secure-store/)'s and
-[local auth](/docs/packages/local-auth/)'s adapter entries: single-file re-exports with no
-lifecycle code. The Android auth-session polyfill does hold live state — a `Linking` subscription
-and an `AppState` listener — but both belong to one in-flight promise inside the core and are torn
-down when it settles, so no caller ever subscribes or cleans up, and there is nothing for a hook,
-composable, or service to own. The native code itself is never vendored or copied —
-`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
-guide](/docs/howtos/expo-native-module-setup/)).
+The adapter entries have the same shape as [secure store](/docs/packages/secure-store/)'s and
+[local auth](/docs/packages/local-auth/)'s: single-file re-exports with no lifecycle code.
+
+The Android auth-session polyfill does hold live state, a `Linking` subscription and an `AppState`
+listener. Both belong to one in-flight promise inside the core and are torn down when it settles.
+So no caller ever subscribes or cleans up, and there is nothing for a hook, composable, or service
+to own.
+
+The native code itself is never vendored or copied. `expo-modules-autolinking` resolves it straight
+out of `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

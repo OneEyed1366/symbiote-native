@@ -11,21 +11,8 @@ fingerprint, face or passcode. `@symbiote-native/secure-store` wraps
 Keychain, Android Keystore) so every SymbioteNative adapter can reach it, not just React. Like
 [store review](/docs/packages/store-review/) and [local auth](/docs/packages/local-auth/), every
 export is a free function with no per-instance state, so there is no hook/composable/service to
-wrap — the React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
+wrap. The React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the same
 `core`.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 ## Installation
 
@@ -38,16 +25,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --s
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-secure-store` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-secure-store`'s native code is discovered by `expo-modules-autolinking`,
   a different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -315,7 +302,7 @@ native module declares none of them, so they read `undefined` there.
 - **A missing key reads `null`, not an error.** `JSON.parse(null)` returns `null` too, so guard
   with `?? 'null'` or an explicit check before using the result.
 - **The synchronous pair blocks the JavaScript thread.** With `requireAuthentication` on, the app
-  stays unresponsive until the user authenticates — prefer the async functions unless you
+  stays unresponsive until the user authenticates. Prefer the async functions unless you
   genuinely need a value during a synchronous render path.
 
 ## Common questions
@@ -355,7 +342,8 @@ packages/secure-store/src/
 
 Same shape as [store review](/docs/packages/store-review/)'s and
 [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file re-exports with no
-lifecycle code, since every export is a stateless free function — there is nothing for a hook,
+lifecycle code, since every export is a stateless free function.
+There is nothing for a hook,
 composable, rune, or service to subscribe to or clean up. The native code itself is never vendored or
-copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
+copied: `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
 setup guide](/docs/howtos/expo-native-module-setup/)).

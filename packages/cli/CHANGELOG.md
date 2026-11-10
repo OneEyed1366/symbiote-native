@@ -1,5 +1,11 @@
 # @symbiote-native/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- [#96](https://github.com/OneEyed1366/symbiote-native/pull/96) [`c23cef9`](https://github.com/OneEyed1366/symbiote-native/commit/c23cef9da297442d2faf32f96ccf2d651b3a8b1e) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `--reanimated` adds `@symbiote-native/reanimated` with its two native peers, and writes `react-native-worklets/plugin` last in `babel.config.js`, on `new` and on `add`.
+
 ## 0.4.0
 
 ### Minor Changes

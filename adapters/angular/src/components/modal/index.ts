@@ -31,6 +31,7 @@ import {
   renderModal,
   resolveAccessibilityProps,
   shouldRenderModal,
+  warnAboutModalProps,
   type IAccessibilityProps,
   type IAriaProps,
   type IModalAnimationType,
@@ -42,11 +43,16 @@ import {
   dlog,
   isSymbioteEvent,
   Platform,
+  type IColorValue,
   type IStyleProp,
   type ISymbioteEvent,
   type IViewStyle,
 } from '@symbiote-native/engine';
 import { AccessibilityEventsBase } from '../../accessibility-events';
+import {
+  ListScopeProvider,
+  NO_LIST_SCOPE,
+} from '../virtualized-list/nested-scope';
 import {
   anchorHostStyle,
   ModalHost,
@@ -63,25 +69,26 @@ export type {
 } from '@symbiote-native/components';
 
 // Mirrors React's IModalProps minus children (Angular takes children via <ng-content>).
-export interface IAngularModalProps extends IAccessibilityProps, IAriaProps {
-  visible?: boolean;
-  transparent?: boolean;
-  backdropColor?: string;
-  animationType?: IModalAnimationType;
-  presentationStyle?: IModalPresentationStyle;
-  supportedOrientations?: ReadonlyArray<IModalOrientation>;
-  hardwareAccelerated?: boolean;
-  statusBarTranslucent?: boolean;
-  navigationBarTranslucent?: boolean;
-  allowSwipeDismissal?: boolean;
-  onShow?: () => void;
-  onDismiss?: () => void;
-  onRequestClose?: () => void;
-  // The engine hands every listener the ISymbioteEvent wrapper, so the orientation is read at
-  // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
-  onOrientationChange?: (event: ISymbioteEvent) => void;
-  style?: IStyleProp<IViewStyle>;
-}
+export type IAngularModalProps = IAccessibilityProps &
+  IAriaProps & {
+    visible?: boolean;
+    transparent?: boolean;
+    backdropColor?: IColorValue;
+    animationType?: IModalAnimationType;
+    presentationStyle?: IModalPresentationStyle;
+    supportedOrientations?: ReadonlyArray<IModalOrientation>;
+    hardwareAccelerated?: boolean;
+    statusBarTranslucent?: boolean;
+    navigationBarTranslucent?: boolean;
+    allowSwipeDismissal?: boolean;
+    onShow?: () => void;
+    onDismiss?: () => void;
+    onRequestClose?: () => void;
+    // The engine hands every listener the ISymbioteEvent wrapper, so the orientation is read at
+    // event.nativeEvent.orientation (IModalOrientationChangeEvent describes that payload).
+    onOrientationChange?: (event: ISymbioteEvent) => void;
+    style?: IStyleProp<IViewStyle>;
+  };
 
 // What the Modal component itself takes as plain @Input()s: the full surface minus the
 // show/dismiss/close/orientation and accessibility events, which it exposes as real @Output()
@@ -107,6 +114,8 @@ export type IAngularModalInputs = Omit<
   ],
   schemas: [CUSTOM_ELEMENTS_SCHEMA],
   imports: [ModalHost, ViewHost, SymbioteHostPropsDirective],
+  // The content sits outside the list's scroll, so a list in it is not nested in that list
+  providers: [{ provide: ListScopeProvider, useValue: NO_LIST_SCOPE }],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (shouldRender) {
@@ -133,7 +142,7 @@ export class Modal
   @Output() readonly requestClose = new EventEmitter<void>();
   @Input() visible?: boolean;
   @Input() transparent?: boolean;
-  @Input() backdropColor?: string;
+  @Input() backdropColor?: IColorValue;
   @Input() animationType?: IModalAnimationType;
   @Input() presentationStyle?: IModalPresentationStyle;
   @Input() supportedOrientations?: ReadonlyArray<IModalOrientation>;
@@ -160,6 +169,18 @@ export class Modal
     this.state = createInitialModalState(isModalVisible(this.visible));
   }
 
+  // RN checks on mount and on every update, a dev build only
+  private warnOnMisuse(): void {
+    warnAboutModalProps({
+      presentationStyle: this.presentationStyle,
+      transparent: this.transparent,
+      navigationBarTranslucent: this.navigationBarTranslucent,
+      statusBarTranslucent: this.statusBarTranslucent,
+      allowSwipeDismissal: this.allowSwipeDismissal,
+      onRequestClose: this.requestClose.observed,
+    });
+  }
+
   // Bridges the non-reactive @Input fields `hostProps` reads into the reactive graph, so it can
   // memoize. Plain fields read inside a computed() are UNTRACKED - something must signal "a
   // dependency changed" or the bag goes stale. Signal inputs would do this natively, but `input()`
@@ -174,6 +195,7 @@ export class Modal
     // Before the keep-alive early-return below: this is the single moment Angular has finished
     // writing every changed @Input, and `hostProps` depends on far more than `visible`.
     this.hostPropsRevision.update(revision => revision + 1);
+    this.warnOnMisuse();
     const visibleChange = changes.visible;
     // First change is reflected by the ngOnInit seed; only later toggles drive the keep-alive.
     if (visibleChange === undefined || visibleChange.firstChange) return;

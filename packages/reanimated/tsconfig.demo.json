@@ -1,0 +1,31 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "composite": false,
+    "declaration": false,
+    "noEmit": true,
+    "jsxImportSource": "@symbiote-native/react",
+    "paths": {
+      "react": ["../../node_modules/react"],
+      "react-native-reanimated": ["./node_modules/react-native-reanimated"],
+      "react-native-reanimated/src/*": [
+        "./node_modules/react-native-reanimated/lib/typescript/*"
+      ],
+      "react-native-worklets": ["./node_modules/react-native-worklets"],
+      "@symbiote-native/react": ["../../adapters/react/src/index.ts"],
+      "@symbiote-native/react/jsx-runtime": [
+        "../../adapters/react/src/jsx-runtime.ts"
+      ],
+      "@symbiote-native/react/jsx-dev-runtime": [
+        "../../adapters/react/src/jsx-dev-runtime.ts"
+      ],
+      "@symbiote-native/reanimated": ["./src/core/index.ts"],
+      "@symbiote-native/reanimated/react": ["./src/react/index.ts"]
+    }
+  },
+  "include": [
+    "../../examples/react/screens/reanimated",
+    "../../examples/react/components/ActionButton.tsx"
+  ]
+}

@@ -2,68 +2,54 @@ import { Drawer, useDrawerNavigation } from '@symbiote-native/navigation/react';
 import type {
   IDrawerDescriptorMap,
   IDrawerNavigatorHandle,
+  IScreenOptions,
 } from '@symbiote-native/navigation/react';
 import type { IDrawerRouterState } from '@symbiote-native/navigation';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { LINE_COLOR } from '../navigation-lines';
 import { ActionButton } from '../components/ActionButton';
+import { ScreenHero } from '../components/ScreenHero';
+import { DrawerRecipes } from './drawer/DrawerRecipes';
+import { DrawerPanelContext } from './drawer/drawer-panel';
+import {
+  DEFAULT_DRAWER_SETTINGS,
+  drawerPropsOf,
+} from './drawer/drawer-settings';
+import { usePanelState } from './panel';
 
-const drawerLineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
+export const drawerDemoScreenOptions: IScreenOptions = {
+  title: 'Drawer Demo',
+  headerShown: true,
+  headerTintColor: LINE_COLOR.structure,
+  headerTranslucent: true,
+  headerTitleColor: '#ffffff',
+  headerStyle: { backgroundColor: '#0b1622' },
+  headerUserInterfaceStyle: 'dark',
+};
 
-// Home/Settings are each Drawer's own top-level screen component; useDrawerNavigation() reads the
-// enclosing Drawer's handle (already narrowed to IDrawerNavigatorHandle) straight from context.
+const DRAWER_STYLE = { backgroundColor: '#13243a' };
+
+// `useDrawerNavigation()` reads the handle of the enclosing Drawer from context
 function DrawerHomeScreen() {
-  const navigation = useDrawerNavigation();
   return (
-    <safe-area-view className="screen">
-      <view className="section">
-        <view className={`line-tag line-tag-${drawerLineInfo.line}`}>
-          <text className="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</text>
-        </view>
-        <view className="hero-card">
-          <view
-            className="hero-badge"
-            style={{ backgroundColor: LINE_COLOR.structure }}
-          >
-            <text className="hero-badge-text">DR</text>
-          </view>
-          <view className="hero-copy">
-            <text className="hero-title">Drawer</text>
-            <text className="hero-body">
-              A swipeable drawer sliding in from the right, driven by the
-              navigator's own gesture handler.
-            </text>
-          </view>
-        </view>
-        <text className="info-text">
-          drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
-          or use a button
-        </text>
-        <ActionButton
-          testID="drawer-open"
-          title="Open drawer"
-          onPress={() => navigation.openDrawer()}
-          color={LINE_COLOR.structure}
+    <scroll-view className="screen" contentInsetAdjustmentBehavior="automatic">
+      <view className="scroll-content">
+        <ScreenHero
+          route={ROUTE_NAME.DrawerDemo}
+          title="Drawer"
+          body="A swipeable drawer driven by the navigator's own gesture handler. Change its props below and swipe from the chosen edge."
         />
-        <ActionButton
-          testID="drawer-toggle"
-          title="Toggle drawer"
-          onPress={() => navigation.toggleDrawer()}
-          color={LINE_COLOR.structure}
-        />
+        <DrawerRecipes />
       </view>
-    </safe-area-view>
+    </scroll-view>
   );
 }
 
 function DrawerSettingsScreen() {
   const navigation = useDrawerNavigation();
   return (
-    <safe-area-view className="screen">
-      <view className="section">
-        <view className={`line-tag line-tag-${drawerLineInfo.line}`}>
-          <text className="line-tag-text">{`${drawerLineInfo.code} · ${drawerLineInfo.label}`}</text>
-        </view>
+    <scroll-view className="screen" contentInsetAdjustmentBehavior="automatic">
+      <view className="scroll-content">
         <text className="section-label">Drawer demo · Settings</text>
         <ActionButton
           testID="drawer-close-from-settings"
@@ -72,7 +58,7 @@ function DrawerSettingsScreen() {
           color={LINE_COLOR.structure}
         />
       </view>
-    </safe-area-view>
+    </scroll-view>
   );
 }
 
@@ -109,31 +95,28 @@ function renderDrawerContent({
   );
 }
 
-/**
- * Drawer demo: a swipeable Drawer navigator with 2 Drawer.Screens, a non-default
- * drawerPosition ('right') and drawerType ('slide') to prove those props actually flow through
- * to render-drawer.ts's geometry, plus imperative open/toggle/close buttons alongside the swipe
- * gesture. renderDrawerContent supplies the menu panel (Drawer ships no built-in one).
- */
+// The panel lives here, above the Drawer, so its two screens share it and it outlives a switch
 export function DrawerDemoScreen() {
+  const panel = usePanelState(DEFAULT_DRAWER_SETTINGS);
   return (
-    <Drawer
-      initialRouteName="Home"
-      drawerPosition="right"
-      drawerType="slide"
-      renderDrawerContent={renderDrawerContent}
-      drawerStyle={{ backgroundColor: '#13243a' }}
-    >
-      <Drawer.Screen
-        name="Home"
-        component={DrawerHomeScreen}
-        options={{ title: 'Home', drawerLabel: 'Home' }}
-      />
-      <Drawer.Screen
-        name="Settings"
-        component={DrawerSettingsScreen}
-        options={{ title: 'Settings', drawerLabel: 'Settings' }}
-      />
-    </Drawer>
+    <DrawerPanelContext.Provider value={panel}>
+      <Drawer
+        initialRouteName="Home"
+        {...drawerPropsOf(panel.settings)}
+        renderDrawerContent={renderDrawerContent}
+        drawerStyle={DRAWER_STYLE}
+      >
+        <Drawer.Screen
+          name="Home"
+          component={DrawerHomeScreen}
+          options={{ title: 'Home', drawerLabel: 'Home' }}
+        />
+        <Drawer.Screen
+          name="Settings"
+          component={DrawerSettingsScreen}
+          options={{ title: 'Settings', drawerLabel: 'Settings' }}
+        />
+      </Drawer>
+    </DrawerPanelContext.Provider>
   );
 }

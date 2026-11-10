@@ -1,8 +1,6 @@
-// Keyboard module: the first consumer of the native->JS event bridge. Native
-// emits keyboard notifications (show/hide/changeFrame) into the device hub; this
-// subscribes through a NativeEventEmitter bound to the KeyboardObserver native
-// module, which RN keys its keyboard events off of. Mirrors RN's
-// Libraries/Components/Keyboard/Keyboard.js, slimmed to the parts we need.
+// Keyboard over the `KeyboardObserver` native module, a copy of RN's `Keyboard.js`
+// TODO(rn-port): `dismiss` needs RN's `dismissKeyboard`, which reaches React's renderer
+// So the whole module stays ours until that one call has a renderer-free path
 
 import { createDeviceEventModule } from '../native-modules';
 import {
@@ -11,8 +9,10 @@ import {
   type INativeEventListener,
 } from '../native-events';
 import { dlog } from '../debug';
+import { Platform } from '../platform';
 import { blurTextInput, currentlyFocusedInput } from '../text-input-state';
-import { LayoutAnimation } from '../layout-animation';
+import { coerceLayoutAnimationType } from '../layout-animation';
+import { LayoutAnimation } from '../react-native-host';
 
 // The native module name RN registers the keyboard observer under, confirmed
 // from its spec (specs_DEPRECATED/modules/INativeKeyboardObserver.js:20,
@@ -34,23 +34,23 @@ export type IKeyboardEventName =
 
 // The soft-keyboard frame in screen coordinates. RN's IKeyboardMetrics: the shape
 // carried by a IKeyboardEvent's endCoordinates (and iOS startCoordinates).
-export interface IKeyboardMetrics {
+export type IKeyboardMetrics = {
   screenX: number;
   screenY: number;
   width: number;
   height: number;
-}
+};
 
 // The payload native delivers with each keyboard notification. RN's IKeyboardEvent;
 // the iOS-only fields (startCoordinates / isEventFromThisApp) are optional so the one
 // type covers both platforms. The consumer narrows beyond endCoordinates as needed.
-export interface IKeyboardEvent {
+export type IKeyboardEvent = {
   duration: number;
   easing: string;
   endCoordinates: IKeyboardMetrics;
   startCoordinates?: IKeyboardMetrics;
   isEventFromThisApp?: boolean;
-}
+};
 
 function isKeyboardEvent(payload: unknown): payload is IKeyboardEvent {
   return (
@@ -66,10 +66,10 @@ function isKeyboardEvent(payload: unknown): payload is IKeyboardEvent {
 // (so native starts/stops watching the keyboard as JS subscribes); it satisfies
 // EventEmitterModule. The spec carries no dismiss() (RN dismisses via a separate
 // utility), so dismiss() here is a no-op for the first cut (see Keyboard.dismiss).
-interface INativeKeyboardObserver extends IEventEmitterModule {
+type INativeKeyboardObserver = IEventEmitterModule & {
   addListener(eventType: string): void;
   removeListeners(count: number): void;
-}
+};
 
 // The latest keyboardDidShow event, or null when the keyboard is hidden. RN's
 // `_currentlyShowing`. Kept fresh by an internal self-subscription (see getEmitter):
@@ -77,17 +77,15 @@ interface INativeKeyboardObserver extends IEventEmitterModule {
 // isVisible() / metrics() reads need no native round-trip.
 let currentlyShowing: IKeyboardEvent | null = null;
 
-// Lazily resolved so importing this module has no native side effect: a headless
-// run without a fake __turboModuleProxy still loads it; resolution happens on the
-// first addListener. Null when the module isn't linked.
-//
-// The self-subscription policy that diverges from a plain lazy-resolve+emitter:
-// Keyboard caches the latest show event, clearing on hide (RN's constructor), so
-// isVisible()/metrics() read synchronously with no native round-trip. Bypasses
-// trackSubscription so removeAllListeners never tears down the cache feed.
+// Resolved lazily so importing this module has no native side effect, null when not linked
+
+// Keyboard caches the latest show event and clears it on hide, as RN's constructor does
+// So `isVisible` and `metrics` read synchronously, with no native round-trip
 const deviceEventModule = createDeviceEventModule<INativeKeyboardObserver>({
   moduleName: KEYBOARD_OBSERVER_MODULE,
   moduleLogPrefix: 'Keyboard: KeyboardObserver module',
+  // RN hands the module to the emitter on iOS only
+  bindModuleToEmitter: Platform.select({ ios: true, default: false }),
   onEmitterCreated: emitter => {
     emitter.addListener(KEYBOARD_EVENT.didShow, payload => {
       if (isKeyboardEvent(payload)) currentlyShowing = payload;
@@ -145,7 +143,7 @@ export const Keyboard = {
     );
     LayoutAnimation.configureNext({
       duration,
-      update: { duration, type: LayoutAnimation.coerceType(easing) },
+      update: { duration, type: coerceLayoutAnimationType(easing) },
     });
   },
 

@@ -1,5 +1,19 @@
 # @symbiote-native/css-parser
 
+## 0.6.0
+
+### Minor Changes
+
+- [#96](https://github.com/OneEyed1366/symbiote-native/pull/96) [`c23cef9`](https://github.com/OneEyed1366/symbiote-native/commit/c23cef9da297442d2faf32f96ccf2d651b3a8b1e) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `@keyframes`, `animation` and `transition` compile to the shape Reanimated reads, and keyframes declared in one file reach a class used in another.
+
+  `:hover`, `:focus`, `:focus-within`, `:active` and `:active-deepest` on the last compound of a selector compile to a state of the property they set, such as `opacity: { ':hover': 0.5 }`. The engine joins it with the base value of the same property.
+
+  A state on an ancestor, two states on one compound and a state through a deep combinator are dropped with a warning.
+
+  `:active` is no longer a switched-off selector, and a style with states that nothing serves is refused by the engine in a dev bundle.
+
+- [#96](https://github.com/OneEyed1366/symbiote-native/pull/96) [`c23cef9`](https://github.com/OneEyed1366/symbiote-native/commit/c23cef9da297442d2faf32f96ccf2d651b3a8b1e) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A `.vue` or `.svelte` file that holds a worklet no longer fails the build with `ENOENT`. The Metro transformers compile it under a name that is not on disk, so they now turn the worklets plugin's source maps off for it and keep the options the app set. `relabelForUpstream` is the new css-parser export that does it.
+
 ## 0.5.4
 
 ### Patch Changes

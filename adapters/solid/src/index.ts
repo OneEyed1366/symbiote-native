@@ -4,8 +4,9 @@
 // uses. All Fabric clone-on-write lives in the engine, shared cross-adapter. App code imports
 // @symbiote-native/solid, never react-native.
 //
-// Layer status (symbiote-new-adapter §7): L4 in progress, with full parity on what is exported
-// `Portal` and `createTunnel` sit on the universal renderer, and this barrel grows by layer
+// Layer status (symbiote-new-adapter §7): L4 in progress, the barrel grows a layer at a time
+// Primitives, touch components, lists and the engine runtime modules are at full parity with React
+// `Portal` (same-surface) and `createTunnel` (cross-surface) sit on the universal renderer
 //
 // The two lifecycle primitives are spelled `createColorScheme` / `createWindowDimensions`, not
 // `use*`: in Solid `use*` means consuming something that already exists (useContext,
@@ -61,10 +62,15 @@ export { defineOptionalDescriptorComponent } from './define-optional-descriptor-
 
 // Safe in the barrel (unlike ./bootstrap, which imports react-native): the registry seam itself
 // only reaches the engine and solid-js.
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
   IWrapperComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -75,8 +81,9 @@ export type {
   ITaskCancelProvider,
 } from './modules/app-registry';
 
-// Animated keeps only the list and scroll components, since `Animated.View` and the like are tags
-// Pass the animated value in `style`, and write `<Animated.ScrollView/>` directly, unlike Angular
+// Animated keeps only the list and scroll components, over the engine's value graph
+// The primitives are tags: `<view style={{ opacity: someAnimatedValue }}>` is the whole API
+// Solid's JSX takes `<Animated.ScrollView/>` directly, unlike Angular (dotted-component-tags.md)
 export { StatusBar } from './modules/status-bar';
 export type { IStatusBarProps, IStatusBarStyle } from './modules/status-bar';
 
@@ -102,6 +109,11 @@ export type { ITunnel, ITunnelInProps } from './create-tunnel';
 // the subscription logic; these add only the Solid lifecycle (signal + onCleanup).
 export { createColorScheme } from './primitives/create-color-scheme';
 export { createWindowDimensions } from './primitives/create-window-dimensions';
+export {
+  createAnimatedColor,
+  createAnimatedValue,
+  createAnimatedValueXY,
+} from '@symbiote-native/engine';
 export { createPermissionHook } from './primitives/create-permission-hook';
 export { createResourceHook } from './primitives/create-resource-hook';
 export { defineNativeViewComponent } from './primitives/define-native-view-component';
@@ -125,13 +137,11 @@ export {
   DynamicColorIOS,
   processColor,
 } from '@symbiote-native/engine';
-// The three app-entry seams, wired once on a real host. setNativeViewConfigSource is how a
-// third-party Fabric view auto-derives its metadata:
-//   setNativeViewConfigSource(name => ReactNativeViewConfigRegistry.get(name))
+// Seams wired once on a real host: `setNativeViewConfigSource` derives third-party view configs
+//   `setNativeViewConfigSource(name => ReactNativeViewConfigRegistry.get(name))`
 export {
   setNativeViewConfigSource,
   setColorProcessor,
-  setDeviceEventSource,
 } from '@symbiote-native/engine';
 // Diagnostics gated by DEBUG (<keep_logs_gate_behind_DEBUG>): app code logs through the same seam
 // the engine does, never a bare console.log.
@@ -179,6 +189,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -253,8 +264,9 @@ export type {
   IAccessibilityEventType,
 } from '@symbiote-native/engine';
 
-// Solid's control flow has no DOM dependency, so it is re-exported to keep an app on one import
-// `Switch` and `Match` stay in 'solid-js', as RN's Switch owns that name
+// Control flow from `solid-js` works over the universal renderer as is, `Portal` is our own above
+// `Switch` is RN's component here, so the `Switch`/`Match` pair stays in `solid-js`
+// A lone `Match` would compile and then fail at runtime, so it is withheld too
 export {
   For,
   Index,
@@ -263,3 +275,44 @@ export {
   Suspense,
   SuspenseList,
 } from 'solid-js';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  EventEmitter,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEmitterSubscription,
+  IEventEmitter,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

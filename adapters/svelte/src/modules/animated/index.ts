@@ -21,64 +21,19 @@
 // `style` down to a Symbiote primitive accepts an AnimatedNode by construction.
 
 import {
-  AnimatedValue,
-  AnimatedValueXY,
-  AnimatedColor,
+  AnimatedDrivers,
   AnimatedMock,
-  Easing,
   Platform,
-  timing,
-  spring,
-  decay,
-  parallel,
-  sequence,
-  stagger,
-  loop,
-  delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
 } from '@symbiote-native/engine';
 import FlatList from '../../components/flat-list/index.svelte';
 import SectionList from '../../components/section-list/index.svelte';
-
-// The live, JS-driven driver namespace (real frames). RN's AnimatedImplementation.
-const liveDrivers = {
-  Value: AnimatedValue,
-  ValueXY: AnimatedValueXY,
-  Color: AnimatedColor,
-  Easing,
-  timing,
-  spring,
-  decay,
-  parallel,
-  sequence,
-  stagger,
-  loop,
-  delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
-};
 
 // RN swaps the WHOLE driver namespace for the mock when the host reports isDisableAnimations
 // (reduced motion / test env): the mock keeps the same surface but jumps each animation to its
 // final value synchronously, no frames. Only this half is swapped — the component names below are
 // the same references either way, exactly like RN spreading `...Animated` (impl or mock) over one
 // set of components.
-const drivers = Platform.isDisableAnimations ? AnimatedMock : liveDrivers;
+const drivers = Platform.isDisableAnimations ? AnimatedMock : AnimatedDrivers;
 
 // ANNOTATED, and it is not decoration. svelte2tsx emits each component's type as a
 // module-private `$$IsomorphicComponent`, so an INFERRED object type cannot be written into this
@@ -90,10 +45,10 @@ const drivers = Platform.isDisableAnimations ? AnimatedMock : liveDrivers;
 //
 // Invisible to `tsc --build` — the declaration emit is its own stage (`pnpm pack` ->
 // `scripts/emit-svelte-declarations.mjs`), so this only fails at publish.
-interface IAnimatedNamespace {
+type IAnimatedNamespace = {
   FlatList: typeof import('../../components/flat-list/index.svelte').default;
   SectionList: typeof import('../../components/section-list/index.svelte').default;
-}
+};
 
 export const Animated: IAnimatedNamespace & typeof drivers = {
   FlatList,

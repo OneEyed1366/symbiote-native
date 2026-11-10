@@ -13,12 +13,14 @@ import { mount, unmount } from '@symbiote-native/react';
 import {
   createLiveTree,
   installRecordingFabric,
+  seedWindowDimensions,
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 
 const NATIVE_ID = 'accessory-1';
 const BACKGROUND_COLOR = '#eee';
 const ROOT_TAG = 230;
+const ACCESSORY_STYLE = { flex: 1 };
 
 function App(): ReactElement {
   return (
@@ -27,7 +29,7 @@ function App(): ReactElement {
       <input-accessory-view
         nativeID={NATIVE_ID}
         backgroundColor={BACKGROUND_COLOR}
-        style={{ flex: 1 }}
+        style={ACCESSORY_STYLE}
       >
         <text>Done</text>
       </input-accessory-view>
@@ -37,7 +39,10 @@ function App(): ReactElement {
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
-beforeEach(() => fabric.reset());
+beforeEach(() => {
+  fabric.reset();
+  seedWindowDimensions();
+});
 afterEach(() => unmount(ROOT_TAG));
 
 function accessoryNode(): ILiveNode {
@@ -51,9 +56,7 @@ function accessoryNode(): ILiveNode {
 
 describe('InputAccessoryView', () => {
   describe('Positive — mounts through the real tag -> behavior -> Fabric path', () => {
-    // why: the fold is proven at the unit level in core; this proves the tag path does not drop
-    // or mistranslate any of it on the way to a real Fabric node, and that the engine flattens
-    // the style prop the same way through this mount.
+    // The fold is proven in core, this proves the tag path hands all of it to a real Fabric node
     it('mounts a real RCTInputAccessoryView carrying nativeID, backgroundColor, and flattened style', () => {
       mount(ROOT_TAG, <App />);
       const accessory = accessoryNode();
@@ -62,19 +65,16 @@ describe('InputAccessoryView', () => {
       expect(accessory.payload.flex).toBe(1);
     });
 
-    // why: the fold builds no structural children of its own, so the caller's <text> must be the
-    // host's only child — losing it, or nesting it a level down, is the failure this pins.
-    it('nests the caller-supplied ReactNode children directly under the host', () => {
+    // RN renders the children inside a SafeAreaView that fills the accessory
+    it('nests the caller-supplied ReactNode children in a safe area view', () => {
       mount(ROOT_TAG, <App />);
       const accessory = accessoryNode();
       expect(accessory.children).toHaveLength(1);
-      expect(accessory.children[0].viewName).toBe('RCTText');
+      expect(accessory.children[0].viewName).toBe('SafeAreaView');
+      expect(accessory.children[0].children[0].viewName).toBe('RCTText');
     });
 
-    // why: an InputAccessoryView docks to a TextInput purely by a shared string id (RN
-    // convention, no runtime linking code) — nativeID here must equal inputAccessoryViewID
-    // there. This proves neither primitive's own prop-routing mutates or drops that id
-    // somewhere along its own path when both are mounted together.
+    // The accessory docks to a text input only by the shared id, so neither side may rewrite it
     it('keeps the nativeID <-> inputAccessoryViewID docking pair intact across both', () => {
       mount(ROOT_TAG, <App />);
       const input = live.findLive(

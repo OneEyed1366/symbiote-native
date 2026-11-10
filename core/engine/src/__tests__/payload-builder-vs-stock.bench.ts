@@ -1,11 +1,5 @@
 // OUR payload builder against REACT NATIVE'S OWN, on byte-identical input.
 //
-// The device answers the whole-row question already — stock Create 257.3 ms against Svelte's 234.6
-// on the same 10-node row, with stock sending 87 001 prop keys to our 44 001 — but a row total
-// cannot say whether one PART is behind. The payload builder is the only part of the two stacks
-// that is directly comparable: everything else differs structurally (stock diffs fibers where we
-// replay named ops; stock crosses JSI per node where we fill a buffer). This one function does not.
-//
 // `ReactNativeAttributePayload.create(props, validAttributes)` is exactly what React's Fabric host
 // config calls on the create path, and it is reachable headless — its only imports are
 // `flattenStyle` and `deepDiffer`, both pure JS. `BaseViewConfig.ios` supplies the real
@@ -53,8 +47,8 @@ import {
   registerTextInputBehavior,
 } from '../../../components/src/index.ts';
 
-// `BaseViewConfig.ios` reaches `NativeModules`, which throws at MODULE SCOPE with no bridge config —
-// the Tier-B floor `symbiote-rn-port-elimination` records. A minimal one suffices: the view config
+// `BaseViewConfig.ios` reaches `NativeModules`, which throws at MODULE SCOPE with no bridge config.
+// A minimal one suffices: the view config
 // is a plain object literal and asks the bridge for nothing. Dynamic import, because a static one
 // hoists above the assignment.
 Object.assign(globalThis, {

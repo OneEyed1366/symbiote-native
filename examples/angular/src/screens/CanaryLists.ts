@@ -7,6 +7,7 @@ import {
 } from '@symbiote-native/angular';
 import type { ISymbioteEvent } from '@symbiote-native/angular';
 import { ActionButton } from '../components/ActionButton';
+import { MvcpDivider } from './canary-parts';
 import {
   ACCENT,
   CHIP_GAP,
@@ -110,6 +111,7 @@ export class CanaryRetentionCard {
   imports: [
     ActionButton,
     FlatList,
+    MvcpDivider,
     SYMBIOTE_ELEMENTS,
     VListItemDirective,
     VListSeparatorDirective,
@@ -129,9 +131,8 @@ export class CanaryRetentionCard {
           <text class="list-row-text">{{ label(item) }}</text>
         </view>
       </ng-template>
-      <!-- The divider is list chrome between measured cells: the offset table has to count it -->
       <ng-template vListSeparator>
-        <view class="mvcp-divider" />
+        <MvcpDivider />
       </ng-template>
     </FlatList>
     <ActionButton

@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, computed, signal } from '@angular/core';
 import {
   PortalOutletDirective,
   SYMBIOTE_ELEMENTS,
@@ -29,7 +29,8 @@ import { CanaryRuntimeNotes } from './CanaryRuntimeNotes';
 import { CanaryScrollHeader } from './CanaryScrollHeader';
 import { CanaryStatusBar } from './CanaryStatusBar';
 import { CanaryKeyboardAvoiding, CanaryStyleProps } from './CanaryStyleProps';
-import { ACCENT, LOGO_URI, REFRESH_MS, overlayTunnel } from './canary-shared';
+import { injectPullRefresh } from './canary-hooks';
+import { ACCENT, LOGO_URI, overlayTunnel } from './canary-shared';
 
 @Component({
   selector: 'CanaryScreen',
@@ -94,6 +95,15 @@ import { ACCENT, LOGO_URI, REFRESH_MS, overlayTunnel } from './canary-shared';
         <CanaryRuntimeNotes />
         <CanaryStatusBar />
         <CanaryNativeButtons />
+        <!-- The native spinner shows only while iOS holds the pull, so ours follows the flag -->
+        @if (isRefreshing()) {
+          <view class="refresh-row">
+            <activity-indicator [color]="accent"></activity-indicator>
+            <text class="accent-note">Refreshing…</text>
+          </view>
+        } @else {
+          <text class="muted-center">{{ refreshNote() }}</text>
+        }
         <CanaryCounter [count]="count()" (tap)="increment()" />
         <CanaryControls />
         <AnimatedDemo></AnimatedDemo>
@@ -155,14 +165,14 @@ export class CanaryScreen implements OnInit {
   readonly tunnel = overlayTunnel;
 
   readonly count = signal(0);
-  readonly isRefreshing = signal(false);
-
   readonly increment = (): void => this.count.update(value => value + 1);
 
-  readonly onRefresh = (): void => {
-    this.isRefreshing.set(true);
-    setTimeout(() => this.isRefreshing.set(false), REFRESH_MS);
-  };
+  private readonly pull = injectPullRefresh();
+  readonly isRefreshing = this.pull.isRefreshing;
+  readonly onRefresh = this.pull.onRefresh;
+  readonly refreshNote = computed(
+    () => `pull to refresh · refreshed ${this.pull.refreshes()}×`,
+  );
 
   ngOnInit(): void {
     hide();

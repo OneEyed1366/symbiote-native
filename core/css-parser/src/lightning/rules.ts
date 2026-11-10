@@ -9,11 +9,18 @@ import type {
   StyleRule,
   TransformResult,
 } from 'lightningcss';
+import {
+  keyframesOf,
+  motionToStyle,
+  type IKeyframesByName,
+  type IKeyframesValue,
+  type IPlainStyle,
+  type IRuleStyle,
+} from './animations.ts';
 import { cssWithoutBrokenDeclarations } from './broken-declarations.ts';
 import {
   declarationToStyle,
   type IDeclarationContext,
-  type IStyleObject,
 } from './declarations.ts';
 import {
   createMediaTracker,
@@ -23,6 +30,7 @@ import {
 import { propertyRuleOf } from './property-rule.ts';
 import { isCustomDeclaration, variableOf } from './raw-var.ts';
 import { selectorsToMatches, type ISelectorCombinator } from './selectors.ts';
+import { stateStyle } from './state-rules.ts';
 import { REM_TO_PX, warnOnce } from '../values.ts';
 
 // Dropped whole with the rules inside, as RN answers none of these conditions
@@ -49,7 +57,8 @@ export type IStyleRule = {
   readonly specificity: readonly [number, number, number];
   /** Source order across the file, 0-based, so it breaks a specificity tie */
   readonly order: number;
-  readonly style: IStyleObject;
+  /** A rule on a state writes each value under it, see `./state-rules.ts` */
+  readonly style: IRuleStyle;
   /** Index into `ICompiledCss.conditions`, absent for a rule outside any `@media` */
   readonly cond?: number;
   /** One per gap between tokens, carried but not read yet: the registry matches by token subset */
@@ -90,6 +99,8 @@ export type ICompiledCss = {
 
 type ICollectedRule = {
   readonly tokens: readonly string[];
+  /** The state of the last compound (`:hover`), under which every value of the rule is written */
+  readonly state?: string;
   readonly specificity: readonly [number, number, number];
   readonly combinators: readonly ISelectorCombinator[];
   readonly declarations: readonly Declaration[];
@@ -100,6 +111,7 @@ type ICompileState = {
   readonly filename: string;
   readonly warned: Set<string>;
   readonly collected: ICollectedRule[];
+  readonly keyframeRules: unknown[];
   readonly rootVariables: IRootVariable[];
   readonly properties: ICompiledProperty[];
   readonly media: IMediaTracker;
@@ -195,12 +207,71 @@ function exportedNames(result: TransformResult): Record<string, string> {
   return names;
 }
 
+function keyframesByName(
+  keyframeRules: readonly unknown[],
+  context: IDeclarationContext,
+): IKeyframesByName {
+  const byName = new Map<string, IKeyframesValue>();
+  for (const rule of keyframeRules) {
+    const found = keyframesOf(rule, declaration =>
+      declarationToStyle(declaration, context),
+    );
+    if (found !== null) byName.set(found.name, found.steps);
+  }
+  return byName;
+}
+
+function styleOf(
+  declarations: readonly Declaration[],
+  context: IDeclarationContext,
+  keyframes: IKeyframesByName,
+): IPlainStyle {
+  return declarations.reduce<IPlainStyle>(
+    (style, declaration) => ({
+      ...style,
+      ...(motionToStyle(declaration, keyframes) ??
+        declarationToStyle(declaration, context)),
+    }),
+    {},
+  );
+}
+
+// The file's keyframes ride in the rules array as a rule with no tokens, so every emitter ships
+// them unchanged and the registry finds them for an animation named in another file
+function keyframesCarrier(
+  keyframes: IKeyframesByName,
+  names: Readonly<Record<string, string>>,
+  order: number,
+): IStyleRule | null {
+  if (keyframes.size === 0) return null;
+  const style: IRuleStyle = {};
+  for (const [name, steps] of keyframes) {
+    style[`@keyframes ${names[name] ?? name}`] = steps;
+  }
+  return { tokens: [], specificity: [0, 0, 0], order, style, combinators: [] };
+}
+
 function toRules(
   collected: readonly ICollectedRule[],
   names: Readonly<Record<string, string>>,
   context: IDeclarationContext,
+  state: ICompileState,
 ): { rules: IStyleRule[]; globals: Set<string> } {
   const globals = new Set<string>();
+  const keyframes = keyframesByName(state.keyframeRules, context);
+  const styleFor = (rule: ICollectedRule): IRuleStyle => {
+    const style = styleOf(rule.declarations, context, keyframes);
+    if (rule.state === undefined) return style;
+    return stateStyle(style, rule.state, () =>
+      warnOnce(
+        state.warned,
+        `state-motion:${state.filename}`,
+        `[@symbiote-native/css-parser] ${state.filename}: an animation or a transition is ` +
+          'dropped from a rule on a state, since it cannot hold for one state only. Put it on ' +
+          'the class.',
+      ),
+    );
+  };
   const rules = collected.map((rule, order) => ({
     tokens: rule.tokens.map(token => {
       const renamed = names[token];
@@ -211,16 +282,12 @@ function toRules(
     combinators: rule.combinators,
     order,
     ...(rule.cond === undefined ? {} : { cond: rule.cond }),
-    style: rule.declarations.reduce<IStyleObject>(
-      (style, declaration) => ({
-        ...style,
-        ...declarationToStyle(declaration, context),
-      }),
-      {},
-    ),
+    style: styleFor(rule),
   }));
   // A rule with no declaration left only adds a candidate for the registry to weigh per lookup
-  return { rules: rules.filter(rule => Object.keys(rule.style).length > 0), globals };
+  const painting = rules.filter(rule => Object.keys(rule.style).length > 0);
+  const carrier = keyframesCarrier(keyframes, names, rules.length);
+  return { rules: carrier === null ? painting : [...painting, carrier], globals };
 }
 
 // Kept apart from `compileCssToRules` so the transform call reads on its own
@@ -239,7 +306,15 @@ function createState(
           `\`@${atRule}\` rule that uses it is dropped.`,
       ),
   });
-  return { filename, warned, collected: [], rootVariables: [], properties: [], media };
+  return {
+    filename,
+    warned,
+    collected: [],
+    keyframeRules: [],
+    rootVariables: [],
+    properties: [],
+    media,
+  };
 }
 
 type ICompilePass = {
@@ -269,6 +344,9 @@ function compilePass(
         ),
         media: state.media.onMedia,
         container: state.media.onContainer,
+        keyframes: rule => {
+          state.keyframeRules.push(rule.value);
+        },
         property: ({ value: rule }) => {
           const descriptor = propertyRuleOf(css, rule);
           if (descriptor === null) return;
@@ -285,7 +363,7 @@ function compilePass(
 
   const names = exportedNames(result);
   const context = { filename, ...(remToPx === undefined ? {} : { remToPx }) };
-  const { rules, globals } = toRules(state.collected, names, context);
+  const { rules, globals } = toRules(state.collected, names, context, state);
 
   const compiled = {
     rules,

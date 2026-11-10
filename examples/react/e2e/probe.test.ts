@@ -1,9 +1,8 @@
 import { by, device, element, waitFor } from 'detox';
 
-// The go/no-go probe. It proves Detox attaches to a
-// symbiote-driven tree at the stock RN host: launchApp() must complete the New-Arch startup sync
-// (the #4506 bridgeless-deadlock gate), then a symbiote-rendered native view carrying the canary's
-// existing testID={`resp-chip-${index}`} must be visible, and survive a recommit from a native tap.
+// The go/no-go probe: Detox must attach to a symbiote-driven tree at the stock RN host
+// `launchApp()` completes the New-Arch startup sync (the #4506 bridgeless-deadlock gate)
+// Then a native view with the canary's `resp-chip-${index}` testID is visible and survives a tap
 // App.tsx boots on the navigation demo Menu screen (@symbiote-native/navigation's Stack) — the
 // probe pushes into "Canary" first, the screen carrying resp-chip-0/canary-scroll.
 describe('symbiote attach probe', () => {
@@ -22,6 +21,10 @@ describe('symbiote attach probe', () => {
   it('navigates from the menu into the Canary screen through Fabric', async () => {
     // toExist alone races the Menu screen's own layout pass — the row can exist in the tree
     // a beat before it's laid out/hittable. toBeVisible waits for that to settle.
+    await waitFor(element(by.id('menu-row-FrameworkHub')))
+      .toBeVisible()
+      .withTimeout(10_000);
+    await element(by.id('menu-row-FrameworkHub')).tap();
     await waitFor(element(by.id('menu-row-Canary')))
       .toBeVisible()
       .withTimeout(10_000);

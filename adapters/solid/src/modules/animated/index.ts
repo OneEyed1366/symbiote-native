@@ -21,29 +21,9 @@
 // through graph.__addChild. This file only assembles the surface.
 
 import {
-  AnimatedValue,
-  AnimatedValueXY,
-  AnimatedColor,
+  AnimatedDrivers,
   AnimatedMock,
-  Easing,
   Platform,
-  timing,
-  spring,
-  decay,
-  parallel,
-  sequence,
-  stagger,
-  loop,
-  delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
 } from '@symbiote-native/engine';
 import { FlatList } from '../../components/flat-list';
 import { SectionList } from '../../components/section-list';
@@ -66,36 +46,11 @@ type IAnimatedComponent = ReturnType<typeof createAnimatedComponent>;
 let animatedFlatList: IAnimatedComponent | undefined;
 let animatedSectionList: IAnimatedComponent | undefined;
 
-// The live, JS-driven driver half. RN's AnimatedImplementation.
-const liveDrivers = {
-  Value: AnimatedValue,
-  ValueXY: AnimatedValueXY,
-  Color: AnimatedColor,
-  Easing,
-  timing,
-  spring,
-  decay,
-  parallel,
-  sequence,
-  stagger,
-  loop,
-  delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
-};
-
 // RN swaps the WHOLE driver namespace for the mock when the host reports isDisableAnimations
 // (reduced motion / test env): same surface, every animation jumping to its final value with no
 // frames. The COMPONENTS stay live in both branches — only this half is swapped, exactly as RN
 // spreads `...Animated` over the same component getters.
-const drivers = Platform.isDisableAnimations ? AnimatedMock : liveDrivers;
+const drivers = Platform.isDisableAnimations ? AnimatedMock : AnimatedDrivers;
 
 export const Animated = {
   get FlatList(): IAnimatedComponent {

@@ -5,29 +5,9 @@
 // Vue-driven engine.
 
 import {
-  AnimatedValue,
-  AnimatedValueXY,
-  AnimatedColor,
+  AnimatedDrivers,
   AnimatedMock,
-  Easing,
   Platform,
-  timing,
-  spring,
-  decay,
-  parallel,
-  sequence,
-  stagger,
-  loop,
-  delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
 } from '@symbiote-native/engine';
 import { FlatList } from '../../components/flat-list';
 import { SectionList } from '../../components/section-list';
@@ -58,36 +38,11 @@ const AnimatedScrollView = createAnimatedComponent('scroll-view');
 let animatedFlatList: ReturnType<typeof createAnimatedComponent> | undefined;
 let animatedSectionList: ReturnType<typeof createAnimatedComponent> | undefined;
 
-// The live, JS-driven driver namespace (real frames). RN's AnimatedImplementation.
-const liveDrivers = {
-  Value: AnimatedValue,
-  ValueXY: AnimatedValueXY,
-  Color: AnimatedColor,
-  Easing,
-  timing,
-  spring,
-  decay,
-  parallel,
-  sequence,
-  stagger,
-  loop,
-  delay,
-  add,
-  subtract,
-  multiply,
-  divide,
-  modulo,
-  diffClamp,
-  event,
-  forkEvent,
-  unforkEvent,
-};
-
 // RN swaps the WHOLE driver namespace for the mock when the host reports isDisableAnimations
 // (reduced motion/test env): the mock keeps the same surface but jumps each animation to its
 // final value synchronously, no frames. The animated COMPONENTS stay live in both branches; only
 // the drivers/value/operators/events half is swapped.
-const drivers = Platform.isDisableAnimations ? AnimatedMock : liveDrivers;
+const drivers = Platform.isDisableAnimations ? AnimatedMock : AnimatedDrivers;
 
 export const Animated = {
   View: AnimatedView,

@@ -16,10 +16,10 @@ import {
 const BAR_STYLE = 'dark-content';
 const ROOT_TAG = 270;
 
-interface IRecordedCall {
+type IRecordedCall = {
   method: string;
   args: unknown[];
-}
+};
 
 const recorded: IRecordedCall[] = [];
 
@@ -65,6 +65,10 @@ function App(): ReactElement {
   );
 }
 
+// The stack sends to native once per frame, from `setImmediate`
+const frame = (): Promise<void> =>
+  new Promise(resolve => setImmediate(resolve));
+
 function find(method: string): IRecordedCall | undefined {
   return recorded.find(call => call.method === method);
 }
@@ -75,7 +79,11 @@ beforeEach(() => {
   fabric.reset();
   recorded.length = 0;
 });
-afterEach(() => unmount(ROOT_TAG));
+// Unmounting queues a flush back to the defaults, which has to land before the next case
+afterEach(async () => {
+  unmount(ROOT_TAG);
+  await frame();
+});
 
 describe('StatusBar (iOS)', () => {
   it('renders null — only the app View sits under the container', () => {
@@ -85,29 +93,46 @@ describe('StatusBar (iOS)', () => {
     expect(root.children[0].children, 'and it is empty').toHaveLength(0);
   });
 
-  it('drives setStyle with the bar style and the animated flag', () => {
+  it('drives setStyle with the bar style and the animated flag', async () => {
     mount(ROOT_TAG, <App />);
+    await frame();
     const styleCall = find('setStyle');
     expect(styleCall, 'setStyle was called').toBeDefined();
     expect(styleCall!.args).toEqual([BAR_STYLE, true]);
   });
 
-  it('drives setHidden(true, "fade") for hidden + animated', () => {
+  it('drives setHidden(true, "fade") for hidden + animated', async () => {
     mount(ROOT_TAG, <App />);
+    await frame();
     const hiddenCall = find('setHidden');
     expect(hiddenCall, 'setHidden was called').toBeDefined();
     expect(hiddenCall!.args).toEqual([true, 'fade']);
   });
 
-  it('never calls the network-activity setter when its prop is omitted', () => {
-    mount(ROOT_TAG, <App />);
-    expect(find('setNetworkActivityIndicatorVisible')).toBeUndefined();
+  it('drives the network-activity indicator from its prop', async () => {
+    mount(
+      ROOT_TAG,
+      <view>
+        <StatusBar networkActivityIndicatorVisible />
+      </view>,
+    );
+    await frame();
+    expect(find('setNetworkActivityIndicatorVisible')!.args).toEqual([true]);
   });
 
-  // Proves delegation, not just matching behavior: the statics must be the SAME function
-  // objects the engine exports, not a local reimplementation that happens to produce
-  // identical native calls. A duplicated-but-equivalent body would pass every test above
-  // while still being the bug this fix removes.
+  it('restores the defaults when the component unmounts', async () => {
+    mount(ROOT_TAG, <App />);
+    await frame();
+    recorded.length = 0;
+
+    unmount(ROOT_TAG);
+    await frame();
+
+    expect(find('setStyle')!.args).toEqual(['default', false]);
+    expect(find('setHidden')!.args).toEqual([false, 'none']);
+  });
+
+  // The statics must be the engine's own function objects, a copy would pass every test above
   it('attaches the engine statusBarImperative statics verbatim, not a local reimplementation', () => {
     expect(StatusBar.setBarStyle).toBe(statusBarImperative.setBarStyle);
     expect(StatusBar.setHidden).toBe(statusBarImperative.setHidden);

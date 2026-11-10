@@ -26,10 +26,10 @@ import {
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
-export interface ITransitionProps {
+export type ITransitionProps = {
   duration?: number;
   appear?: boolean;
-}
+};
 
 const DEFAULT_DURATION_MS = 300;
 
@@ -57,9 +57,11 @@ function fadeTo(
   done: () => void,
 ): void {
   const value = opacityOf.get(el) ?? animatedOpacity(el, toValue === 1 ? 0 : 1);
-  timing(value, { toValue, duration }).start(({ finished }) => {
-    if (finished) done();
-  });
+  timing(value, { toValue, duration, useNativeDriver: false }).start(
+    ({ finished }) => {
+      if (finished) done();
+    },
+  );
 }
 
 // This project's native equivalent of Vue's CSS transition classes. Named per-`name`

@@ -125,3 +125,9 @@ For the full working reference — JS driver vs native driver side by side, a
 `PanResponder`-driven drag box, a tracking spring, and a `diffClamp`
 collapsing header — see `AnimatedDemo`/`AnimatedParityDemo` in
 [`examples/react/App.tsx`](https://github.com/OneEyed1366/symbiote-native/blob/master/examples/react/App.tsx).
+
+## When you need worklets
+
+`Animated` runs its curves in JS or on the native driver. For animations driven by shared values on
+the UI thread, layout animations (`entering`, `exiting`, `layout`) or CSS animations, use
+[`@symbiote-native/reanimated`](/docs/packages/reanimated/). It works in all five adapters.

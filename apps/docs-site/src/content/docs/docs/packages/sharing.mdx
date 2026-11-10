@@ -12,19 +12,6 @@ SymbioteNative adapter can reach it, not just React. Outgoing share is two free 
 shared `core`; the incoming half ships as `useIncomingShare` on React, Vue, Svelte and Solid, and
 `injectIncomingShare` on Angular.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 ## Scope: outgoing and incoming share
 
 `expo-sharing` has two halves, and both are ported to every adapter.
@@ -38,7 +25,7 @@ shared `core`; the incoming half ships as `useIncomingShare` on React, Vue, Svel
   type="caution"
   title="Incoming share needs a share target in the host app"
 >
-  The incoming functions return data only once the app carries a share target: an
+  The incoming functions return data only once the app carries a share target. That means an
   iOS Share Extension (a second Xcode target with its own `Info.plist`,
   entitlements and an App Group shared with the app) plus Android intent filters
   on the main activity. Upstream's config plugin generates it. It is native
@@ -71,23 +58,23 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --s
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-sharing` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-sharing`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
 
 The package's `native-link.json` asks `symbiote-expo-link` for the Android Gradle dependency and
-module-map entry on every install. Nothing else is needed: opening the share sheet requires no iOS
-permission, so there is no usage-description string, and the `SharingFileProvider` plus the
+module-map entry on every install. Nothing else is needed. Opening the share sheet requires no iOS
+permission, so there is no usage-description string. The `SharingFileProvider` plus the
 `<queries>` block Android needs on API 30+ ship inside `expo-sharing`'s own manifest and merge
 into your app automatically.
 
@@ -304,7 +291,7 @@ from a file-system API. Anything else throws before the native call is made.
 - **Android runs one share at a time.** Calling `shareAsync` again while a chooser is still open
   rejects rather than queueing.
 - **The iOS share extension is experimental upstream.** It opens the main app target instead of
-  handling the share in its own view controller, which Apple does not officially support and may
+  handling the share in its own view controller. Apple does not officially support this and it may
   stop working in a future iOS release.
 - **The share sheet can only be verified on a device or simulator.** The headless test suite fakes
   the native module, so it proves argument marshalling and the error paths, not the sheet itself.
@@ -312,7 +299,7 @@ from a file-system API. Anything else throws before the native call is made.
 ## Common questions
 
 **Android says "Not allowed to read file under given URL" or "Failed to find configured root".**
-Share a file that lives in the app's own document or cache directory, for example one written with
+Share a file from the app's own document or cache directory, such as one written with
 the [file system](/docs/packages/file-system/) package. A path owned by another app, such as a
 media library asset, can be rejected. Copy it into `Paths.cache` first, then share the copy.
 

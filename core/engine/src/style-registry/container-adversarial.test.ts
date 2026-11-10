@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import { resetContainerTracking } from '../container-tracking';
-import { Dimensions } from '../dimensions';
+import { Dimensions } from '../react-native-host';
 import { deliverDirect } from '../events/delivery';
 import { resetMediaEnvironment } from '../media-environment';
 import { resetMutationBuffer } from '../mutation-buffer';

@@ -12,6 +12,13 @@
 // The base is fully agnostic, so it lives ONCE in @symbiote-native/components
 // (<prop_types_split_agnostic_vs_per_adapter>). Only the class-styling field is per-adapter, and
 // React spells it `className`.
+import type { ReactNode, Ref } from 'react';
 import type { ITextInputProps as ITextInputBaseProps } from '@symbiote-native/components';
+import type { IHostInstance } from '../../host-instance';
 
-export type ITextInputProps = ITextInputBaseProps & { className?: string };
+// `ref` and `children` are framework elements, RN reads a string child as the input's text
+export type ITextInputProps = ITextInputBaseProps & {
+  className?: string;
+  ref?: Ref<IHostInstance>;
+  children?: ReactNode;
+};

@@ -6,6 +6,7 @@
 // per-adapter; everything here is shared so a new adapter reuses it verbatim.
 
 import { AnimatedNode } from './graph';
+import { animatedNodeOrObject } from './object';
 import { AnimatedStyle } from './style';
 
 export function isAnimatedNode(value: unknown): value is AnimatedNode {
@@ -21,25 +22,29 @@ export function readPassthroughStyle(passthrough: unknown): unknown {
   return Reflect.get(passthrough, 'style');
 }
 
-// Replace animated entries in a props map with their current rasterized values so the
-// first paint (and every re-render) carries concrete props. `style` is run through
-// AnimatedStyle so an animated style key resolves to its current number.
+// Заменяет animated-значения в props текущим числом, чтобы первый кадр нёс конкретные props
+// `collapsable: false` как у RN, т.к. у сплющенной вью нет тега для нативного драйвера
 export function reduceProps(
   props: Record<string, unknown>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(props)) {
     const value = props[key];
-    if (key === 'style') {
-      const styleNode = AnimatedStyle.from(value);
-      out[key] = styleNode !== undefined ? styleNode.__getValue() : value;
-    } else if (isAnimatedNode(value)) {
-      out[key] = value.__getValue();
-    } else {
-      out[key] = value;
-    }
+    const node = reducibleNode(key, value);
+    out[key] = node === undefined ? value : node.__getValue();
   }
+  out.collapsable = false;
   return out;
+}
+
+// Дети управляются реконсилером и в props для свёртки не участвуют
+const CHILDREN_PROP = 'children';
+
+// Узел, который сворачивается в текущее значение: `style`, сам узел или вложенный объект
+function reducibleNode(key: string, value: unknown): AnimatedNode | undefined {
+  if (key === CHILDREN_PROP) return undefined;
+  if (key === 'style') return AnimatedStyle.from(value);
+  return animatedNodeOrObject(value);
 }
 
 // A ScrollView / FlatList / SectionList ref captures an imperative handle (RN's

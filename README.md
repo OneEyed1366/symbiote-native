@@ -4,9 +4,11 @@
 
 # SymbioteNative
 
-### Want React Native's stack, but you don't write React? Today you can't.
+### One native core. Any UI framework.
 
-**Stable** | iOS + Android | React, Vue 3, Angular, Svelte, Solid
+Vue, Svelte, Solid, Angular and React drive stock, unforked React Native.
+
+**Stable API** | iOS + Android | React, Vue 3, Angular, Svelte, Solid
 
 [**Docs**](https://docs.symbiote-native.dev) | [Install](#install) | [Demo](#see-it-work) | [vs. NativeScript / Hippy / Lynx](#why-not-nativescript-hippy-or-lynx) | [Benchmarks](#how-fast-against-stock-react-native) | [Architecture](#how-it-works) | [Contributing](./CONTRIBUTING.md)
 
@@ -43,8 +45,8 @@ Pick a framework and you get a working app: Metro configured, the entry seam wir
 autolinking if you want it.
 
 **Start a new app rather than converting one you already have.** The renderer, the Metro config and
-the entry point all differ from a stock RN app, so bolting SymbioteNative onto an existing one is
-more work than moving your screens into a fresh project, and it is not a path we support.
+the entry point all differ from a stock RN app. Bolting SymbioteNative onto an existing one is
+more work than moving your screens into a fresh project. It is not a path we support.
 
 `react-native` stays **your app's own top-level dependency**. SymbioteNative never hides it, it only
 replaces the JS renderer driving it.
@@ -60,9 +62,9 @@ What each framework needs in the build differs, and the CLI writes it for you:
 | [Solid](./adapters/solid)     | `@symbiote-native/solid`   | its `babel-preset` listed **last** in Metro's presets                                                                                                                     |
 
 Every adapter is [on npm](https://www.npmjs.com/org/symbiote-native). Beyond the five adapters and
-the shared `core/` packages, a growing set of companion packages under [`packages/`](./packages)
-covers navigation, third-party native views, and Expo-module wrappers for device, sensor and
-permission APIs — each with its own README.
+the shared `core/` packages, companion packages live under [`packages/`](./packages). They cover
+navigation, third-party native views, and Expo-module wrappers for device, sensor and permission
+APIs. Each has its own README.
 
 ---
 
@@ -136,8 +138,8 @@ older than we are.
 
 The difference is the row you read first. All three alternatives wrote their own native layer, so
 picking one means adopting its ecosystem too. As far as we have verified, SymbioteNative is the only
-one reusing React Native's own unforked Fabric/JSI/Yoga pipeline as the shared native backend: Meta
-keeps maintaining the native half, upstream releases keep arriving, and Detox, the debugger and
+one reusing React Native's own unforked Fabric/JSI/Yoga pipeline as the shared native backend. Meta
+keeps maintaining the native half and upstream releases keep arriving. Detox, the debugger and
 native modules work because underneath it really is an RN app.
 
 The price of that bet is the other direction. We stay inside what Fabric can already do, where a
@@ -154,8 +156,8 @@ The costs:
   package gets a thin agnostic wrapper written here: no native code, no forking, a few hundred
   lines. Cheap per package, but manual, so the covered surface grows one library at a time.
 
-Their multi-framework support is real and current, not a claim we are discounting: NativeScript
-maintains five live flavors, Hippy ships React in QQ and Tencent News, and Vue Lynx has its own docs
+Their multi-framework support is real and current, not a claim we are discounting. NativeScript
+maintains five live flavors. Hippy ships React in QQ and Tencent News. Vue Lynx has its own docs
 site and about half of Lynx's usage. The row that differs is whose native layer runs underneath.
 
 The wrapping cost has one mechanism behind it: a library's JS component calls React hooks in its own
@@ -289,10 +291,14 @@ row asserts that before it reads a millisecond.
   and a mean carries every interruption into the ratio.
 
 Both tables have been corrected more than once, always by finding the ruler wrong rather than the
-code: a JavaScriptCore harness for an engine that ships Hermes, a harness that skipped Hermes's
-optimizer, a stock column built from Fabric view names instead of the components a real app renders,
-and two benchmark screens stopping their clocks a React phase apart. The method above is what those
-cost.
+code. The wrong rulers were:
+
+- a JavaScriptCore harness for an engine that ships Hermes
+- a harness that skipped Hermes's optimizer
+- a stock column built from Fabric view names instead of the components a real app renders
+- two benchmark screens stopping their clocks a React phase apart
+
+The method above is what those cost.
 
 ---
 
@@ -347,20 +353,24 @@ linked into the app, never as a patch to RN's sources.
 ## Status
 
 **Stable API, native core rewritten underneath.** Five frameworks drive the same untouched core on
-iOS and Android with RN's renderer never in the path. Every primitive (`View`, `Text`, `Image`,
-`ScrollView`, `TextInput`, `Pressable`, `Switch`, `Modal`, the `VirtualizedList` family), the
-runtime-module layer (`Platform`, `StyleSheet`, `Dimensions`, `Alert`, `Share`), `Animated` on both
-the JS and native drivers, the gesture and responder lifecycle, and accessibility all commit through
-the engine into Fabric, proven on device.
+iOS and Android with RN's renderer never in the path. All of this commits through the engine into Fabric, proven on device:
+
+- every primitive (`View`, `Text`, `Image`, `ScrollView`, `TextInput`, `Pressable`, `Switch`,
+  `Modal`, the `VirtualizedList` family)
+- the runtime-module layer (`Platform`, `StyleSheet`, `Dimensions`, `Alert`, `Share`)
+- `Animated` on both the JS and native drivers
+- Reanimated worklets (`@symbiote-native/reanimated`) on all five adapters
+- the gesture and responder lifecycle
+- accessibility
 
 **What is still catching up:** `@symbiote-native/cli` has just landed and has little mileage on it
 yet; the long-tail prop surface keeps widening; Android is at canary parity while iOS stays the
-reference surface; Reanimated is the largest remaining gap and is not started.
+reference surface.
 
 **Angular is the slowest adapter, and on a device it is the only one slower than stock** (1.15x on a
 thousand-row create, 3.69x on `Clear`; the other four run 0.72-0.83x). The cost is Angular's own, not
-the adapter's: a row component instance is about 81 us in LViews, DI scopes and `EventEmitter`s,
-measured against the identical row inlined, and `Clear` is Angular tearing 2 000 of them down while
+the adapter's. A row component instance is about 81 us in LViews, DI scopes and `EventEmitter`s,
+measured against the identical row inlined. `Clear` is Angular tearing 2 000 of them down, while
 the engine's share of that step is 2.4-3.8 ms on every adapter alike.
 
 The bar for "done" is the canary, not a percentage. RN's surface is effectively unbounded, so the

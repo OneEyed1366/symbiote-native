@@ -1,0 +1,1265 @@
+---
+title: Reanimated
+description: react-native-reanimated 4.7 and react-native-worklets 0.13 for every SymbioteNative adapter. Shared values, animated styles, layout animations, CSS animations and worklets on the UI thread.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
+
+`@symbiote-native/reanimated` brings [`react-native-reanimated`](https://docs.swmansion.com/react-native-reanimated/)
+4.7 and [`react-native-worklets`](https://docs.swmansion.com/react-native-worklets/) 0.13 to every
+SymbioteNative adapter. It is neither a native **view** wrapper like the [slider](/docs/packages/slider/)
+nor a native **module** wrapper like [sensors](/docs/packages/sensors/). The native half of Reanimated
+is not wrapped at all: it stays upstream's own, in your app, and runs against the engine's tree as it is.
+
+What this package replaces is the React-only JS half, the hooks and the `createAnimatedComponent`
+wrapper. In their place are bindings to the engine that any framework can call.
+
+Every adapter carries the whole export list of upstream 4.7.1, with upstream's signatures. A test
+compares each name with the entry of each adapter. A name that upstream adds on a bump fails the
+build here before it reaches you.
+
+## Installation
+
+```sh
+npx @symbiote-native/cli new my-app --reanimated
+npx @symbiote-native/cli add --reanimated   # inside an existing app
+```
+
+The CLI layer installs the three packages and puts the worklets plugin last in `babel.config.js`.
+By hand, the app lists both native packages next to this one, pinned to the versions this release
+was built against:
+
+```sh
+npm install @symbiote-native/reanimated react-native-reanimated@4.7.1 react-native-worklets@0.13.0
+```
+
+```js
+// babel.config.js: the worklets plugin goes last
+module.exports = {
+  presets: ['module:@react-native/babel-preset'],
+  plugins: ['react-native-worklets/plugin'],
+};
+```
+
+Then run `pod install` in `ios/`, rebuild, and start Metro once with `--reset-cache`. `react-native`
+stays an explicit top-level dependency of the app, as for every SymbioteNative package.
+
+<Aside type="note" title="Vue SFC and Svelte need nothing more">
+  Their Metro transformers turn the plugin's source maps off for `.vue` and `.svelte` files, because
+  those are compiled under a name that is not on disk. A Vue or Svelte app only adds the plugin.
+</Aside>
+
+<Aside type="caution" title="Shared element transitions are off until you turn them on">
+  Reanimated bakes this flag into the native build. Set it in the app's `package.json`, reinstall the
+  pods (or rebuild Android), and only then does `sharedTransitionTag` do anything:
+
+  ```json
+  { "reanimated": { "staticFeatureFlags": { "ENABLE_SHARED_ELEMENT_TRANSITIONS": true } } }
+  ```
+</Aside>
+
+## Usage
+
+### Animate a style
+
+A shared value lives on both threads. An animated style reads it inside a worklet and the UI thread
+repaints the node every frame, with no render on the JS side.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import { useEffect } from 'react';
+    import Animated, {
+      useSharedValue,
+      useAnimatedStyle,
+      withSpring,
+    } from '@symbiote-native/reanimated/react';
+
+    export function Box() {
+      const x = useSharedValue(0);
+      const style = useAnimatedStyle(() => {
+        'worklet';
+        return { transform: [{ translateX: x.value }] };
+      });
+
+      useEffect(() => {
+        x.value = withSpring(100);
+      }, [x]);
+
+      return <Animated.View className="box" style={style} />;
+    }
+    ```
+
+    `Animated.View`, `Animated.Text` and `Animated.Image` are the host tags themselves, so a plain
+    `<view style={style} />` takes an animated style too.
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import { onMounted } from 'vue';
+    import {
+      useSharedValue,
+      useAnimatedStyle,
+      withSpring,
+    } from '@symbiote-native/reanimated/vue';
+
+    const x = useSharedValue(0);
+    const style = useAnimatedStyle(() => {
+      'worklet';
+      return { transform: [{ translateX: x.value }] };
+    });
+
+    onMounted(() => {
+      x.value = withSpring(100);
+    });
+    </script>
+
+    <template>
+      <view class="box" :style="style" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component, OnInit } from '@angular/core';
+    import {
+      SYMBIOTE_ELEMENTS,
+      SymbioteHostPropsDirective,
+    } from '@symbiote-native/angular';
+    import {
+      useSharedValue,
+      useAnimatedStyle,
+      withSpring,
+    } from '@symbiote-native/reanimated/angular';
+
+    // A worklet closes over the locals of its factory, as `this` does not cross to the UI runtime
+    function createBox() {
+      const x = useSharedValue(0);
+      const style = useAnimatedStyle(() => {
+        'worklet';
+        return { transform: [{ translateX: x.value }] };
+      });
+      return { x, props: { style } };
+    }
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS, SymbioteHostPropsDirective],
+      template: `<view class="box" [symbioteHostProps]="box.props"></view>`,
+    })
+    export class Box implements OnInit {
+      readonly box = createBox();
+
+      ngOnInit(): void {
+        this.box.x.value = withSpring(100);
+      }
+    }
+    ```
+
+    The hooks run in an injection context: a constructor, a field initializer, or
+    `runInInjectionContext`.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { onMount } from 'svelte';
+      import {
+        useSharedValue,
+        useAnimatedStyle,
+        withSpring,
+      } from '@symbiote-native/reanimated/svelte';
+
+      const x = useSharedValue(0);
+      const style = useAnimatedStyle(() => {
+        'worklet';
+        return { transform: [{ translateX: x.value }] };
+      });
+
+      onMount(() => {
+        x.value = withSpring(100);
+      });
+    </script>
+
+    <view class="box" {style} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { onMount } from 'solid-js';
+    import {
+      useSharedValue,
+      useAnimatedStyle,
+      withSpring,
+    } from '@symbiote-native/reanimated/solid';
+
+    export function Box() {
+      const x = useSharedValue(0);
+      const style = useAnimatedStyle(() => {
+        'worklet';
+        return { transform: [{ translateX: x.value }] };
+      });
+
+      onMount(() => {
+        x.value = withSpring(100);
+      });
+
+      return <view class="box" style={style} />;
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+Every adapter names the hooks exactly as React does. There is no `create*` or `inject*` form,
+because the worklet callback is upstream's code and reads `x.value` the same way everywhere.
+
+### Reactive values in Vue, Svelte, Solid and Angular
+
+Setup runs once in these four frameworks. So a changing prop or signal is read **inside** the
+updater, the way the framework reads it: `props.scale` in Vue, Svelte and Solid, `scale()` for an
+Angular signal. The hook follows what the updater reads and starts the mapper again over a fresh
+copy of the closure when it changes.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    React runs the component again on every render, so the updater closes over the latest props and
+    there is nothing to follow by hand.
+
+    ```tsx
+    const style = useAnimatedStyle(() => {
+      'worklet';
+      return { opacity: visible ? 1 : 0 };
+    });
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```ts
+    const props = defineProps<{ visible: boolean }>();
+
+    const style = useAnimatedStyle(() => {
+      'worklet';
+      return { opacity: props.visible ? 1 : 0 };
+    });
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    Read the signal inside the updater. The factory keeps the worklet away from `this`, which does
+    not cross to the UI runtime.
+
+    ```ts
+    function createFade(visible: Signal<boolean>) {
+      return useAnimatedStyle(() => {
+        'worklet';
+        return { opacity: visible() ? 1 : 0 };
+      });
+    }
+
+    // in the component: a field initializer is an injection context
+    readonly fade = { style: createFade(this.visible) };
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      let props: { visible: boolean } = $props();
+
+      const style = useAnimatedStyle(() => {
+        'worklet';
+        return { opacity: props.visible ? 1 : 0 };
+      });
+    </script>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    export function Fade(props: { visible: boolean }) {
+      const style = useAnimatedStyle(() => {
+        'worklet';
+        return { opacity: props.visible ? 1 : 0 };
+      });
+      return <view style={style} />;
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+A value copied into a plain variable outside the updater is frozen (`const visible = props.visible`).
+That is those frameworks' own rule, not a limit of the package. A reactive value cannot be followed
+in an event handler or a frame callback, so pass it through a shared value instead.
+
+### Entering, exiting and layout animations
+
+`entering`, `exiting`, `layout` and `sharedTransitionTag` work on the animated tags as upstream's do.
+The prop names and the builders (`FadeIn`, `FlipOutXDown`, `LinearTransition`, `Keyframe`) are
+upstream's. What differs per framework is only how a tag takes them.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import Animated, { FadeIn, FadeOut } from '@symbiote-native/reanimated/react';
+
+    {isShown && (
+      <Animated.View className="tile" entering={FadeIn} exiting={FadeOut} />
+    )}
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import Reanimated, { FadeIn, FadeOut } from '@symbiote-native/reanimated/vue';
+    </script>
+
+    <template>
+      <Reanimated.View v-if="isShown" class="tile" :entering="FadeIn" :exiting="FadeOut" />
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    ```ts
+    import { Component } from '@angular/core';
+    import {
+      SYMBIOTE_ELEMENTS,
+      SymbioteHostPropsDirective,
+    } from '@symbiote-native/angular';
+    import { FadeIn, FadeOut } from '@symbiote-native/reanimated/angular';
+
+    @Component({
+      standalone: true,
+      imports: [SYMBIOTE_ELEMENTS, SymbioteHostPropsDirective],
+      template: `
+        @if (isShown) {
+          <view class="tile" [symbioteHostProps]="fade"></view>
+        }
+      `,
+    })
+    export class Tile {
+      isShown = true;
+      readonly fade = { entering: FadeIn, exiting: FadeOut };
+    }
+    ```
+
+    A host tag takes layout animations only through `[symbioteHostProps]`. An `[entering]` binding
+    on a tag does not compile under AOT.
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import { FadeIn, FadeOut } from '@symbiote-native/reanimated/svelte';
+    </script>
+
+    {#if isShown}
+      <view class="tile" p={{ entering: FadeIn, exiting: FadeOut }} />
+    {/if}
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { Show } from 'solid-js';
+    import { FadeIn, FadeOut } from '@symbiote-native/reanimated/solid';
+
+    <Show when={isShown()}>
+      <view class="tile" {...{ entering: FadeIn, exiting: FadeOut }} />
+    </Show>
+    ```
+
+  </TabItem>
+</Tabs>
+
+Presets chain like upstream's: `FadeIn.delay(150).duration(400)`. A custom animation is a
+`Keyframe`, and `layout` takes the transitions (`LinearTransition`, `FadingTransition`,
+`SequencedTransition`, `JumpingTransition`, `CurvedTransition`, `EntryExitTransition`).
+`LayoutAnimationConfig` skips the entering animation of what mounts together with it.
+
+### Derived values, reactions, scroll and measure
+
+These hooks have upstream's signatures and behave the same in every adapter. What changes is where
+they are called and how the JS side keeps its state. Outside React every callback carries the
+`'worklet'` directive, and Angular calls the hooks from a factory run in a field initializer.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import {
+      Extrapolation,
+      interpolate,
+      scrollTo,
+      runOnUI,
+      useAnimatedReaction,
+      useAnimatedRef,
+      useAnimatedScrollHandler,
+      useDerivedValue,
+      useSharedValue,
+    } from '@symbiote-native/reanimated/react';
+    import { scheduleOnRN } from 'react-native-worklets';
+
+    const progress = useSharedValue(0);
+    const [quarter, setQuarter] = useState(0);
+
+    // A value computed from another, on the UI thread
+    const angle = useDerivedValue(() =>
+      interpolate(progress.value, [0, 1], [0, 360], Extrapolation.CLAMP),
+    );
+
+    // A side effect when a value crosses a line, reported back to the JS thread
+    useAnimatedReaction(
+      () => Math.floor(progress.value * 4),
+      (now, before) => {
+        if (now !== before) scheduleOnRN(setQuarter, now);
+      },
+    );
+
+    // A scroll handler that writes to a shared value, and a ref the UI thread can scroll
+    const scrollRef = useAnimatedRef();
+    const onScroll = useAnimatedScrollHandler({
+      onScroll: event => {
+        progress.value = event.contentOffset.y / 400;
+      },
+    });
+    const toTop = () => runOnUI(() => { 'worklet'; scrollTo(scrollRef, 0, 0, true); })();
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```ts
+    import { ref } from 'vue';
+    import {
+      Extrapolation,
+      interpolate,
+      scrollTo,
+      runOnUI,
+      useAnimatedReaction,
+      useAnimatedRef,
+      useAnimatedScrollHandler,
+      useDerivedValue,
+      useSharedValue,
+    } from '@symbiote-native/reanimated/vue';
+    import { scheduleOnRN } from 'react-native-worklets';
+
+    const progress = useSharedValue(0);
+    const quarter = ref(0);
+    const setQuarter = (now: number) => {
+      quarter.value = now;
+    };
+
+    const angle = useDerivedValue(() => {
+      'worklet';
+      return interpolate(progress.value, [0, 1], [0, 360], Extrapolation.CLAMP);
+    });
+
+    useAnimatedReaction(
+      () => {
+        'worklet';
+        return Math.floor(progress.value * 4);
+      },
+      (now, before) => {
+        'worklet';
+        if (now !== before) scheduleOnRN(setQuarter, now);
+      },
+    );
+
+    const scrollRef = useAnimatedRef();
+    const onScroll = useAnimatedScrollHandler({
+      onScroll: event => {
+        'worklet';
+        progress.value = event.contentOffset.y / 400;
+      },
+    });
+    const toTop = () => runOnUI(() => { 'worklet'; scrollTo(scrollRef, 0, 0, true); })();
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    A worklet closes over the locals of its factory, as `this` does not cross to the UI runtime. The
+    factory takes the JS-side setter as an argument.
+
+    ```ts
+    function createProgress(setQuarter: (now: number) => void) {
+      const progress = useSharedValue(0);
+
+      const angle = useDerivedValue(() => {
+        'worklet';
+        return interpolate(progress.value, [0, 1], [0, 360], Extrapolation.CLAMP);
+      });
+
+      useAnimatedReaction(
+        () => {
+          'worklet';
+          return Math.floor(progress.value * 4);
+        },
+        (now, before) => {
+          'worklet';
+          if (now !== before) scheduleOnRN(setQuarter, now);
+        },
+      );
+
+      const scrollRef = useAnimatedRef();
+      const onScroll = useAnimatedScrollHandler({
+        onScroll: event => {
+          'worklet';
+          progress.value = event.contentOffset.y / 400;
+        },
+      });
+      return { progress, angle, scrollRef, onScroll };
+    }
+
+    // in the component, with `quarter = signal(0)`
+    readonly state = createProgress(now => this.quarter.set(now));
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import {
+        Extrapolation,
+        interpolate,
+        scrollTo,
+        runOnUI,
+        useAnimatedReaction,
+        useAnimatedRef,
+        useAnimatedScrollHandler,
+        useDerivedValue,
+        useSharedValue,
+      } from '@symbiote-native/reanimated/svelte';
+      import { scheduleOnRN } from 'react-native-worklets';
+
+      const progress = useSharedValue(0);
+      let quarter = $state(0);
+      const setQuarter = (now: number) => {
+        quarter = now;
+      };
+
+      const angle = useDerivedValue(() => {
+        'worklet';
+        return interpolate(progress.value, [0, 1], [0, 360], Extrapolation.CLAMP);
+      });
+
+      useAnimatedReaction(
+        () => {
+          'worklet';
+          return Math.floor(progress.value * 4);
+        },
+        (now, before) => {
+          'worklet';
+          if (now !== before) scheduleOnRN(setQuarter, now);
+        },
+      );
+
+      const scrollRef = useAnimatedRef();
+      const onScroll = useAnimatedScrollHandler({
+        onScroll: event => {
+          'worklet';
+          progress.value = event.contentOffset.y / 400;
+        },
+      });
+    </script>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import { createSignal } from 'solid-js';
+    import {
+      Extrapolation,
+      interpolate,
+      scrollTo,
+      runOnUI,
+      useAnimatedReaction,
+      useAnimatedRef,
+      useAnimatedScrollHandler,
+      useDerivedValue,
+      useSharedValue,
+    } from '@symbiote-native/reanimated/solid';
+    import { scheduleOnRN } from 'react-native-worklets';
+
+    export function Progress() {
+      const progress = useSharedValue(0);
+      const [quarter, setQuarter] = createSignal(0);
+
+      const angle = useDerivedValue(() => {
+        'worklet';
+        return interpolate(progress.value, [0, 1], [0, 360], Extrapolation.CLAMP);
+      });
+
+      useAnimatedReaction(
+        () => {
+          'worklet';
+          return Math.floor(progress.value * 4);
+        },
+        (now, before) => {
+          'worklet';
+          if (now !== before) scheduleOnRN(setQuarter, now);
+        },
+      );
+
+      const scrollRef = useAnimatedRef();
+      const onScroll = useAnimatedScrollHandler({
+        onScroll: event => {
+          'worklet';
+          progress.value = event.contentOffset.y / 400;
+        },
+      });
+      // ...
+    }
+    ```
+
+  </TabItem>
+</Tabs>
+
+An animated ref goes to a scroll view as `ref` in React, Vue, Svelte and Solid, and as
+`[animatedRef]` on Angular's `AnimatedScrollView`. The Components tabs below show each form.
+
+`useAnimatedProps` writes a native prop that is not a style, such as the `text` of `TextInput`. That
+`TextInput` is exported next to `Animated`, because the adapters' text input is a tag and there is no
+component to wrap.
+
+The thread helpers `scheduleOnUI`, `scheduleOnRN`, `scheduleOnRuntime` and `createWorkletRuntime`
+come from `react-native-worklets` as in upstream. The older `runOnUI` and `runOnJS` names stay on
+this package.
+
+### CSS animations and transitions
+
+A stylesheet runs on the UI thread through Reanimated's CSS layer. These are wired: `animation*`,
+`transition*`, `@keyframes` (also from another file) and the `onCSS*` callbacks. So are the node
+states `:hover`, `:focus`, `:focus-within`, `:active` and `:active-deepest`.
+
+```css
+@keyframes pulse {
+  from { opacity: 1; }
+  to { opacity: 0.4; }
+}
+
+.dot {
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.bar {
+  transition: width 400ms ease-in-out;
+}
+
+.press:active {
+  opacity: 0.6;
+}
+```
+
+The same through a style object, for a value computed at runtime:
+
+```ts
+import { css } from '@symbiote-native/reanimated/react';
+
+const bounce = css.keyframes({
+  from: { transform: [{ translateY: 0 }] },
+  to: { transform: [{ translateY: -16 }] },
+});
+
+const styles = css.create({
+  ball: {
+    animationName: bounce,
+    animationDuration: '600ms',
+    animationDirection: 'alternate',
+    animationIterationCount: 'infinite',
+    animationTimingFunction: 'ease-in-out',
+  },
+});
+```
+
+The style object and the `onCSS*` callbacks go on the node the way each framework writes a tag prop.
+The `css` helper is the same in all of them.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    <Animated.View style={styles.ball} />
+    <Animated.View className="bar" onCSSTransitionEnd={() => setEnds(ends + 1)} />
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <view :style="styles.ball" />
+    <Reanimated.View class="bar" :onCSSTransitionEnd="countEnd" />
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    A callback on a host tag goes through `[symbioteHostProps]`, like `entering`.
+
+    ```ts
+    // template: <view class="bar" [symbioteHostProps]="barProps"></view>
+    readonly ballProps = { style: styles.ball };
+    readonly barProps = {
+      onCSSTransitionEnd: () => this.ends.update(count => count + 1),
+    };
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <view class="ball" style={styles.ball} />
+    <view class="bar" p={{ onCSSTransitionEnd: countEnd }} />
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    <view class="ball" style={styles.ball} />
+    <view class="bar" {...{ onCSSTransitionEnd: () => setEnds(ends() + 1) }} />
+    ```
+
+  </TabItem>
+</Tabs>
+
+A state works on the last compound of a selector only. `:active` here is Reanimated's, not the
+press machine of `Pressable`. Do not put it on the same node as a `style` function that reads
+`pressed`.
+
+## API
+
+The surface of upstream 4.7.1, name for name. `@symbiote-native/reanimated` is the core and holds
+everything with no component, ref or renderer in it. `@symbiote-native/reanimated/<framework>` adds
+what needs the framework and re-exports the core.
+
+### Hooks
+
+Same names and upstream signatures in `/react`, `/vue`, `/svelte`, `/solid` and `/angular`. Angular calls
+them in an injection context: a constructor, a field initializer, or `runInInjectionContext`.
+
+| Hook                       | Signature                                                      | Description                                                                                    |
+| -------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `useSharedValue`           | `(initialValue: Value \| (() => Value)) => SharedValue<Value>` | A value readable and writable on both threads; a function argument runs once for the initial  |
+| `useDerivedValue`          | `(updater, dependencies?) => DerivedValue<Value>`              | A read-only shared value recomputed on the UI thread whenever what its updater reads changes  |
+| `useAnimatedStyle`         | `(updater, dependencies?) => AnimatedStyleHandle<Style>`       | A style handle repainted from the UI thread; pass it as `style` of a tag                       |
+| `useAnimatedProps`         | `(updater, dependencies?, adapters?) => Partial<Props>`        | Animated props that are not style, such as the `text` of a `TextInput`                         |
+| `useAnimatedReaction`      | `(prepare, react, dependencies?) => void`                      | Runs `react(prepared, previous)` on the UI thread when what `prepare` returns changes          |
+| `useAnimatedRef`           | `() => AnimatedRef<TRef>`                                      | A ref the UI thread can use with `measure`, `scrollTo`, `dispatchCommand` and `setNativeProps` |
+| `useAnimatedScrollHandler` | `(handlers, dependencies?) => ScrollHandlerProcessed`          | Worklet handlers for `onScroll`, `onBeginDrag`, `onEndDrag` and the momentum events            |
+| `useScrollOffset`          | `(animatedRef, providedOffset?) => SharedValue<number>`        | The scroll offset of a view as a shared value; `useScrollViewOffset` is the deprecated alias   |
+| `useEvent`                 | `(handler, eventNames?, rebuild?) => EventHandlerProcessed`    | Builds a native event handler that runs as a worklet                                           |
+| `useHandler`               | `(handlers, dependencies?) => UseHandlerContext`               | The context and dependency tracking for a custom event hook built on `useEvent`                |
+| `useComposedEventHandler`  | `(handlers) => ComposedHandlerProcessed`                       | Combines several processed handlers into one prop                                              |
+| `useFrameCallback`         | `(callback, autostart?) => FrameCallback`                      | A callback on every frame, with `setActive` to start and stop it                               |
+| `useAnimatedSensor`        | `(sensorType, userConfig?) => AnimatedSensor`                  | Device sensor readings as a shared value                                                       |
+| `useAnimatedKeyboard`      | `(options?) => AnimatedKeyboardInfo`                           | The keyboard height and state as shared values                                                 |
+| `useReducedMotion`         | `() => boolean`                                                | Whether the system asks for reduced motion                                                     |
+| `useTimestamp`             | `(isActive?) => SharedValue<number>`                           | A clock shared value; where setup runs once the flag is read once, so the clock pauses itself  |
+
+### Animation functions
+
+| Function          | Signature                                                             | Description                                                            |
+| ----------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `withTiming`      | `(toValue, config?, callback?) => T`                                  | Animates to a value over a duration with an easing                     |
+| `withSpring`      | `(toValue, config?, callback?) => T`                                  | Animates to a value with a spring                                      |
+| `withDecay`       | `(config, callback?) => number`                                       | Continues a velocity and slows down, optionally between clamp limits   |
+| `withDelay`       | `(delayMs, animation, reduceMotion?) => T`                            | Starts the animation after a pause                                     |
+| `withRepeat`      | `(animation, numberOfReps?, reverse?, callback?, reduceMotion?) => T` | Repeats an animation; `-1` repeats forever                             |
+| `withSequence`    | `(...animations) => T`                                                | Runs animations one after another                                      |
+| `withClamp`       | `({ min, max }, animation) => T`                                      | Keeps an animation inside a range                                      |
+| `cancelAnimation` | `(sharedValue) => void`                                               | Stops the animation of a shared value where it stands                  |
+| `defineAnimation` | `(starting, factory) => T`                                            | Builds an animation of your own, which the functions above are made of |
+
+Spring presets for `withSpring`: `GentleSpringConfig`, `SnappySpringConfig`, `WigglySpringConfig`,
+`Reanimated3DefaultSpringConfig`. Each has a duration-based twin: `GentleSpringConfigWithDuration`,
+`SnappySpringConfigWithDuration`, `WigglySpringConfigWithDuration` and
+`Reanimated3DefaultSpringConfigWithDuration`.
+
+### Easing, interpolation and colors
+
+| Name                                       | Description                                                                        |
+| ------------------------------------------ | ---------------------------------------------------------------------------------- |
+| `Easing`                                   | The easing namespace, including `Easing.bezier`                                    |
+| `cubicBezier`, `linear`, `steps`           | Easing factories for CSS timing functions                                          |
+| `interpolate`                              | `(value, inputRange, outputRange, type?) => number`                                |
+| `interpolateColor`                         | `(value, inputRange, outputRange, colorSpace?, options?)` in `RGB`, `HSV` or `LAB` |
+| `Extrapolation`, `Extrapolate`             | What happens outside the input range: `CLAMP`, `EXTEND`, `IDENTITY`               |
+| `clamp`                                    | `(value, min, max) => number`                                                      |
+| `processColor`, `convertToRGBA`, `isColor` | Color parsing helpers                                                              |
+| `contrastColor`                            | The readable text color for a background                                           |
+| `PlatformColor`, `DynamicColorIOS`         | Platform colors that survive the worklet boundary                                  |
+
+### Components
+
+All five adapters export every component below. The tabs after the table show how each framework writes them.
+
+| Name                                | Props of its own                                                                     | Description                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| `Animated.View`, `Text`, `Image`    | the tag props listed below                                                           | The host tags themselves; every tag takes an animated style       |
+| `Animated.TextInput`, `TextInput`   | `animatedProps`                                                                      | A text input tag that takes `animatedProps`                       |
+| `Animated.ScrollView`               | `scrollViewOffset`, a ref                                                            | Asks for a scroll event every frame and writes its offset         |
+| `Animated.FlatList`                 | `itemLayoutAnimation`, `skipEnteringExitingAnimations`, `cellRendererComponentStyle` | A `FlatList` whose rows take layout animations                    |
+| `createAnimatedComponent`           | none                                                                                 | Returns the component it is given                                 |
+| `createCSSAnimatedComponent`        | none                                                                                 | Returns the component it is given                                 |
+| `LayoutAnimationConfig`             | `skipEntering`, `skipExiting`                                                        | Skips the entering and exiting animations of its subtree          |
+| `SharedTransitionBoundary`          | `isActive`                                                                           | Scopes the shared element transitions of its subtree              |
+| `PerformanceMonitor`                | `smoothingFrames`                                                                    | Shows a JS and a UI frame rate readout                            |
+| `ReducedMotionConfig`               | `mode`                                                                               | Overrides the reduced motion mode for the app while it is mounted |
+
+In React and Solid the cell style prop is spelled `CellRendererComponentStyle`, as in React Native. Vue, Svelte and Angular spell it `cellRendererComponentStyle`.
+
+Props on a tag: `entering`, `exiting`, `layout`, `animatedProps`, `sharedTransitionTag`,
+`sharedTransitionStyle`, and the CSS callbacks `onCSSAnimationStart`, `onCSSAnimationEnd`,
+`onCSSAnimationIteration`, `onCSSAnimationCancel`, `onCSSTransitionRun`, `onCSSTransitionStart`,
+`onCSSTransitionEnd` and `onCSSTransitionCancel`.
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+    ```tsx
+    import Animated, {
+      FadeIn,
+      LayoutAnimationConfig,
+      LinearTransition,
+      PerformanceMonitor,
+      ReduceMotion,
+      ReducedMotionConfig,
+      SharedTransitionBoundary,
+    } from '@symbiote-native/reanimated/react';
+
+    <ReducedMotionConfig mode={ReduceMotion.System} />
+    <PerformanceMonitor />
+
+    <LayoutAnimationConfig skipEntering skipExiting>
+      <Animated.View className="tile" entering={FadeIn} />
+    </LayoutAnimationConfig>
+
+    <SharedTransitionBoundary isActive={isFirst}>
+      <Animated.View className="box" sharedTransitionTag="box" />
+    </SharedTransitionBoundary>
+
+    <Animated.ScrollView ref={scrollRef} scrollViewOffset={offset} onScroll={onScroll}>
+      {rows.map(row => <view key={row} className="row" />)}
+    </Animated.ScrollView>
+
+    <Animated.FlatList
+      data={rows}
+      keyExtractor={keyOf}
+      renderItem={renderRow}
+      itemLayoutAnimation={LinearTransition}
+      CellRendererComponentStyle={tintOfRow}
+      skipEnteringExitingAnimations
+    />
+    ```
+
+  </TabItem>
+  <TabItem label="Vue">
+    ```vue
+    <script setup lang="ts">
+    import Reanimated, {
+      FadeIn,
+      LayoutAnimationConfig,
+      LinearTransition,
+      PerformanceMonitor,
+      ReduceMotion,
+      ReducedMotionConfig,
+      SharedTransitionBoundary,
+    } from '@symbiote-native/reanimated/vue';
+    </script>
+
+    <template>
+      <ReducedMotionConfig :mode="ReduceMotion.System" />
+      <PerformanceMonitor />
+
+      <LayoutAnimationConfig :skipEntering="true" :skipExiting="true">
+        <Reanimated.View class="tile" :entering="FadeIn" />
+      </LayoutAnimationConfig>
+
+      <SharedTransitionBoundary :isActive="isFirst">
+        <Reanimated.View class="box" sharedTransitionTag="box" />
+      </SharedTransitionBoundary>
+
+      <Reanimated.ScrollView :ref="scrollRef" :scrollViewOffset="offset" :onScroll="onScroll">
+        <view v-for="row in rows" :key="row" class="row" />
+      </Reanimated.ScrollView>
+
+      <Reanimated.FlatList
+        :data="rows"
+        :keyExtractor="keyOf"
+        :itemLayoutAnimation="LinearTransition"
+        :cellRendererComponentStyle="tintOfRow"
+        skipEnteringExitingAnimations
+      >
+        <template #item="{ item }">
+          <view class="row" />
+        </template>
+      </Reanimated.FlatList>
+    </template>
+    ```
+
+  </TabItem>
+  <TabItem label="Angular">
+    Every component is a standalone class: list it in `imports`, then write its selector. There is no
+    `Animated.View` in a template, so a tag takes `entering` and `sharedTransitionTag` through
+    `[symbioteHostProps]`.
+
+    ```ts
+    import { Component } from '@angular/core';
+    import {
+      SYMBIOTE_ELEMENTS,
+      SymbioteHostPropsDirective,
+      VListItemDirective,
+    } from '@symbiote-native/angular';
+    import {
+      AnimatedFlatList,
+      AnimatedScrollView,
+      FadeIn,
+      LayoutAnimationConfig,
+      LinearTransition,
+      PerformanceMonitor,
+      ReduceMotion,
+      ReducedMotionConfig,
+      SharedTransitionBoundary,
+    } from '@symbiote-native/reanimated/angular';
+
+    @Component({
+      standalone: true,
+      imports: [
+        AnimatedFlatList,
+        AnimatedScrollView,
+        LayoutAnimationConfig,
+        PerformanceMonitor,
+        ReducedMotionConfig,
+        SharedTransitionBoundary,
+        SYMBIOTE_ELEMENTS,
+        SymbioteHostPropsDirective,
+        VListItemDirective,
+      ],
+      template: `
+        <ReducedMotionConfig [mode]="system" />
+        <PerformanceMonitor />
+
+        <LayoutAnimationConfig [skipEntering]="true" [skipExiting]="true">
+          <view class="tile" [symbioteHostProps]="fade"></view>
+        </LayoutAnimationConfig>
+
+        <SharedTransitionBoundary [isActive]="isFirst">
+          <view class="box" [symbioteHostProps]="shared"></view>
+        </SharedTransitionBoundary>
+
+        <AnimatedScrollView
+          [animatedRef]="scrollRef"
+          [scrollViewOffset]="offset"
+          [scrollViewProps]="scrollProps"
+        >
+          @for (row of rows; track row) {
+            <view class="row"></view>
+          }
+        </AnimatedScrollView>
+
+        <AnimatedFlatList
+          [data]="rows"
+          [keyExtractor]="keyOf"
+          [itemLayoutAnimation]="linear"
+          [cellRendererComponentStyle]="tintOfRow"
+          [skipEnteringExitingAnimations]="true"
+        >
+          <ng-template vListItem let-item>
+            <view class="row"></view>
+          </ng-template>
+        </AnimatedFlatList>
+      `,
+    })
+    export class Components {
+      readonly system = ReduceMotion.System;
+      readonly linear = LinearTransition;
+      readonly fade = { entering: FadeIn };
+      readonly shared = { sharedTransitionTag: 'box' };
+      // The props of the scroll view go in one bag, as a component cannot name them all
+      readonly scrollProps = { onScroll: scrollHandler };
+      // rows, isFirst, keyOf, tintOfRow, scrollRef, offset and scrollHandler come from your own setup
+    }
+    ```
+
+  </TabItem>
+  <TabItem label="Svelte">
+    ```svelte
+    <script lang="ts">
+      import Reanimated, {
+        FadeIn,
+        LayoutAnimationConfig,
+        LinearTransition,
+        PerformanceMonitor,
+        ReduceMotion,
+        ReducedMotionConfig,
+        SharedTransitionBoundary,
+      } from '@symbiote-native/reanimated/svelte';
+    </script>
+
+    <ReducedMotionConfig mode={ReduceMotion.System} />
+    <PerformanceMonitor />
+
+    <LayoutAnimationConfig skipEntering skipExiting>
+      <view class="tile" p={{ entering: FadeIn }} />
+    </LayoutAnimationConfig>
+
+    <SharedTransitionBoundary isActive={isFirst}>
+      <view class="box" p={{ sharedTransitionTag: 'box' }} />
+    </SharedTransitionBoundary>
+
+    <Reanimated.ScrollView ref={scrollRef} scrollViewOffset={offset} {onScroll}>
+      {#each rows as row (row)}
+        <view class="row" />
+      {/each}
+    </Reanimated.ScrollView>
+
+    <Reanimated.FlatList
+      data={rows}
+      keyExtractor={keyOf}
+      itemLayoutAnimation={LinearTransition}
+      cellRendererComponentStyle={tintOfRow}
+      skipEnteringExitingAnimations
+    >
+      {#snippet item({ item })}
+        <view class="row" />
+      {/snippet}
+    </Reanimated.FlatList>
+    ```
+
+  </TabItem>
+  <TabItem label="Solid">
+    ```tsx
+    import Animated, {
+      FadeIn,
+      LayoutAnimationConfig,
+      LinearTransition,
+      PerformanceMonitor,
+      ReduceMotion,
+      ReducedMotionConfig,
+      SharedTransitionBoundary,
+    } from '@symbiote-native/reanimated/solid';
+
+    <ReducedMotionConfig mode={ReduceMotion.System} />
+    <PerformanceMonitor />
+
+    <LayoutAnimationConfig skipEntering skipExiting>
+      <view class="tile" {...{ entering: FadeIn }} />
+    </LayoutAnimationConfig>
+
+    <SharedTransitionBoundary isActive={isFirst()}>
+      <view class="box" {...{ sharedTransitionTag: 'box' }} />
+    </SharedTransitionBoundary>
+
+    <Animated.ScrollView ref={scrollRef} scrollViewOffset={offset} onScroll={onScroll}>
+      <For each={rows}>{row => <view class="row" />}</For>
+    </Animated.ScrollView>
+
+    <Animated.FlatList
+      data={rows()}
+      keyExtractor={keyOf}
+      renderItem={renderRow}
+      itemLayoutAnimation={LinearTransition}
+      CellRendererComponentStyle={tintOfRow}
+      skipEnteringExitingAnimations
+    />
+    ```
+
+  </TabItem>
+</Tabs>
+
+### Layout animations
+
+| Group              | Names                                                                                                                                                 |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fade               | `FadeIn`, `FadeInRight`, `FadeInLeft`, `FadeInUp`, `FadeInDown`, `FadeOut`, `FadeOutRight`, `FadeOutLeft`, `FadeOutUp`, `FadeOutDown`                 |
+| Slide              | `SlideInRight`, `SlideInLeft`, `SlideInUp`, `SlideInDown`, `SlideOutRight`, `SlideOutLeft`, `SlideOutUp`, `SlideOutDown`                              |
+| Zoom               | `ZoomIn`, `ZoomInRotate`, `ZoomInLeft`, `ZoomInRight`, `ZoomInUp`, `ZoomInDown`, `ZoomInEasyUp`, `ZoomInEasyDown`, `ZoomOut`, `ZoomOutRotate`, `ZoomOutLeft`, `ZoomOutRight`, `ZoomOutUp`, `ZoomOutDown`, `ZoomOutEasyUp`, `ZoomOutEasyDown` |
+| Bounce             | `BounceIn`, `BounceInDown`, `BounceInUp`, `BounceInLeft`, `BounceInRight`, `BounceOut`, `BounceOutDown`, `BounceOutUp`, `BounceOutLeft`, `BounceOutRight` |
+| Flip               | `FlipInXUp`, `FlipInYLeft`, `FlipInXDown`, `FlipInYRight`, `FlipInEasyX`, `FlipInEasyY`, `FlipOutXUp`, `FlipOutYLeft`, `FlipOutXDown`, `FlipOutYRight`, `FlipOutEasyX`, `FlipOutEasyY` |
+| Stretch            | `StretchInX`, `StretchInY`, `StretchOutX`, `StretchOutY`                                                                                              |
+| Rotate             | `RotateInDownLeft`, `RotateInDownRight`, `RotateInUpLeft`, `RotateInUpRight`, `RotateOutDownLeft`, `RotateOutDownRight`, `RotateOutUpLeft`, `RotateOutUpRight` |
+| LightSpeed         | `LightSpeedInRight`, `LightSpeedInLeft`, `LightSpeedOutRight`, `LightSpeedOutLeft`                                                                    |
+| Pinwheel           | `PinwheelIn`, `PinwheelOut`                                                                                                                           |
+| Roll               | `RollInLeft`, `RollInRight`, `RollOutLeft`, `RollOutRight`                                                                                            |
+| Layout transitions | `LinearTransition`, `FadingTransition`, `SequencedTransition`, `JumpingTransition`, `CurvedTransition`, `EntryExitTransition`, `Layout`              |
+| Custom             | `Keyframe`, `ReanimatedKeyframe`, `SharedTransition`                                                                                                  |
+| Builders           | `BaseAnimationBuilder`, `ComplexAnimationBuilder`; chain `.duration()`, `.delay()`, `.springify()`, `.easing()`, `.withCallback()` and the rest from upstream |
+
+### Refs, measuring and the UI thread
+
+| Name                                               | Signature                                                        | Description                                                                      |
+| -------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `measure`                                          | `(animatedRef) => MeasuredDimensions \| null`                    | Size and position of a view, called from a worklet                               |
+| `scrollTo`                                         | `(animatedRef, x, y, animated) => void`                          | Scrolls a view from a worklet                                                    |
+| `dispatchCommand`                                  | `(animatedRef, command, args?) => void`                          | Sends a native command such as `focus` to a view                                 |
+| `setNativeProps`                                   | `(animatedRef, props) => void`                                   | Writes props to a view from the UI thread                                        |
+| `getRelativeCoords`                                | `(animatedRef, absoluteX, absoluteY) => ComponentCoords \| null` | Converts page coordinates to the coordinates inside a view                       |
+| `setGestureState`                                  | `(handlerTag, newState) => void`                                 | Sets the state of a gesture handler by tag                                       |
+| `getViewProp`                                      | `(viewTag, propName, component?) => Promise<T>`                  | Reads a prop back from the native side; needs the component on Fabric            |
+| `runOnUI`, `runOnJS`                               | `(fn) => (...args) => void`                                      | Run a function on the UI runtime, or call back to the JS thread                  |
+| `runOnRuntime`, `createWorkletRuntime`             | `(workletRuntime, worklet) => WorkletFunction`                   | Run a worklet on a worklet runtime of your own                                   |
+| `executeOnUIRuntimeSync`                           | `(fn) => (...args) => R`                                         | Run on the UI runtime and wait for the result                                    |
+| `isWorkletFunction`, `makeShareableCloneRecursive` | see upstream                                                     | Check a worklet, or make a value shareable between runtimes                      |
+| `makeMutable`, `isSharedValue`                     | `(initial) => Mutable`, `(value) => boolean`                     | A shared value outside a hook; a guard for one                                   |
+| `startMapper`, `stopMapper`                        | see upstream                                                     | The mapper that keeps shared values and styles in step; the hooks use it for you |
+| `createAnimatedPropAdapter`                        | `(adapter, nativeProps?)`                                        | Adapts props for `useAnimatedProps`                                              |
+
+### Worklets API
+
+These come from `react-native-worklets`, which the app already lists. Import them from there, as the
+Reanimated docs do. The older `runOnUI`, `runOnJS` and `runOnRuntime` stay on this package too.
+
+| Name                                                   | Signature                                                     | Description                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------------- | --------------------------------------------------------------- |
+| `scheduleOnUI`                                         | `(worklet, ...args) => void`                                  | Runs a worklet on the UI runtime without waiting                |
+| `scheduleOnRN`                                         | `(fun, ...args) => void`                                      | Calls a JS function on the React Native runtime from a worklet  |
+| `scheduleOnRuntime`, `scheduleOnRuntimeWithId`         | `(runtime, worklet, ...args) => void`                         | Runs a worklet on a worklet runtime without waiting             |
+| `runOnUISync`                                          | `(worklet, ...args) => ReturnValue`                           | Runs on the UI runtime and returns the result                   |
+| `runOnUIAsync`                                         | `(worklet, ...args) => Promise<ReturnValue>`                  | Runs on the UI runtime and resolves with the result             |
+| `runOnRuntimeSync`, `runOnRuntimeSyncWithId`           | `(runtime, worklet, ...args) => ReturnValue`                  | Runs on a worklet runtime and returns the result                |
+| `runOnRuntimeAsync`, `runOnRuntimeAsyncWithId`         | `(runtime, worklet, ...args) => Promise<ReturnValue>`         | Runs on a worklet runtime and resolves with the result          |
+| `createWorkletRuntime`                                 | `(config?) => WorkletRuntime`                                 | Creates a worklet runtime of your own                           |
+| `isWorkletFunction`                                    | `(value) => boolean`                                          | Tells whether a function is a worklet                           |
+| `getRuntimeKind`, `RuntimeKind`                        | `() => RuntimeKind`                                           | Which kind of runtime the code runs on                          |
+| `isUIRuntime`, `isRNRuntime`, `isWorkerRuntime`        | `() => boolean`                                               | Which runtime the code runs on, as a plain check                |
+| `createSerializable`, `createSynchronizable`           | `(value) => ref`                                              | Make a value that can cross between runtimes                    |
+
+Types: `WorkletFunction`, `WorkletRuntime`.
+
+### Configuration, flags and diagnostics
+
+| Name                                                 | Description                                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `configureReanimatedLogger`, `ReanimatedLogLevel`    | Sets the level and strictness of Reanimated's own warnings                         |
+| `enableLayoutAnimations`                             | Turns layout animations on or off                                                  |
+| `getStaticFeatureFlag`                               | Reads a flag baked into the native build                                           |
+| `getDynamicFeatureFlag`, `setDynamicFeatureFlag`     | Reads or sets a flag at runtime                                                    |
+| `ReduceMotion`                                       | `System`, `Always` or `Never`, taken by animation functions                        |
+| `reanimatedVersion`, `isReanimated3`, `isConfigured` | Version and setup checks                                                           |
+| `getUseOfValueInStyleWarning`                        | Returns the text of the warning about a shared value used directly in a style      |
+| `NativeEventsManager`                                | Upstream's attach and detach logic; the engine's own event binding does not use it |
+
+Enums: `InterfaceOrientation`, `IOSReferenceFrame`, `KeyboardState`, `SensorType`, `LayoutAnimationType`.
+
+### Screen transitions
+
+`ScreenTransition`, `startScreenTransition` and `finishScreenTransition` are exported with upstream's
+signatures. They are not tied to `@symbiote-native/navigation` yet.
+
+### Testing
+
+`setUpTests`, `withReanimatedTimer`, `advanceAnimationByTime`, `advanceAnimationByFrame` and
+`getAnimatedStyle` are upstream's Jest helpers. The package's own tests run under vitest, so use
+them only where your runner provides what they expect.
+
+### Types
+
+Every type of upstream's entry is exported. The ones you will name most are `SharedValue`,
+`DerivedValue`, `AnimatedRef`, `AnimatedStyle`, `AnimatedProps`, `WithTimingConfig`,
+`WithSpringConfig`, `WithDecayConfig`, `EntryOrExitLayoutType`, `ILayoutAnimationBuilder`,
+`ExitAnimationsValues`, `EntryAnimationsValues`, `LayoutAnimationsValues`, `ScrollEvent`,
+`MeasuredDimensions`, `FrameInfo`, `WorkletRuntime`, `AnimatableValue` and `CSSAnimationKeyframes`.
+The full list, from the entry file:
+
+```
+AnimatableValue AnimatableValueObject AnimatedKeyboardInfo AnimatedKeyboardOptions AnimatedProps
+AnimatedRef AnimatedScreenTransition AnimatedScrollViewProps AnimatedSensor AnimatedStyle
+AnimatedTransform Animation AnimationCallback AnimationObject BaseLayoutAnimationConfig
+CSSAnimationCallback CSSAnimationDelay CSSAnimationDirection CSSAnimationDuration CSSAnimationEvent
+CSSAnimationFillMode CSSAnimationIterationCount CSSAnimationKeyframeSelector CSSAnimationKeyframes
+CSSAnimationPlayState CSSAnimationProperties CSSAnimationSettings CSSAnimationTimingFunction
+CSSCallbackProps CSSGradientStop CSSKeyframesRule CSSLinearGradientProps CSSPseudoSelectorKey
+CSSRadialGradientProps CSSStyle CSSTransitionCallback CSSTransitionDelay CSSTransitionDuration
+CSSTransitionEvent CSSTransitionProperties CSSTransitionProperty CSSTransitionSettings
+CSSTransitionShorthand CSSTransitionTimingFunction ComponentCoords DecayAnimation DelayAnimation
+DerivedValue EasingFunction EasingFunctionFactory EntryAnimationsValues EntryExitAnimationFunction
+EntryOrExitLayoutType EventHandler EventHandlerProcessed ExitAnimationsValues ExtrapolationConfig
+ExtrapolationType FlatListPropsWithLayout FrameCallback FrameInfo GoBackGesture IEntryExitAnimationBuilder
+ILayoutAnimationBuilder InterpolateHSV InterpolateRGB InterpolationOptions KeyframeProps LayoutAnimation
+LayoutAnimationFunction LayoutAnimationStartFunction LayoutAnimationsValues LogData LogFunction
+LoggerConfig MeasuredDimensions ParsedColorArray PerformanceMonitorProps ReanimatedEvent RepeatAnimation
+ScreenTransitionConfig ScrollEvent ScrollHandler ScrollHandlerProcessed ScrollHandlers SensorConfig
+SequenceAnimation SharedTransitionBoundaryProps SharedValue SpringAnimation StyleLayoutAnimation
+StyleProps TimingAnimation TransformArrayItem UseHandlerContext Value3D ValueRotation WithDecayConfig
+WithSpringConfig WithTimingConfig WorkletRuntime
+```
+
+## Notes
+
+- Checked on an iOS simulator and on Android, in all five adapters (Vue in both TSX and SFC form).
+- Shared element transitions follow Reanimated's own flag, off by default (see Installation).
+- `animatedProps` takes handles only. Upstream also copies a plain object into static props, which
+  a normal prop does as well.
+- `useTimestamp(isActive)` reads its flag once in the frameworks where setup runs once.
+- A CSS state used in a style with no package registered throws in a dev bundle and the property is
+  ignored in a release one.
+- `react-native-gesture-handler` is a separate package and is not part of this one.
+
+## Common questions
+
+- **"Failed to create a worklet", or the hook throws that it needs a worklet.** The worklets plugin is
+  missing from `babel.config.js`, or it is not the last entry. Put `react-native-worklets/plugin`
+  last, then restart Metro with `--reset-cache`, since a stale cache keeps the old transform.
+- **"Native part of Reanimated doesn't seem to be initialized", or a mismatch between the JS and the
+  native version.** The app was not rebuilt after the install or an upgrade. Run `pod install` and
+  rebuild; the JS, the native code and the plugin must all come from the same minor version.
+- **"Unable to find a specification for RNWorklets" on iOS, or "Unable to resolve module
+  react-native-worklets".** `react-native-worklets` is not installed. Add the version this release
+  lists in its peers, `~0.13.0`, next to `react-native-reanimated` `~4.7.1`.
+- **The box jumps instead of animating.** Assigning `x.value = 100` sets the value at once.
+  Assign the result of an animation function: `x.value = withTiming(100)`.
+- **The style does not follow a prop in Vue, Svelte, Solid or Angular.** The prop is read outside the
+  updater, so only its first value reached the UI thread. Read it inside the updater, or move it
+  into a shared value.
+- **Shared element transitions do nothing.** The `ENABLE_SHARED_ELEMENT_TRANSITIONS` flag is off. It is
+  part of the native build, so a rebuild is needed after you set it.
+- **`[entering]` fails to compile in an Angular template.** A host tag takes layout animations only
+  through `[symbioteHostProps]`; `imports` lists classes, never a tag name.
+- **"Reduced motion setting is enabled on this device".** It is a development warning and safe to
+  ignore. Silence it with `LogBox.ignoreLogs`, or turn the setting off on the device.
+- **An exiting animation never plays, or an animation jumps to its end, on one device.** The system's
+  reduced motion setting is on. Then `withTiming` and `withSpring` return the target value at once, an
+  entering animation reaches its end instantly, and exiting animations and shared transitions are omitted.
+  Pass `ReduceMotion.Never` to the animations that must always run, such as
+  `FadeIn.reduceMotion(ReduceMotion.Never)`, and use `useReducedMotion()` to choose a gentler one.
+- **A tile with `entering` flickers on iOS when its animated style returns a `transform`.** Reported in
+  Reanimated 4 and open upstream. Upstream advises against animating the same properties with a layout
+  animation and an animated style on one node. Put the layout animation on a wrapper view instead.
+- **A release build with a development bundle fails.** Reanimated does not support that pairing; bundle
+  in release mode too.
+- **Does `createAnimatedComponent` wrap my component?** No, it returns the component you give it.
+  Tags are already animated, so there is nothing to wrap.
+
+Sources: [Reanimated troubleshooting](https://docs.swmansion.com/react-native-reanimated/docs/guides/troubleshooting),
+[Reanimated accessibility guide](https://docs.swmansion.com/react-native-reanimated/docs/guides/accessibility/),
+[Reanimated compatibility table](https://docs.swmansion.com/react-native-reanimated/docs/guides/compatibility),
+[software-mansion/react-native-reanimated#4737](https://github.com/software-mansion/react-native-reanimated/issues/4737),
+[software-mansion/react-native-reanimated#7354](https://github.com/software-mansion/react-native-reanimated/issues/7354).
+
+## How the wrapper works
+
+`@symbiote-native/reanimated` ships no native code. The native half of Reanimated and Worklets stays
+upstream's and is listed in your app, so the app's own autolinking picks it up.
+
+The JS half is split in two. Everything without a component, ref or renderer in it is upstream's code,
+re-exported: animations, easing, interpolation, colors, the layout animation builders, the worklets
+API. The hooks are the package's own thin controllers over upstream's `*Common` helpers, bound to the
+engine instead of to a React component.
+
+```
+packages/reanimated/src/
+├── core/        shared controllers over the upstream helpers, no framework in them
+├── register.ts  the engine claims, imported bare so a release build keeps them
+├── react/       hooks/       @symbiote-native/reanimated/react
+├── vue/         composables/ @symbiote-native/reanimated/vue
+├── svelte/      runes/       @symbiote-native/reanimated/svelte
+├── solid/       primitives/  @symbiote-native/reanimated/solid
+└── angular/     services/    @symbiote-native/reanimated/angular
+```
+
+`Animated.View` is the host tag itself. So an animated style, `entering` and the CSS props reach the
+node through the engine's prop claim, which takes those props out of the Fabric payload and hands
+them to Reanimated. That is why the same node works in every framework (see
+[how it works](/docs/how-it-works/)).
+
+A framework whose setup runs once follows what an updater reads and restarts the mapper over a fresh
+copy of the closure. This is why a value read outside the updater is frozen.

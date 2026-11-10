@@ -1,0 +1,21 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "react-native-reanimated": ["./node_modules/react-native-reanimated"],
+      "react-native-reanimated/src/*": [
+        "./node_modules/react-native-reanimated/lib/typescript/*"
+      ],
+      "react-native-worklets": ["./node_modules/react-native-worklets"],
+      "vue": ["../../adapters/vue/node_modules/vue"],
+      "@symbiote-native/vue": ["../../adapters/vue/src/index.ts"],
+      "@symbiote-native/reanimated": ["./src/core/index.ts"],
+      "@symbiote-native/reanimated/vue": ["./src/vue/index.ts"]
+    }
+  },
+  "vueCompilerOptions": {
+    "lib": "@symbiote-native/vue"
+  },
+  "include": ["../../examples/vue-sfc/screens/reanimated/**/*"]
+}

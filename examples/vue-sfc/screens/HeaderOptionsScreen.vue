@@ -1,113 +1,74 @@
-<!--
-  Header options demo: exercises headerLargeTitle, headerTintColor/headerStyle.backgroundColor,
-  a left bar button and a right bar-button MENU (both routed through setParams, see
-  header-options-screen-options.ts), and the full headerSearchBarOptions surface — every event
-  callback, plus the imperative SearchBarCommands ref driven by the buttons below (no need to
-  pull down manually to prove it). Vue SFC twin of
-  .examples/react/screens/HeaderOptionsScreen.tsx.
--->
-<script setup lang="ts">
-import { computed } from 'vue';
-import { useRoute } from '@symbiote-native/navigation/vue';
-import ActionButton from '../components/ActionButton.vue';
-import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-import { searchBarRef } from './header-options-screen-options';
+<script lang="ts">
+import type { IScreenOptionsResolver } from '@symbiote-native/navigation/vue';
+import { LINE_COLOR } from '../navigation-lines';
+import {
+  headerChromeOptionsOf,
+  readHeaderOptionsSettings,
+  searchBarOptionsOf,
+} from './header-options/header-options-settings';
+import { searchBarRef } from './header-options/search-bar-ref';
 
-type IHeaderOptionsParams = {
-  lastHeaderAction?: string;
-  lastSearchText?: string;
-  lastSearchSubmitted?: string;
-  lastSearchBarEvent?: string;
+// Registered on the root Stack.Screen as a resolver: the panel switches live in the route params,
+// and the bar button, menu and search callbacks write what they heard back into the same params
+export const headerOptionsScreenOptions: IScreenOptionsResolver = ({
+  route,
+  navigation,
+}) => {
+  const settings = readHeaderOptionsSettings(route.params);
+  return {
+    title: 'Header Options',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.presentation,
+    headerTitleColor: '#ffffff',
+    headerStyle: { backgroundColor: '#0b1622' },
+    // The large title has its own appearance, left unset it is system white
+    headerLargeStyle: { backgroundColor: '#0b1622' },
+    // The search field takes its chrome from this trait, not from the colours above
+    headerUserInterfaceStyle: 'dark',
+    ...headerChromeOptionsOf(settings, lastHeaderAction =>
+      navigation.setParams({ lastHeaderAction }),
+    ),
+    headerSearchBarOptions: {
+      ...searchBarOptionsOf(settings),
+      ref: searchBarRef,
+      onChangeText: lastSearchText => navigation.setParams({ lastSearchText }),
+      onSearchButtonPress: lastSearchSubmitted =>
+        navigation.setParams({ lastSearchSubmitted }),
+      onFocus: () => navigation.setParams({ lastSearchBarEvent: 'focused' }),
+      onBlur: () => navigation.setParams({ lastSearchBarEvent: 'blurred' }),
+      onCancelButtonPress: () =>
+        navigation.setParams({ lastSearchBarEvent: 'cancel pressed' }),
+      onClose: () =>
+        navigation.setParams({ lastSearchBarEvent: 'closed (Android)' }),
+      onOpen: () =>
+        navigation.setParams({ lastSearchBarEvent: 'opened (Android)' }),
+    },
+  };
 };
+</script>
 
-function isHeaderOptionsParams(value: unknown): value is IHeaderOptionsParams {
-  return typeof value === 'object' && value !== null;
-}
-
-const route = useRoute();
-const params = computed(() =>
-  isHeaderOptionsParams(route.value.params) ? route.value.params : {},
-);
-const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HeaderOptions];
+<script setup lang="ts">
+import ScreenHero from '../components/ScreenHero.vue';
+import { ROUTE_NAME } from '../routes';
+import HeaderRecipes from './header-options/HeaderRecipes.vue';
+import SearchRecipes from './header-options/SearchRecipes.vue';
 </script>
 
 <template>
-  <safe-area-view class="screen">
-    <view class="section">
-      <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
-      </view>
-      <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: LINE_COLOR.presentation }"
-        >
-          <text class="hero-badge-text"> HD </text>
-        </view>
-        <view class="hero-copy">
-          <text class="hero-title"> Header options </text>
-          <text class="hero-body">
-            Bar buttons, a right-side menu, a native search bar, and
-            headerLargeTitle — every headerSearchBarOptions callback wired to a
-            live control below.
-          </text>
-        </view>
-      </view>
-      <text class="info-text">
-        headerLargeTitle · headerTintColor · headerStyle.backgroundColor
-      </text>
-      <text testID="header-last-action" class="info-text">
-        {{
-          `last header action: ${params.lastHeaderAction ?? 'none yet — tap a bar button or menu item'}`
-        }}
-      </text>
-      <text testID="header-search-text" class="info-text">
-        {{
-          `last search text: ${params.lastSearchText ?? 'none yet — pull down and type'}`
-        }}
-      </text>
-      <text testID="header-search-submitted" class="info-text">
-        {{
-          `last search submitted: ${params.lastSearchSubmitted ?? 'none yet — type and press search'}`
-        }}
-      </text>
-      <text testID="header-search-event" class="info-text">
-        {{
-          `last search bar event: ${params.lastSearchBarEvent ?? 'none yet — focus/blur/cancel the search bar'}`
-        }}
-      </text>
-      <text class="note-text">
-        Pull down to reveal the search bar (headerSearchBarOptions), or use the
-        buttons below to drive it imperatively through its SearchBarCommands
-        ref.
-      </text>
-      <ActionButton
-        testID="search-bar-focus"
-        title="Focus search bar"
-        :onPress="() => searchBarRef?.focus()"
-        :color="LINE_COLOR.presentation"
+  <!-- The scroll view is the first child of the screen, so the large title can collapse with it -->
+  <scroll-view
+    testID="header-options-scroll"
+    class="screen"
+    contentInsetAdjustmentBehavior="automatic"
+  >
+    <view class="scroll-content">
+      <ScreenHero
+        :route="ROUTE_NAME.HeaderOptions"
+        title="Header options"
+        body="The native header: large title, bar buttons and menus, and the search bar with every knob and event."
       />
-      <ActionButton
-        testID="search-bar-set-text"
-        title="Set text: preset value"
-        :onPress="() => searchBarRef?.setText('preset value')"
-        :color="LINE_COLOR.presentation"
-      />
-      <ActionButton
-        testID="search-bar-clear"
-        title="Clear search"
-        :onPress="() => searchBarRef?.clearText()"
-        :color="LINE_COLOR.presentation"
-      />
-      <ActionButton
-        testID="search-bar-cancel"
-        title="Cancel search"
-        :onPress="() => searchBarRef?.cancelSearch()"
-        :color="LINE_COLOR.presentation"
-      />
+      <HeaderRecipes />
+      <SearchRecipes />
     </view>
-  </safe-area-view>
+  </scroll-view>
 </template>

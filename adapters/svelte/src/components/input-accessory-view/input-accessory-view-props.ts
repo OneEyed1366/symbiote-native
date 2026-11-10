@@ -4,19 +4,23 @@
 // declared per-adapter from scratch, mirroring React's and Vue's own local declarations, per
 // CLAUDE.md's <prop_types_split_agnostic_vs_per_adapter>.
 import type { Snippet } from 'svelte';
-import type { IStyleProp, IViewStyle } from '@symbiote-native/engine';
+import type {
+  IColorValue,
+  IStyleProp,
+  IViewStyle,
+} from '@symbiote-native/engine';
 import type {
   IAccessibilityProps,
   IAriaProps,
 } from '@symbiote-native/components';
 import type { ISvelteClassValue } from '../../class-value';
 
-export interface IInputAccessoryViewProps
-  extends IAccessibilityProps, IAriaProps {
-  // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
-  nativeID?: string;
-  backgroundColor?: string;
-  style?: IStyleProp<IViewStyle>;
-  class?: ISvelteClassValue;
-  children?: Snippet;
-}
+export type IInputAccessoryViewProps = IAccessibilityProps &
+  IAriaProps & {
+    // The id a TextInput's inputAccessoryViewID points at to dock above its keyboard.
+    nativeID?: string;
+    backgroundColor?: IColorValue;
+    style?: IStyleProp<IViewStyle>;
+    class?: ISvelteClassValue;
+    children?: Snippet;
+  };

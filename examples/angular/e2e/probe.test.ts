@@ -1,37 +1,35 @@
 import { by, device, element, waitFor } from 'detox';
 
-// Go/no-go probe for the Angular canary. It proves the native RN host starts, the
-// Angular adapter mounts through @symbiote-native/engine, and a Fabric view from the Angular
-// template reaches the native hierarchy with its testID. The app boots on the navigation demo
-// Menu screen (@symbiote-native/navigation's Stack) — the probe pushes into "Canary" first,
-// the screen carrying every primitive under test.
+// Go/no-go probe: a Fabric view from the Angular template reaches the native tree with its `testID`
+// The app boots on the Menu, so the probe opens the Framework hub and pushes into `Canary` first
+
+const MAX_SCROLL_STEPS = 15;
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// CanaryScreen's demo list is long (dozens of sections) — an element below the fold exists but
-// isn't hittable, so any tap/typeText target needs an explicit scroll first (sync is off, so
-// nothing does this implicitly). Resets to the top first so this works regardless of where a
-// prior test left the scroll position, then steps down a fixed distance at a time, checking
-// visibility after each step — scrollTo('bottom') overshoots targets that sit well above the
-// screen's true end (more demo sections follow them), and whileElement(...).scroll()'s own retry
-// budget doesn't reach every target on a screen this long. The scroll gesture itself keeps
-// drifting for a beat after it resolves (RN momentum/deceleration), so a settle delay follows
-// before any tap/typeText targeting the result.
-async function bringIntoView(id: string): Promise<void> {
-  const scrollView = element(by.id('angular-canary-scroll'));
-  const target = element(by.id(id));
-  await scrollView.scrollTo('top');
-  for (let step = 0; step < 15; step += 1) {
-    try {
-      await waitFor(target).toBeVisible().withTimeout(400);
-      break;
-    } catch {
-      await scrollView.scroll(500, 'down');
-    }
+// Sync is off, so a below-the-fold target exists but is not hittable until it is scrolled to
+// Steps down by a fixed distance, `scrollTo('bottom')` overshoots targets above the screen end
+async function scrollUntilVisible(
+  id: string,
+  stepsLeft: number,
+): Promise<void> {
+  try {
+    await waitFor(element(by.id(id)))
+      .toBeVisible()
+      .withTimeout(400);
+  } catch (error) {
+    if (stepsLeft <= 0) throw error;
+    await element(by.id('angular-canary-scroll')).scroll(500, 'down');
+    return scrollUntilVisible(id, stepsLeft - 1);
   }
-  await waitFor(target).toBeVisible().withTimeout(3_000);
+}
+
+// Momentum keeps drifting after the scroll resolves, so a settle delay follows
+async function bringIntoView(id: string): Promise<void> {
+  await element(by.id('angular-canary-scroll')).scrollTo('top');
+  await scrollUntilVisible(id, MAX_SCROLL_STEPS);
   await sleep(300);
 }
 
@@ -44,8 +42,11 @@ describe('Angular symbiote attach probe', () => {
   });
 
   it('navigates from the menu into the Canary screen through Fabric', async () => {
-    // toExist alone races the Menu screen's own layout pass — the row can exist in the tree
-    // a beat before it's laid out/hittable. toBeVisible waits for that to settle.
+    // `toExist` races the layout pass, the row can exist a beat before it is hittable
+    await waitFor(element(by.id('menu-row-FrameworkHub')))
+      .toBeVisible()
+      .withTimeout(10_000);
+    await element(by.id('menu-row-FrameworkHub')).tap();
     await waitFor(element(by.id('menu-row-Canary')))
       .toBeVisible()
       .withTimeout(10_000);
@@ -87,14 +88,9 @@ describe('Angular symbiote attach probe', () => {
       .withTimeout(10_000);
   });
 
-  // SKIPPED: angular-open-modal sits at elementFrame.y≈5862 inside this screen's very tall
-  // scroll content (real on-screen frame.y≈588, well within the viewport — confirmed reachable
-  // by a raw coordinate tap outside Detox). Detox's own hittability pre-check reports it
-  // non-hittable regardless — a long-standing upstream issue (wix/Detox #3130, #4747, #2229;
-  // the strict hittability assertion landed in 19.3.0 and is still open), likely aggravated here
-  // by the two FlatLists nested inside this ScrollView (an anti-pattern Detox is known to
-  // mis-measure around). Re-enable once upstream fixes hittability for deep/nested-scroll
-  // targets, or if CanaryScreen's nested FlatLists are ever pulled out of the ScrollView.
+  // SKIPPED: Detox reports `angular-open-modal` non-hittable, a raw coordinate tap reaches it
+  // Upstream issue (wix/Detox #3130, #4747, #2229), likely worsened by the nested FlatLists
+  // Re-enable once it is fixed upstream or the FlatLists leave the ScrollView
   it.skip('opens and closes an Angular Modal through Fabric', async () => {
     await bringIntoView('angular-open-modal');
     await element(by.id('angular-open-modal')).tap();

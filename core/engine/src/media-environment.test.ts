@@ -2,10 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { Dimensions } from './dimensions';
 import { resetMediaEnvironment } from './media-environment';
 import { createElement, routeProp } from './node';
 import { getPublishedStyle } from './node-style';
+import { Dimensions } from './react-native-host';
 import { clearGlobalStyles, registerRules } from './style-registry';
 import { resetMediaSubscriptions } from './style-registry/media-subscriptions';
 

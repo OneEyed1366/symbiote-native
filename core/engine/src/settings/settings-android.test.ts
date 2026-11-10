@@ -1,19 +1,22 @@
-// Settings on Android is RN's SettingsFallback (Settings.js -> SettingsFallback.js): every call
-// warns and does nothing — no JS snapshot, no watchers. The iOS build's SettingsManager behavior
-// must not leak onto Android.
+// Off iOS, `Settings` is RN's SettingsFallback (Settings.js): every call warns and does nothing,
+// with no snapshot and no watchers
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
-import { Settings } from './index.android';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// @ts-expect-error - untyped Flow source
+import SettingsFallback from 'react-native/Libraries/Settings/SettingsFallback';
+import { Settings, setReactNativeHost } from '../react-native-host';
 
 const UNSUPPORTED = 'Settings is not yet supported on this platform.';
+
+beforeEach(() => {
+  setReactNativeHost({ Settings: SettingsFallback });
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('Settings (android) — RN SettingsFallback', () => {
-  // why: RN returns null and keeps no state; a value set on Android is not readable back.
+describe('Settings (android) - RN SettingsFallback', () => {
   it('get returns null, even after a set', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     Settings.set({ theme: 'dark' });
@@ -21,7 +24,6 @@ describe('Settings (android) — RN SettingsFallback', () => {
     expect(warn).toHaveBeenCalledWith(UNSUPPORTED);
   });
 
-  // why: RN hands back -1 and never calls the watcher.
   it('watchKeys returns -1 and never fires', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const callback = vi.fn();

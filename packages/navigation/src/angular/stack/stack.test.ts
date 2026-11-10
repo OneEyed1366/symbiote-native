@@ -1,23 +1,10 @@
-// Co-located Angular-driven test (ADR 0025) for the @symbiote-native/navigation Angular Stack.
-// Proves the shared core drives Angular correctly against an INJECTED codegen-shaped ViewConfig
-// (mirrors packages/navigation/src/react/stack.test.tsx and
-// adapters/angular/src/components/switch/switch.test.ts's mount/unmount harness - this codebase's
-// Angular tests drive the real renderer via `mount`/`unmount`, not TestBed). Stack/ScreenDirective
-// are imported from their own modules (NOT the package barrel, './index') so the third-party
-// native-spec side-effect (../register) never loads headless.
-//
-// Route-stack REDUCER logic (navigatorReducer's push/pop/popToTop/popTo/replace/setParams/reset
-// transitions) is core's responsibility and has its own canonical, framework-free coverage in
-// core/navigator-state.test.ts (mirrors react/stack/stack.test.tsx's identical scoping decision -
-// see its own header comment). This file only proves Angular's dispatch->signal->template WIRING
-// works, which push/pop/setParams/reset below already establish as one pattern; popToTop/popTo/
-// replace go through that exact same private `dispatch()` method (see index.ts), so they are N/A
-// here rather than re-proving the same wiring a third/fourth/fifth time.
-//
-// No Negative group: Stack has no guard clause of its own that throws - "refuses to pop the last
-// route" is a no-op the reducer already fails closed on (core's own contract, proven by
-// navigator-state.test.ts's "no-op on a single-route stack" case), observed here only as an
-// unchanged screen count, not a thrown error.
+// Angular `Stack` against an injected codegen-shaped ViewConfig, driven through `mount` and not
+// TestBed. Imported from `./index`, not the package barrel, so `../register` never loads headless
+
+// Reducer transitions are core's own tests, this file proves the dispatch to signal to template
+// wiring. `popToTop`, `popTo` and `replace` share the private `dispatch()` that push and pop cover
+
+// No Negative group: popping the last route is a no-op the reducer already fails closed on
 
 import '@angular/compiler';
 import {
@@ -27,6 +14,8 @@ import {
   ViewChild,
   signal,
   type Signal,
+  type TemplateRef,
+  type Type,
 } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -48,15 +37,22 @@ import {
 import { Stack } from './index';
 import type { INavigatorHandle } from './index';
 import { ScreenDirective } from '../screen.directive';
+import type { IAngularScreenOptions } from '../screen.directive';
 import { injectRoute } from '../injectors';
-import type { INavigatorState, IRoute, ISearchBarCommands } from '../../core';
+import type {
+  INavigatorState,
+  IRoute,
+  IScreenOptionsResolver,
+  ISearchBarCommands,
+} from '../../core';
 
-const ROOT_TAG = 5120;
+const ROOT_TAG = 5_120;
 const SCREEN_VIEW = 'RNSScreen';
 const STACK_VIEW = 'RNSScreenStack';
 const HEADER_CONFIG_VIEW = 'RNSScreenStackHeaderConfig';
 const HEADER_SUBVIEW_VIEW = 'RNSScreenStackHeaderSubview';
 const SEARCH_BAR_VIEW = 'RNSSearchBar';
+const SHEET_FOOTER_VIEW = 'RNSScreenFooter';
 
 function directEvent(registrationName: string): { registrationName: string } {
   return { registrationName };
@@ -81,7 +77,7 @@ const RNS_SCREEN_STACK_VIEW_CONFIG: INativeViewConfig = {
   directEventTypes: {
     topFinishTransitioning: directEvent('onFinishTransitioning'),
   },
-  validAttributes: {},
+  validAttributes: { nativeContainerBackgroundColor: true },
 };
 
 const RNS_HEADER_CONFIG_VIEW_CONFIG: INativeViewConfig = {
@@ -101,19 +97,18 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
   [STACK_VIEW]: RNS_SCREEN_STACK_VIEW_CONFIG,
   [HEADER_CONFIG_VIEW]: RNS_HEADER_CONFIG_VIEW_CONFIG,
   [SEARCH_BAR_VIEW]: RNS_SEARCH_BAR_VIEW_CONFIG,
-  // Same prop/event surface as a plain RNSScreen (resolveScreenRenderPlan's screenProps don't
-  // differ by outer tag) - only WHICH tag gets mounted differs, which is exactly what the modal
-  // test below proves.
+  // Same props and events as a plain RNSScreen, only the mounted tag differs
   [MODAL_SCREEN_VIEW]: RNS_SCREEN_VIEW_CONFIG,
+  [SHEET_FOOTER_VIEW]: {
+    directEventTypes: {},
+    validAttributes: { collapsable: true },
+  },
 };
 
 const fabric = installRecordingFabric();
 setNativeViewConfigSource(name => VIEW_CONFIGS[name]);
-// On a real Metro build, adapters/angular's babel-register-composed.cjs auto-registers `Stack`
-// as an anchor host by scanning the AOT-compiled @Component's selector - vitest never runs that
-// pipeline, so this test drives the same self-registration entry point by hand (mirrors
-// renderer.test.ts's 'RefApiDemo' convention). Without it, `<Stack>` falls through to a raw
-// Fabric createNode('Stack') call instead of a non-painting anchor.
+// Metro registers `Stack` as an anchor host at bundle time, vitest skips that step
+// Without this call `<Stack>` would reach Fabric as a raw `Stack` node
 registerComposedComponent('Stack');
 
 const tick = (): Promise<void> =>
@@ -122,20 +117,16 @@ const tick = (): Promise<void> =>
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// A POP is the subject of half this file, so every walk below descends the LIVE child links from
-// the outermost stack container down. A recording keeps every node it ever saw created, so a
-// popped screen is still in the record and only the tree says it is gone.
+// Half this file is about pops, so walks descend the live child links from the stack container
+// A recording keeps popped screens too, only the tree says one is gone
 function stackRoot(): ISymbioteNode {
   const stack = fabric.find(node => node.viewName === STACK_VIEW);
   if (stack === undefined) throw new Error('no screen stack created');
   return stack.handle;
 }
 
-// ANCHORS ARE FLATTENED, and on this adapter that is not a detail. Angular's renderer leaves an
-// anchor under the header config; an anchor is structural bookkeeping nothing native ever sees, so
-// the commit walk puts its children in its place (`renderableChildren`) and so does this. The count
-// below means NATIVE children — "zero children when there is no search bar" is a claim about native
-// cost, and an anchor is none.
+// Anchors are flattened, as the commit walk does: bookkeeping nothing native ever sees
+// The counts below mean native children, an anchor costs none
 function kidsOf(node: IAuthoredNode): IAuthoredNode[] {
   const walk = (handle: ISymbioteNode): IAuthoredNode[] => {
     const kids: IAuthoredNode[] = [];
@@ -196,9 +187,8 @@ class HomeScreenComponent {}
 })
 class DetailsScreenComponent {}
 
-// Each mounted instance captures its own live route Signal (injectRoute) in order - index 0 is
-// Home, index 1 the pushed Details - so a test reads params/key straight off the screen's DI-
-// provided route instead of a former @Input, and a setParams still updates it reactively.
+// Each mounted screen captures its own `injectRoute` signal in order, Home first, then Details
+// A test reads params and key off it, and `setParams` still updates it
 const capturedParamRoutes: Signal<IRoute<unknown>>[] = [];
 
 @Component({
@@ -257,12 +247,8 @@ async function mountStack(): Promise<INavigatorHandle> {
   return host.nav;
 }
 
-// Dedicated hosts (fixed component wiring declared up front, mirroring react/stack.test.tsx's
-// per-test `createElement(...)` calls) for the params/setParams/search-bar scenarios below -
-// swapping a `[component]`/`[options]` binding value on an already-mounted host AFTER `mount()`
-// is a real but separate correctness question (does a bare, non-signal field write on the host
-// get picked up by the next CD pass at all); sidestepped here by declaring the desired wiring
-// once, up front, exactly like every other test in this file already does.
+// Dedicated hosts declare their wiring up front for the params and search bar cases
+// Rebinding `[component]` or `[options]` after `mount()` is a separate question, avoided here
 
 let capturedParamsHost: ParamsStackTestHost | undefined;
 
@@ -308,6 +294,37 @@ async function mountParamsStack(): Promise<INavigatorHandle> {
   return host.nav;
 }
 
+let capturedResolverHost: ResolverStackTestHost | undefined;
+
+@Component({
+  selector: 'resolver-stack-test-host',
+  standalone: true,
+  imports: [Stack, ScreenDirective],
+  template: `
+    <Stack #nav initialRouteName="Home">
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+        [options]="resolver"
+      ></ng-template>
+    </Stack>
+  `,
+})
+class ResolverStackTestHost {
+  @ViewChild('nav') nav!: Stack;
+
+  homeComponent = HomeScreenComponent;
+  resolver: IScreenOptionsResolver = ({ route }) => ({
+    title: String(route.params ?? 'none'),
+  });
+
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    capturedResolverHost = this;
+  }
+}
+
 @Component({
   selector: 'search-bar-stack-test-host',
   standalone: true,
@@ -333,6 +350,82 @@ class SearchBarStackTestHost {
   };
 }
 
+type IHeaderTemplates = Record<
+  'left' | 'right' | 'title',
+  TemplateRef<unknown>
+>;
+
+// The options hold `TemplateRef`s that only the host's own template can name, so a case supplies
+// a builder and the host calls it once with its three templates
+let buildHeaderOptions: (
+  templates: IHeaderTemplates,
+) => IAngularScreenOptions = () => ({});
+
+@Component({
+  selector: 'header-views-stack-test-host',
+  standalone: true,
+  imports: [Stack, ScreenDirective],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `
+    <ng-template #left><view testID="custom-left"></view></ng-template>
+    <ng-template #right><view testID="custom-right"></view></ng-template>
+    <ng-template #title><view testID="custom-title"></view></ng-template>
+    <Stack initialRouteName="Home">
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+        [options]="optionsWith(left, right, title)"
+      ></ng-template>
+    </Stack>
+  `,
+})
+class HeaderViewsStackTestHost {
+  homeComponent = HomeScreenComponent;
+  private cachedOptions: IAngularScreenOptions | undefined;
+
+  optionsWith(
+    left: TemplateRef<unknown>,
+    right: TemplateRef<unknown>,
+    title: TemplateRef<unknown>,
+  ): IAngularScreenOptions {
+    this.cachedOptions ??= buildHeaderOptions({ left, right, title });
+    return this.cachedOptions;
+  }
+}
+
+// The footer option holds a `TemplateRef` only the host's own template can name, as above
+let buildFooterOptions: (
+  footer: TemplateRef<unknown>,
+) => IAngularScreenOptions = () => ({});
+
+@Component({
+  selector: 'sheet-footer-stack-test-host',
+  standalone: true,
+  imports: [Stack, ScreenDirective],
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
+  template: `
+    <ng-template #footer><view testID="custom-footer"></view></ng-template>
+    <Stack initialRouteName="Home">
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+        [options]="optionsWith(footer)"
+      ></ng-template>
+    </Stack>
+  `,
+})
+class SheetFooterStackTestHost {
+  homeComponent = HomeScreenComponent;
+  private cachedOptions: IAngularScreenOptions | undefined;
+
+  optionsWith(footer: TemplateRef<unknown>): IAngularScreenOptions {
+    this.cachedOptions ??= buildFooterOptions(footer);
+    return this.cachedOptions;
+  }
+}
+
 @Component({
   selector: 'modal-stack-test-host',
   standalone: true,
@@ -356,6 +449,25 @@ class ModalStackTestHost {
     title: 'Home',
     stackPresentation: 'modal',
   };
+}
+
+@Component({
+  selector: 'container-style-stack-test-host',
+  standalone: true,
+  imports: [Stack, ScreenDirective],
+  template: `
+    <Stack initialRouteName="Home" [nativeContainerStyle]="containerStyle">
+      <ng-template
+        symbioteScreen
+        name="Home"
+        [component]="homeComponent"
+      ></ng-template>
+    </Stack>
+  `,
+})
+class ContainerStyleStackTestHost {
+  homeComponent = HomeScreenComponent;
+  containerStyle = { backgroundColor: '#112233' };
 }
 
 @Component({
@@ -419,6 +531,50 @@ async function mountDynamicStack(): Promise<INavigatorHandle> {
   return host.nav;
 }
 
+type IForScreen = { name: string; component: Type<unknown> };
+
+let capturedForHost: ForStackTestHost | undefined;
+
+// The screen list comes from data, the shape an app takes to register a table of screens
+@Component({
+  selector: 'for-stack-test-host',
+  standalone: true,
+  imports: [Stack, ScreenDirective],
+  template: `
+    <Stack #nav initialRouteName="Home">
+      @for (screen of screens; track screen.name) {
+        <ng-template
+          symbioteScreen
+          [name]="screen.name"
+          [component]="screen.component"
+        ></ng-template>
+      }
+    </Stack>
+  `,
+})
+class ForStackTestHost {
+  @ViewChild('nav') nav!: Stack;
+
+  readonly screens: readonly IForScreen[] = [
+    { name: 'Home', component: HomeScreenComponent },
+    { name: 'Details', component: DetailsScreenComponent },
+  ];
+
+  constructor() {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    capturedForHost = this;
+  }
+}
+
+async function mountForStack(): Promise<INavigatorHandle> {
+  capturedForHost = undefined;
+  mount(ROOT_TAG, ForStackTestHost);
+  await tick();
+  const host = capturedForHost;
+  if (!host) throw new Error('ForStackTestHost never mounted');
+  return host.nav;
+}
+
 describe('Angular Stack navigator', () => {
   it('mounts only the initial route as an RNSScreen, focused, with its header title', async () => {
     await mountStack();
@@ -427,6 +583,14 @@ describe('Angular Stack navigator', () => {
     expect(screens[0].props.activityState).toBe(2);
     expect(fabric.find(n => n.viewName === STACK_VIEW)).toBeDefined();
     expect(headerConfigOf(screens[0]).props.title).toBe('Home');
+  });
+
+  it('paints the stack container with nativeContainerStyle.backgroundColor', async () => {
+    mount(ROOT_TAG, ContainerStyleStackTestHost);
+    await tick();
+
+    const stack = fabric.find(node => node.viewName === STACK_VIEW);
+    expect(stack?.props.nativeContainerBackgroundColor).toBeDefined();
   });
 
   it('push() mounts a second RNSScreen and keeps both at activityState 2', async () => {
@@ -504,10 +668,24 @@ describe('Angular Stack navigator', () => {
     expect(screenNodes()).toHaveLength(2);
   });
 
+  // A demo panel steers the header with route params, so `setParams` has to re-run the resolver
+  it('setParams() re-runs an options resolver, the header follows the params', async () => {
+    capturedResolverHost = undefined;
+    mount(ROOT_TAG, ResolverStackTestHost);
+    await tick();
+    const host = capturedResolverHost;
+    if (!host) throw new Error('ResolverStackTestHost never mounted');
+    expect(headerConfigOf(screenNodes()[0]).props.title).toBe('none');
+
+    host.nav.setParams('second');
+    await tick();
+    expect(headerConfigOf(screenNodes()[0]).props.title).toBe('second');
+  });
+
   it('setParams() targets a route by key when given, not just the focused one', async () => {
     capturedParamRoutes.length = 0;
     const handle = await mountParamsStack();
-    // Home mounts first (ParamsScreenComponent, initialParams: {tab:'feed'}), capturing its route.
+    // Home mounts first and captures its route, its `initialParams` are the feed tab
     const homeRoute = capturedParamRoutes[0];
     if (homeRoute === undefined)
       throw new Error('home route was never captured');
@@ -552,6 +730,11 @@ describe('Angular Stack navigator', () => {
     const subview = kidsOf(header)[0];
     expect(subview.viewName).toBe(HEADER_SUBVIEW_VIEW);
     expect(subview.props.type).toBe('searchBar');
+    expect(subview.props.style).toContainEqual({
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    });
     expect(kidsOf(subview)).toHaveLength(1);
     expect(kidsOf(subview)[0].viewName).toBe(SEARCH_BAR_VIEW);
     expect(kidsOf(subview)[0].props.placeholder).toBe('Search');
@@ -584,18 +767,173 @@ describe('Angular Stack navigator', () => {
     });
   });
 
+  describe('custom header views', () => {
+    async function mountHeaderViews(
+      build: (templates: IHeaderTemplates) => IAngularScreenOptions,
+    ): Promise<IAuthoredNode[]> {
+      buildHeaderOptions = build;
+      mount(ROOT_TAG, HeaderViewsStackTestHost);
+      await tick();
+      return kidsOf(headerConfigOf(screenNodes()[0]));
+    }
+
+    const subviewOfType = (
+      subviews: IAuthoredNode[],
+      type: string,
+    ): IAuthoredNode | undefined =>
+      subviews.find(node => node.props.type === type);
+
+    it.each([
+      {
+        option: 'headerLeft',
+        type: 'left',
+        testID: 'custom-left',
+        build: (t: IHeaderTemplates) => ({ headerLeft: t.left }),
+      },
+      {
+        option: 'headerRight',
+        type: 'right',
+        testID: 'custom-right',
+        build: (t: IHeaderTemplates) => ({ headerRight: t.right }),
+      },
+      {
+        option: 'headerTitle',
+        type: 'center',
+        testID: 'custom-title',
+        build: (t: IHeaderTemplates) => ({ headerTitle: t.title }),
+      },
+    ])(
+      'mounts the $option template inside a $type subview',
+      async ({ type, testID, build }) => {
+        const subview = subviewOfType(await mountHeaderViews(build), type);
+
+        expect(subview?.viewName).toBe(HEADER_SUBVIEW_VIEW);
+        expect(subview && kidsOf(subview)[0]?.props.testID).toBe(testID);
+      },
+    );
+
+    it('sends the side priority and background options to the matching subview', async () => {
+      const subviews = await mountHeaderViews(t => ({
+        headerRight: t.right,
+        headerRightVisibilityPriority: 'low',
+        headerRightBackgroundVisible: false,
+      }));
+
+      const right = subviewOfType(subviews, 'right');
+      expect(right?.props.visibilityPriority).toBe('low');
+      expect(right?.props.hidesSharedBackground).toBe(true);
+    });
+
+    it('hosts the back image source in a back subview holding an image', async () => {
+      const subviews = await mountHeaderViews(() => ({
+        headerBackImageSource: { uri: 'https://example.test/b.png' },
+      }));
+
+      const back = subviewOfType(subviews, 'back');
+      expect(back && kidsOf(back).map(child => child.viewName)).toEqual([
+        'RCTImageView',
+      ]);
+    });
+
+    it('keeps the search bar subview next to a custom one', async () => {
+      const subviews = await mountHeaderViews(t => ({
+        headerLeft: t.left,
+        headerSearchBarOptions: { placeholder: 'Search' },
+      }));
+
+      expect(subviewOfType(subviews, 'left')).toBeDefined();
+      expect(subviewOfType(subviews, 'searchBar')).toBeDefined();
+    });
+
+    it('adds no subview when the app sets no custom view', async () => {
+      expect(await mountHeaderViews(() => ({ title: 'Home' }))).toEqual([]);
+    });
+  });
+
+  describe('sheet footer', () => {
+    async function mountSheet(
+      build: (footer: TemplateRef<unknown>) => IAngularScreenOptions,
+    ): Promise<void> {
+      buildFooterOptions = build;
+      mount(ROOT_TAG, SheetFooterStackTestHost);
+      await tick();
+    }
+
+    const footerNode = () =>
+      findInTree(node => node.viewName === SHEET_FOOTER_VIEW);
+    const hasFooterChild = (viewName: string): boolean => {
+      const parent = findInTree(node => node.viewName === viewName);
+      return (
+        parent !== undefined &&
+        kidsOf(parent).some(kid => kid.viewName === SHEET_FOOTER_VIEW)
+      );
+    };
+
+    it('mounts the footer template inside a native footer on a form sheet', async () => {
+      await mountSheet(footer => ({
+        stackPresentation: 'formSheet',
+        sheetFooter: footer,
+      }));
+
+      const footer = footerNode();
+      expect(footer && kidsOf(footer)[0]?.props.testID).toBe('custom-footer');
+    });
+
+    it('keeps the footer a real view, as native finds it by class', async () => {
+      await mountSheet(footer => ({
+        stackPresentation: 'formSheet',
+        sheetFooter: footer,
+      }));
+
+      expect(footerNode()?.props.collapsable).toBe(false);
+    });
+
+    it('puts the footer in the inner screen that holds the header', async () => {
+      await mountSheet(footer => ({
+        stackPresentation: 'formSheet',
+        sheetFooter: footer,
+      }));
+
+      expect(hasFooterChild(SCREEN_VIEW)).toBe(true);
+    });
+
+    it('puts the footer straight in the screen when the header is hidden', async () => {
+      await mountSheet(footer => ({
+        stackPresentation: 'formSheet',
+        headerShown: false,
+        sheetFooter: footer,
+      }));
+
+      expect(hasFooterChild(MODAL_SCREEN_VIEW)).toBe(true);
+    });
+
+    it.each(['push', 'modal', 'pageSheet'] as const)(
+      'has no footer on a %s screen',
+      async stackPresentation => {
+        await mountSheet(footer => ({
+          stackPresentation,
+          sheetFooter: footer,
+        }));
+
+        expect(footerNode()).toBeUndefined();
+      },
+    );
+
+    it('has no footer when the sheet sets none', async () => {
+      await mountSheet(() => ({ stackPresentation: 'formSheet' }));
+
+      expect(footerNode()).toBeUndefined();
+    });
+  });
+
   it('renders the header config with zero children when there is no search bar', async () => {
     await mountStack();
     const header = headerConfigOf(screenNodes()[0]);
     expect(kidsOf(header)).toHaveLength(0);
   });
 
-  // why: a modally-presented screen has no UINavigationController on iOS (render-stack.ts's
-  // isHeaderInModal comment) - RNSScreenStackHeaderConfig has nothing to attach a native nav bar
-  // to unless the template nests header + content inside a SECOND, inner RNSScreenStack/RNSScreen
-  // pair purely to host it. outerScreenIsModal/isInModal (Stack's template-bound methods) exist
-  // specifically to pick this branch; a plain 'push' screen (every other test in this file) never
-  // exercises it, so this is the only place either method's `true` path is proven at all.
+  // A modal screen has no navigation controller on iOS, so the template nests the header and
+  // content in an inner `RNSScreenStack` and `RNSScreen`. Only this case takes that branch
   it('a modal screen mounts as RNSModalScreen and nests its header inside an inner RNSScreenStack', async () => {
     mount(ROOT_TAG, ModalStackTestHost);
     await tick();
@@ -613,20 +951,16 @@ describe('Angular Stack navigator', () => {
     );
     if (!innerScreen)
       throw new Error('no inner RNSScreen nested inside the inner stack');
-    // The only RNSScreen anywhere is this inner one - the OUTER screen mounted as RNSModalScreen
-    // instead, exactly the substitution outerScreenIsModal exists to make. Compared by node
-    // IDENTITY: a recorded node is a fresh view object per lookup, so only the handle is the node.
+    // The only RNSScreen is the inner one, the outer mounted as RNSModalScreen
+    // Compared by handle, as a recorded node is a fresh view object per lookup
     expect(screenNodes().map(node => node.handle)).toEqual([
       innerScreen.handle,
     ]);
     expect(headerConfigOf(innerScreen).props.title).toBe('Home');
   });
 
-  // why: the route list is navigation HISTORY, not a projection of the @ContentChildren query, so
-  // a marker that leaves the query while its route is still pushed used to leave a phantom entry.
-  // Angular feels that worst of the four: its template mounts an RNSScreen per route regardless,
-  // so componentFor() returning null paints a REAL, EMPTY native screen - a blank screen the user
-  // is parked on with no way to tell what happened.
+  // The template mounts an `RNSScreen` per route, so a marker that leaves the query while its
+  // route is pushed would paint an empty screen the user cannot leave
   it('drops a pushed route whose screen marker leaves the content query', async () => {
     const handle = await mountDynamicStack();
     handle.push('Details');
@@ -648,9 +982,8 @@ describe('Angular Stack navigator', () => {
     expect(handle.canGoBack()).toBe(false);
   });
 
-  // why: the pruning must be PERSISTED into the state signal, not recomputed per read - a phantom
-  // left in the signal has the next push rebuild the stack on top of it, and the user then has to
-  // press back TWICE to leave a route they only visited once.
+  // The pruning must reach the state signal, else the next push rebuilds on the phantom and
+  // back needs two presses
   it('keeps the pruned history when a new route is pushed afterwards', async () => {
     const handle = await mountDynamicStack();
     handle.push('Details');
@@ -667,5 +1000,24 @@ describe('Angular Stack navigator', () => {
       findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
     ).toBeDefined();
     expect(handle.canGoBack()).toBe(false);
+  });
+
+  // An app registers a table of screens with an `@for`, so the content query must see its markers
+  it('registers the screens an @for block renders and pushes one of them', async () => {
+    const handle = await mountForStack();
+    expect(screenNodes()).toHaveLength(1);
+    expect(
+      findInTree(n => n.viewName === 'RCTRawText' && n.props.text === 'home'),
+    ).toBeDefined();
+
+    handle.push('Details');
+    await tick();
+
+    expect(screenNodes()).toHaveLength(2);
+    expect(
+      findInTree(
+        n => n.viewName === 'RCTRawText' && n.props.text === 'details',
+      ),
+    ).toBeDefined();
   });
 });

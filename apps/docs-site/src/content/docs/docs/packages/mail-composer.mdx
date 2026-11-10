@@ -15,19 +15,6 @@ React, Vue, Angular, Svelte, and Solid entry points are plain re-exports of the 
 Nothing is ever sent on the user's behalf. Both platforms open their own composer with the draft
 filled in; the user presses send, edits, or discards it.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -255,11 +242,13 @@ On Android it is always `sent`, whatever the user did.
 **An attachment is missing.** Attach files that live in the app's own storage, with a `file://`
 URI. A path owned by another app can be unreadable by the mail app.
 
-Sources: [Expo docs: MailComposer](https://docs.expo.dev/versions/latest/sdk/mail-composer/),
-[expo/expo#35466 isAvailableAsync not working on Android](https://github.com/expo/expo/issues/35466),
-[expo/expo#37740 plain text share screen on some Androids](https://github.com/expo/expo/issues/37740),
-[expo/expo#16690 cannot send HTML emails and never resolves](https://github.com/expo/expo/issues/16690),
-[expo/expo#20509 composeAsync does not return a result on Android](https://github.com/expo/expo/issues/20509).
+Sources:
+
+- [Expo docs: MailComposer](https://docs.expo.dev/versions/latest/sdk/mail-composer/)
+- [expo/expo#35466 isAvailableAsync not working on Android](https://github.com/expo/expo/issues/35466)
+- [expo/expo#37740 plain text share screen on some Androids](https://github.com/expo/expo/issues/37740)
+- [expo/expo#16690 cannot send HTML emails and never resolves](https://github.com/expo/expo/issues/16690)
+- [expo/expo#20509 composeAsync does not return a result on Android](https://github.com/expo/expo/issues/20509)
 
 ## How the wrapper works
 

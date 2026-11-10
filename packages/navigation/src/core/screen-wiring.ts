@@ -22,6 +22,7 @@ import {
   NAVIGATION_EVENT_FOCUS,
 } from './navigation-events';
 import type { INavigationEmitter } from './navigation-events';
+import type { IEdgeInsetScope } from './edge-insets';
 import type {
   INavigatorPlatform,
   IScreenOptions,
@@ -34,12 +35,20 @@ import {
   resolveStackProps,
 } from './render-stack';
 import type { IScreenRenderPlan } from './render-stack';
+import { warnOnScreenOptions } from './screen-warnings';
+import {
+  isHeaderBarButtonsAvailableForCurrentPlatform,
+  isIOS26OrHigherForCurrentPlatform,
+} from './screens-config';
 import { buildSearchBarHandle } from './search-bar-commands';
 import type { ISearchBarCommands } from './search-bar-commands';
+import type { ITransitionProgress } from './transition-progress';
 
 // `backTitleVisible` defaults to `true` on both platforms per the codegen spec's own default
 const NAVIGATOR_PLATFORM: INavigatorPlatform = {
   defaultHeaderBackTitleVisible: true,
+  headerBarButtonsAvailable: isHeaderBarButtonsAvailableForCurrentPlatform,
+  isIOS26OrHigher: isIOS26OrHigherForCurrentPlatform,
 };
 
 type IRouteRef = { key: string; name: string };
@@ -51,8 +60,13 @@ export type IStackRoutePlanInput = {
   options: IScreenOptions;
   emitter: INavigationEmitter;
   onPop: () => void;
-  // Route keys whose resolved props were already logged, so the dump runs once per mount
+  // Keys the plan remembers between renders: the route keys already logged, so the dump runs once
+  // per mount, and the last header visibility of a route
   loggedKeys: Set<string>;
+  // The scope this stack sits in, its header may already have taken some of the insets
+  parentScope?: IEdgeInsetScope;
+  // Values the route's screen reads through `useTransitionProgress`, left out when none is wired
+  transitionProgress?: ITransitionProgress;
   // The app's search bar ref lives in the adapter's own ref type, so the adapter writes it
   // The node comes along for an adapter whose ref callback re-runs for the same node
   // Left out by an adapter that attaches the ref to the host element itself
@@ -151,6 +165,14 @@ export function resolveStackRoutePlan(
     `Stack: render route "${route.name}" index=${index}/${routeCount - 1} ` +
       `activityState=${computeActivityState(index, routeCount)} at t=${Date.now()}`,
   );
+  const isAndroid = Platform.select({ android: true, default: false }) === true;
+  warnOnScreenOptions({
+    options,
+    routeKey: route.key,
+    isAndroid,
+    isIOS26OrHigher: NAVIGATOR_PLATFORM.isIOS26OrHigher,
+    seenKeys: loggedKeys,
+  });
   const searchBarOptions = options.headerSearchBarOptions;
   const plan = resolveScreenRenderPlan({
     screenId: route.key,
@@ -158,8 +180,10 @@ export function resolveStackRoutePlan(
     routeCount,
     options,
     platform: NAVIGATOR_PLATFORM,
-    isAndroid: Platform.select({ android: true, default: false }) === true,
+    isAndroid,
     screenPassthrough: buildScreenPassthrough(route.name, emitter, input.onPop),
+    parentScope: input.parentScope,
+    transitionProgress: input.transitionProgress,
     searchBarPassthrough: searchBarOptions
       ? buildSearchBarProps(
           route.name,

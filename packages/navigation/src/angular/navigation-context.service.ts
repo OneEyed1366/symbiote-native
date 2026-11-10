@@ -1,27 +1,18 @@
-// The lifecycle half of the framework-agnostic emitter (../core/navigation-events), Angular's
-// twin of react/navigation-context.ts's NavigationContext. React re-scopes a plain Context per
-// screen via NavigationContext.Provider; Angular's equivalent of "nearest-provider lookup" is
-// hierarchical DI - NavigationScopeDirective (./navigation-scope.directive) re-`providers: [...]`
-// a fresh NavigationContextService instance per route, and this service's own constructor injects
-// its PARENT instance (`@Optional() @SkipSelf()`), which Angular resolves to the nearest ANCESTOR
-// provider automatically - the exact `parent` linked list react/navigation-context.ts builds by
-// hand via `ambientContext`. A screen nested inside e.g. a Stack-screen-renders-a-Tab composition
-// reaches the enclosing Stack the same way a React screen does: one hop up `parent`.
-//
-// Every navigator kind a screen might be rendered under; consumers narrow the union themselves
-// ('push' in handle picks out a Stack handle) - mirrors react/navigation-context.ts's
-// IAnyNavigatorHandle exactly, minus the React-specific import cycle avoidance (Angular's `inject`
-// resolves this service by TOKEN, so no circular value import exists here at all - only the
-// type-only imports below, erased at compile time).
+// A screen's route, navigator handle and emitter live in one service, a fresh instance per route
+// `NavigationScopeDirective` provides it, and `parent` is the nearest ancestor instance
 
 import { Injectable, inject, signal, type Signal } from '@angular/core';
-import type { INavigationEmitter, IRoute, IAnyNavigatorHandle } from '../core';
+import type {
+  IEdgeInsetState,
+  INavigationEmitter,
+  IRoute,
+  IAnyNavigatorHandle,
+  ITransitionProgress,
+} from '../core';
 
 export type { IAnyNavigatorHandle } from '../core';
 
-// NOT `providedIn: 'root'` - deliberately component-scoped (see CLAUDE.md's design note for this
-// package): every NavigationScopeDirective usage re-provides this token, so DI naturally mints one
-// instance per route/screen, exactly like a fresh React Context value per screen.
+// Not `providedIn: 'root'`, each `NavigationScopeDirective` usage re-provides it for its own route
 @Injectable()
 export class NavigationContextService {
   private readonly ambientParent = inject(NavigationContextService, {
@@ -29,20 +20,18 @@ export class NavigationContextService {
     skipSelf: true,
   });
 
-  // `route` is the one field that legitimately changes over a mounted screen's lifetime (a
-  // setParams call swaps in a new route OBJECT with the same key/name) while the screen itself
-  // stays mounted - a plain field would go stale the moment a consumer reads it once (e.g. in a
-  // constructor, the natural `inject()` call site). A signal lets `injectRoute()`
-  // (./injectors/inject-route) hand back a live, reactive value with zero per-consumer
-  // subscription plumbing, matching this
-  // package's zoneless/signals-first convention. `navigation`/`emitter` are stable for a screen's
-  // whole lifetime, so they stay plain fields - no reactivity needed there.
+  // `route` is a signal, as `setParams` swaps in a new route object while the screen stays mounted
+  // `navigation` and `emitter` are stable for the screen's lifetime, so they stay plain fields
   private readonly routeSignal = signal<IRoute<unknown> | undefined>(undefined);
   readonly route: Signal<IRoute<unknown> | undefined> =
     this.routeSignal.asReadonly();
 
   navigation!: IAnyNavigatorHandle;
   emitter!: INavigationEmitter;
+  // Only a Stack route has one, as native sends transition events for stack screens alone
+  transitionProgress?: ITransitionProgress;
+  // The insets this screen's header took, a nested header reads them up the `parent` chain
+  edgeInsets?: IEdgeInsetState;
 
   get parent(): NavigationContextService | undefined {
     return this.ambientParent ?? undefined;
@@ -53,11 +42,8 @@ export class NavigationContextService {
   }
 }
 
-// Every injectX function (./injectors/*) opens with the same optional-inject-then-throw guard;
-// this centralizes it so the "must be used within a screen rendered by..." message stays
-// identical everywhere instead of six independently-typed copies. Must be called from an
-// injection context, same requirement `inject()` itself has - every call site is the first line
-// of an injectX function, which callers already only invoke from their own injection context.
+// The throw every `inject*` function shares, so its wording lands once
+// Needs an injection context, as `inject()` itself does
 export function requireNavigationContext(
   injectorName: string,
 ): NavigationContextService {

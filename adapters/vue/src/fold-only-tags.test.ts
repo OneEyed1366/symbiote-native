@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,
   installRecordingFabric,
+  seedWindowDimensions,
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 
@@ -37,7 +38,10 @@ async function mountTag(
   await settle();
 }
 
-beforeEach(() => fabric.reset());
+beforeEach(() => {
+  fabric.reset();
+  seedWindowDimensions();
+});
 afterEach(() => unmount(ROOT_TAG));
 
 describe('Vue: the fold-only tags commit what their wrappers used to', () => {

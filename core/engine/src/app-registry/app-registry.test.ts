@@ -88,3 +88,27 @@ describe('AppRegistry headless-task host bridge', () => {
     expect(replacement.registerCancellableHeadlessTask).toHaveBeenCalledOnce();
   });
 });
+
+// RN's public typings carry these, a library written against them must not meet a TypeError
+describe('AppRegistry setters of the AppContainer RN renders', () => {
+  it('takes a root view style provider and an instrumentation hook', () => {
+    const { AppRegistry } = registry();
+
+    expect(() => {
+      AppRegistry.setRootViewStyleProvider(() => ({ flex: 1 }));
+      AppRegistry.setComponentProviderInstrumentationHook(
+        component => component,
+      );
+    }).not.toThrow();
+  });
+
+  it('runs an application given a display mode as a third argument', () => {
+    const run = vi.fn();
+    const { AppRegistry } = createAppRegistry<() => void, never>(() => run);
+    AppRegistry.registerComponent('app', () => {});
+
+    AppRegistry.runApplication('app', { rootTag: 1 }, 1);
+
+    expect(run).toHaveBeenCalledWith({ rootTag: 1 });
+  });
+});

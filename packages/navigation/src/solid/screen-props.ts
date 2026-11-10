@@ -1,14 +1,11 @@
-// Stack.Screen's public prop types, split out of the marker component itself so screen-registry.ts
-// can name `IScreenProps['options']` without importing a component (which would make the two
-// modules circular).
-//
-// Declared here rather than re-exported from another adapter: `component` is a Solid `Component`
-// and the search-bar `ref` is a Solid callback ref, both framework values, which is exactly the
-// test <prop_types_split_agnostic_vs_per_adapter> applies. The agnostic FIELD BASE (IScreenOptions,
-// ISearchBarOptions, IRoute, INavigatorHandle) is shared from ../core verbatim.
+// `Stack.Screen` public prop types, apart from the marker so `screen-registry.ts` can name them
+// A Solid `Component`, element and callback ref are framework values, so they live here
+// The agnostic field base (`IScreenOptions`, `ISearchBarOptions`, `IRoute`) comes from `../core`
 
 import type { Component } from 'solid-js';
+import type { JSX } from '@symbiote-native/solid/jsx-runtime';
 import type {
+  IHeaderViewOptions,
   INavigatorHandle,
   IRoute,
   IScreenOptions,
@@ -16,10 +13,8 @@ import type {
   ISearchBarOptions,
 } from '../core';
 
-// The imperative search-bar handle (focus/blur/clearText/setText/cancelSearch/
-// toggleCancelButton). React hands it back through a `RefObject`, Vue through a `Ref`; Solid's own
-// spelling of "give me the thing when it exists" is a CALLBACK, which is also what
-// `ref={setCommands}` compiles to. `null` arrives when the host element goes away.
+// The search bar commands reach the app through a callback ref, Solid's spelling of a handle
+// `null` arrives when the host element goes away
 export type ISolidSearchBarOptions = ISearchBarOptions & {
   ref?: (commands: ISearchBarCommands | null) => void;
 };
@@ -27,13 +22,14 @@ export type ISolidSearchBarOptions = ISearchBarOptions & {
 export type ISolidScreenOptions = Omit<
   IScreenOptions,
   'headerSearchBarOptions'
-> & {
-  headerSearchBarOptions?: ISolidSearchBarOptions;
-};
+> &
+  IHeaderViewOptions<JSX.Element> & {
+    headerSearchBarOptions?: ISolidSearchBarOptions;
+    sheetFooter?: () => JSX.Element;
+  };
 
-// The options resolver runs OUTSIDE any component scope (during the options fold), so it still
-// receives the route + navigator handle explicitly - screens read those through the primitives in
-// ./primitives, but a resolver has no owner to read a context from.
+// The resolver runs outside any component scope and gets the route and handle as arguments
+// Screens read those through `./primitives`, a resolver has no owner to read a context from
 export type IScreenOptionsArgs = {
   route: IRoute<unknown>;
   navigation: INavigatorHandle;

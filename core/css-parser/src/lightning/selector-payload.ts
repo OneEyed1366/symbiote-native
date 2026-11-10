@@ -1,135 +1,148 @@
-import type { Token } from 'lightningcss';
+// The payload of `:global(X)` and `:deep(X)` when lightningcss leaves it as a raw token stream
+// It is read as if its classes had been written bare, the wrapper only moves the scope boundary
+
+import type { Token, TokenOrValue } from 'lightningcss';
 import {
   drop,
   pushToken,
   setCombinator,
+  takeState,
   type IBuilder,
 } from './selector-builder.ts';
-import { tokenOf } from './selector-guards.ts';
+import { stateKeyOf } from './selector-states.ts';
 import { COMBINATOR, type ISelectorCombinator } from './selector-types.ts';
-import { applyStateToken, STATE_PSEUDO_CLASS } from './state-token.ts';
 
-// Where the walk stands in the stream, and the authored `:global()` or `:deep()` it came from
-type IStream = {
-  readonly args: readonly unknown[];
-  readonly index: number;
-  readonly wrapper: string;
-};
+// Where a reader says the payload cannot be trusted past this token
+const STOP = -1;
 
-const DELIM_COMBINATORS: Record<string, ISelectorCombinator> = {
-  '>': COMBINATOR.child,
-  '+': COMBINATOR.nextSibling,
-  '~': COMBINATOR.laterSibling,
-};
+const DELIM_COMBINATORS = new Map<string, ISelectorCombinator>([
+  ['>', COMBINATOR.child],
+  ['+', COMBINATOR.nextSibling],
+  ['~', COMBINATOR.laterSibling],
+]);
+
+function isTokenOrValue(value: unknown): value is TokenOrValue {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    typeof value.type === 'string'
+  );
+}
+
+function tokenAt(args: readonly unknown[], index: number): Token | null {
+  const argument = args[index];
+  if (!isTokenOrValue(argument) || argument.type !== 'token') return null;
+  return argument.value;
+}
 
 function identAt(args: readonly unknown[], index: number): string | null {
-  const token = tokenOf(args[index]);
+  const token = tokenAt(args, index);
   return token?.type === 'ident' ? token.value : null;
 }
 
 function isColonAt(args: readonly unknown[], index: number): boolean {
-  return tokenOf(args[index])?.type === 'colon';
+  return tokenAt(args, index)?.type === 'colon';
 }
 
-// Returns the extra tokens consumed, or `null` when the payload is malformed past trust
-function consumeDelim(
-  builder: IBuilder,
-  delim: string,
-  stream: IStream,
-): number | null {
-  const combinator = DELIM_COMBINATORS[delim];
+// The payload being read: `wrapper` is the authored spelling, so a drop warning names the right one
+type ICursor = {
+  readonly builder: IBuilder;
+  readonly args: readonly unknown[];
+  readonly wrapper: string;
+};
+
+// A class is two tokens, a `.` delimiter and the ident, and a `.` alone means a broken payload
+function readDelim(cursor: ICursor, value: string, index: number): number {
+  const { builder, args, wrapper } = cursor;
+  const combinator = DELIM_COMBINATORS.get(value);
   if (combinator !== undefined) {
     setCombinator(builder, combinator);
-    return 0;
+    return index;
   }
-  if (delim === '*') {
+  if (value === '*') {
     drop(builder, 'universal', '*');
-    return 0;
+    return index;
   }
-  if (delim !== '.') {
-    drop(builder, 'unsupported', `${stream.wrapper.slice(0, -1)}${delim})`);
-    return 0;
+  if (value !== '.') {
+    drop(builder, 'unsupported', `${wrapper.slice(0, -1)}${value})`);
+    return index;
   }
-  // A class is two tokens, delim `.` then the ident, and a bare `.` poisons the rest
-  const name = identAt(stream.args, stream.index + 1);
+  const name = identAt(args, index + 1);
   if (name === null) {
-    drop(builder, 'unsupported', stream.wrapper);
-    return null;
+    drop(builder, 'unsupported', wrapper);
+    return STOP;
   }
   builder.specificity[1]++;
   pushToken(builder, name);
-  return 1;
+  return index + 1;
 }
 
 // One colon is a pseudo-class and two a pseudo-element, the name is the ident after them
-function consumeColon(builder: IBuilder, stream: IStream): number {
-  const isPseudoElement = isColonAt(stream.args, stream.index + 1);
-  const nameIndex = stream.index + (isPseudoElement ? 2 : 1);
-  const name = identAt(stream.args, nameIndex) ?? stream.wrapper;
-  builder.specificity[isPseudoElement ? 2 : 1]++;
-
-  if (!isPseudoElement && name === STATE_PSEUDO_CLASS) {
-    applyStateToken(builder);
-  } else {
-    drop(builder, isPseudoElement ? 'pseudo-element' : 'pseudo-class', name);
+function readColon(cursor: ICursor, index: number): number {
+  const { builder, args, wrapper } = cursor;
+  const isPseudoElement = isColonAt(args, index + 1);
+  const nameIndex = index + (isPseudoElement ? 2 : 1);
+  const name = identAt(args, nameIndex) ?? wrapper;
+  const stateKey = isPseudoElement ? null : stateKeyOf(name);
+  if (stateKey !== null) {
+    takeState(builder, name, stateKey);
+    return nameIndex;
   }
-  return nameIndex - stream.index;
+  builder.specificity[isPseudoElement ? 2 : 1]++;
+  drop(builder, isPseudoElement ? 'pseudo-element' : 'pseudo-class', name);
+  return nameIndex;
 }
 
-// The parsed shape names `[data-x]`, so the stream reads the name too and both warn alike
-function consumeBracket(builder: IBuilder, stream: IStream): number {
-  const name = identAt(stream.args, stream.index + 1);
+// The parsed shape names `[data-x]`, so the stream does too, or one source would warn two ways
+function readAttribute({ builder, args }: ICursor, index: number): void {
+  const name = identAt(args, index + 1);
   builder.specificity[1]++;
   drop(builder, 'attribute', name === null ? '[...]' : `[${name}]`);
-  return 0;
 }
 
-function consumeToken(
-  builder: IBuilder,
-  token: Token,
-  stream: IStream,
-): number | null {
+function readToken(cursor: ICursor, index: number): number {
+  const { builder, args, wrapper } = cursor;
+  const token = tokenAt(args, index);
+  if (token === null) {
+    drop(builder, 'unsupported', wrapper);
+    return STOP;
+  }
   switch (token.type) {
     case 'white-space':
       setCombinator(builder, COMBINATOR.descendant);
-      return 0;
+      return index;
     case 'delim':
-      return consumeDelim(builder, token.value, stream);
+      return readDelim(cursor, token.value, index);
     case 'colon':
-      return consumeColon(builder, stream);
+      return readColon(cursor, index);
     case 'ident':
       builder.specificity[2]++;
       drop(builder, 'element', token.value);
-      return 0;
+      return index;
     case 'id-hash':
       builder.specificity[0]++;
       drop(builder, 'id', `#${token.value}`);
-      return 0;
+      return index;
     case 'square-bracket-block':
-      return consumeBracket(builder, stream);
+      readAttribute(cursor, index);
+      return index;
     default:
-      drop(builder, 'unsupported', stream.wrapper);
-      return 0;
+      drop(builder, 'unsupported', wrapper);
+      return index;
   }
 }
 
-/**
- * Folds the raw token payload of `:global(X)` or `:deep(X)` into the builder as if X were
- * written bare. A plain `.css` file yields this shape, `cssModules` yields a parsed selector
- */
 export function consumePayload(
   builder: IBuilder,
   args: readonly unknown[],
   wrapper: string,
 ): void {
-  for (let index = 0; index < args.length; index++) {
-    const token = tokenOf(args[index]);
-    if (token === null) {
-      drop(builder, 'unsupported', wrapper);
-      return;
-    }
-    const skipped = consumeToken(builder, token, { args, index, wrapper });
-    if (skipped === null) return;
-    index += skipped;
+  const cursor: ICursor = { builder, args, wrapper };
+  let index = 0;
+  while (index < args.length) {
+    const last = readToken(cursor, index);
+    if (last === STOP) return;
+    index = last + 1;
   }
 }

@@ -439,3 +439,82 @@ describe('stickyEffectSignature', () => {
     expect(stickyEffectSignature(idle)).toBe(stickyEffectSignature(settled));
   });
 });
+
+// RN `hiddenOnScroll`: the pin gains a `diffClamp` offset over the header's own geometry, so a
+// rebuild must carry `layoutY`/`layoutHeight` and fire again whenever the flag flips
+describe('reduceSticky hiddenOnScroll', () => {
+  function rebuildOf(effects: readonly { kind: string }[]) {
+    const found = effects.find(
+      effect => effect.kind === 'rebuild-interpolation',
+    );
+    if (found?.kind !== 'rebuild-interpolation')
+      throw new Error('expected rebuild-interpolation');
+    return found;
+  }
+
+  it('carries no hide offset while the flag is off', () => {
+    const result = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs(),
+    );
+    expect(rebuildOf(result.effects)).toMatchObject({ hideOffset: undefined });
+  });
+
+  it('a layout with the flag on carries the header geometry for the offset', () => {
+    const result = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs({ hiddenOnScroll: true }),
+    );
+    expect(rebuildOf(result.effects)).toMatchObject({
+      hideOffset: { layoutY: 100, layoutHeight: 40 },
+    });
+  });
+
+  it('flipping the flag rebuilds even though the ranges are unchanged', () => {
+    const measured = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      topInputs(),
+    ).state;
+    const on = reduceSticky(
+      measured,
+      { kind: 'inputs-changed' },
+      topInputs({ hiddenOnScroll: true }),
+    );
+    expect(rebuildOf(on.effects)).toMatchObject({
+      hideOffset: { layoutY: 100, layoutHeight: 40 },
+    });
+    const off = reduceSticky(on.state, { kind: 'inputs-changed' }, topInputs());
+    expect(rebuildOf(off.effects)).toMatchObject({ hideOffset: undefined });
+  });
+
+  it('a repeated inputs-changed with the flag unchanged is still swallowed', () => {
+    const inputs = topInputs({ hiddenOnScroll: true });
+    const first = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      inputs,
+    );
+    const again = reduceSticky(first.state, { kind: 'inputs-changed' }, inputs);
+    expect(again.effects).toEqual([]);
+  });
+
+  it('a new height with the flag on rebuilds (the offset clamp range moved)', () => {
+    const inputs = topInputs({ hiddenOnScroll: true });
+    const first = reduceSticky(
+      createInitialStickyState(),
+      { kind: 'layout', y: 100, height: 40 },
+      inputs,
+    );
+    const taller = reduceSticky(
+      first.state,
+      { kind: 'layout', y: 100, height: 60 },
+      inputs,
+    );
+    expect(rebuildOf(taller.effects)).toMatchObject({
+      hideOffset: { layoutY: 100, layoutHeight: 60 },
+    });
+  });
+});

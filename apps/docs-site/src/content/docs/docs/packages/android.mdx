@@ -17,22 +17,9 @@ two of RN's Android signals hang off exactly that class. Without this package in
 no error. iOS needs no equivalent: `RCTKeyboardObserver` and `RCTSettingsManager` are global
 native observers RN already ships, independent of which renderer drives the view tree.
 
-| OS platform | Support                                  |
-| ----------- | ---------------------------------------- |
-| iOS         | — not needed (RN ships both equivalents) |
-| Android     | ✅ live                                  |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
-All five adapters are listed as live because none of them import this package. They reach it
-through their existing `Keyboard` and `Settings` exports, which resolve a native module by name —
-this package is what makes that name resolve on Android.
+No adapter imports this package. They all reach it through their existing `Keyboard` and `Settings`
+exports, which resolve a native module by name. This package is what makes that name resolve on
+Android.
 
 ## Installation
 
@@ -53,7 +40,7 @@ in that config) and no manifest permission to merge — the shipped `AndroidMani
   title="Two documented APIs are dead on Android without this package"
 >
   [`Keyboard`](/docs/api/react/) and [`Settings`](/docs/api/react/) are listed
-  as available on every adapter's API page, and they are — on iOS
+  as available on every adapter's API page. They work on iOS
   unconditionally, on Android only once this package is installed. Missing it
   produces no crash and no error: `Keyboard.addListener` returns a real
   subscription that never fires, and `Settings.get` reads from an empty
@@ -319,13 +306,14 @@ packages/android/
         └── SettingsManagerModule.kt    # SharedPreferences ("symbiote.settings")
 ```
 
-`KeyboardObserverModule` attaches its inset listener to the current activity's decor view, and
-re-attaches on host resume — the activity and its window may not exist yet when JS first
-subscribes, so a subscription made before the window is ready still starts observing.
+`KeyboardObserverModule` attaches its inset listener to the current activity's decor view. It
+re-attaches on host resume, because the activity and its window may not exist yet when JS first
+subscribes. So a subscription made before the window is ready still starts observing.
+
 `SettingsManagerModule` registers its `SharedPreferences` change listener only while JS is
-observing (from the first `addListener` to the last `removeListeners`), and holds a strong
-reference to it, since `SharedPreferences` keeps only a weak one and GC would otherwise drop the
-subscription.
+observing, from the first `addListener` to the last `removeListeners`. It holds a strong
+reference to the listener, since `SharedPreferences` keeps only a weak one and GC would otherwise
+drop the subscription.
 
 Neither module touches the renderer. That is the point: the [SymbioteNative
 core](/docs/how-it-works/) drives Fabric directly and never forks RN's native stack, so a signal

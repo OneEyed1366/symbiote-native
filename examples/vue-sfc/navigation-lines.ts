@@ -1,25 +1,15 @@
 import { ROUTE_NAME } from './routes';
 import type { IRouteName } from './routes';
 
-// The @symbiote-native/navigation demo suite groups its tour screens into thematic "lines" — which
-// part of the package each screen exercises, plus a Performance line for the benchmark stop and a
-// Styling line for the CSS-compiler showcase — carried through MenuScreen's row badges, each demo
-// screen's own line tag, and (where the native header/tab bar already takes a tint color) the OS
-// chrome itself. One color per line replaces the single flat accent every row/button used to share.
-// Kept in sync by hand with App.css's `:root` `--line-*` tokens — CSS custom properties and this
-// module are different runtimes with no shared import path.
-//
-// Composition is the odd one out: ApiPlayground doesn't exercise @symbiote-native/navigation at
-// all — it's a live demo of Vue's OWN template/Composition API surface running under Symbiote's
-// renderer (see .docs/framework-api-surface/vue.md). It still gets a line entry so it can reuse
-// the exact same wayfinding pill/badge/row language as every other tour stop.
+// The tour screens sit on thematic lines: the part of the package a screen exercises, plus
+// Performance for the benchmarks and Styling for the CSS compiler demo
+// Kept in sync by hand with the `--line-*` tokens of navigation.css, the two share no import path
 export const NAV_LINE = {
   Primitives: 'primitives',
   Presentation: 'presentation',
   Structure: 'structure',
   Introspection: 'introspection',
   Routing: 'routing',
-  Composition: 'composition',
   Performance: 'performance',
   Styling: 'styling',
 } as const;
@@ -27,26 +17,15 @@ export const NAV_LINE = {
 export type INavLine = (typeof NAV_LINE)[keyof typeof NAV_LINE];
 
 export const LINE_COLOR: Record<INavLine, string> = {
-  // Vue's own brand green (vuejs.org's logo/accent green) — CanaryScreen is the "every
-  // @symbiote-native/vue primitive" showcase, so its line wears Vue's actual color instead of
-  // React's. The ONE deliberate difference vs the React port's navigation-lines.ts (which uses
-  // React's brand blue #149eca here) — every other line below stays byte-identical across
-  // frameworks. #42b883 is vuejs.org's primary green, already used throughout this app's
-  // pre-existing canary content (App.vue, before this navigation port).
+  // Vue's own brand green, the one line colour that differs between the flavors
   [NAV_LINE.Primitives]: '#42b883',
   [NAV_LINE.Presentation]: '#5ec8f2',
   [NAV_LINE.Structure]: '#4fd1a5',
   [NAV_LINE.Introspection]: '#b18cf5',
   [NAV_LINE.Routing]: '#f2789a',
-  // Warm orange — visually distinct from every navigation-package line above, since this line
-  // isn't about @symbiote-native/navigation at all. Deliberately lighter than Performance's
-  // amber below: the two sit next to each other in the menu and must read apart.
-  [NAV_LINE.Composition]: '#f6ad55',
-  // Amber — the only line color tied to timing rather than to a package feature.
+  // Amber, the only warm hue in the set, so a timing screen never reads as a navigation line
   [NAV_LINE.Performance]: '#f5a524',
-  // Yellow-green, the one wide hue gap the lines above leave open — far enough from Structure's
-  // mint (#4fd1a5) and Performance's amber (#f5a524) to read apart at badge size, and the CSS
-  // showcase is not a navigation line either.
+  // Yellow-green, far enough from Structure and Performance to read apart at badge size
   [NAV_LINE.Styling]: '#a3d94f',
 };
 
@@ -56,11 +35,20 @@ export type INavLineInfo = {
   label: string;
 };
 
-// Every route reachable from MenuScreen, minus Menu itself. Deliberately excludes Details — it's a
-// plain push-target off Canary, not one of the 12 tour stops.
+// Section hubs only list stops, they are no stops themselves
+export const HUB_ROUTE_NAME = [
+  ROUTE_NAME.FrameworkHub,
+  ROUTE_NAME.NavigationHub,
+  ROUTE_NAME.PackagesHub,
+  ROUTE_NAME.BenchmarksHub,
+] as const satisfies readonly IRouteName[];
+
+export type IHubRouteName = (typeof HUB_ROUTE_NAME)[number];
+
+// Every route a hub lists. Details is left out, it is a push target off a deep link
 export type ITourRouteName = Exclude<
   IRouteName,
-  typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details
+  typeof ROUTE_NAME.Menu | typeof ROUTE_NAME.Details | IHubRouteName
 >;
 
 export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
@@ -74,6 +62,16 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'HD',
     label: 'PRESENTATION LINE',
   },
+  [ROUTE_NAME.HeaderViews]: {
+    line: NAV_LINE.Presentation,
+    code: 'HV',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.Gestures]: {
+    line: NAV_LINE.Presentation,
+    code: 'GS',
+    label: 'PRESENTATION LINE',
+  },
   [ROUTE_NAME.SheetDemo]: {
     line: NAV_LINE.Presentation,
     code: 'SH',
@@ -82,6 +80,11 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
   [ROUTE_NAME.TabsDemo]: {
     line: NAV_LINE.Structure,
     code: 'TB',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.NativeTabs]: {
+    line: NAV_LINE.Structure,
+    code: 'NT',
     label: 'STRUCTURE LINE',
   },
   [ROUTE_NAME.DrawerDemo]: {
@@ -99,6 +102,36 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     code: 'HK',
     label: 'INTROSPECTION LINE',
   },
+  [ROUTE_NAME.OverlayContainers]: {
+    line: NAV_LINE.Structure,
+    code: 'OC',
+    label: 'STRUCTURE LINE',
+  },
+  [ROUTE_NAME.Events]: {
+    line: NAV_LINE.Introspection,
+    code: 'EV',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.TransitionProgress]: {
+    line: NAV_LINE.Introspection,
+    code: 'TP',
+    label: 'INTROSPECTION LINE',
+  },
+  [ROUTE_NAME.InsetsStatusBar]: {
+    line: NAV_LINE.Presentation,
+    code: 'IS',
+    label: 'PRESENTATION LINE',
+  },
+  [ROUTE_NAME.StackTransitions]: {
+    line: NAV_LINE.Routing,
+    code: 'ST',
+    label: 'ROUTING LINE',
+  },
+  [ROUTE_NAME.RuntimeConfig]: {
+    line: NAV_LINE.Introspection,
+    code: 'RC',
+    label: 'INTROSPECTION LINE',
+  },
   [ROUTE_NAME.DeepLinking]: {
     line: NAV_LINE.Routing,
     code: 'DL',
@@ -110,9 +143,9 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     label: 'ROUTING LINE',
   },
   [ROUTE_NAME.ApiPlayground]: {
-    line: NAV_LINE.Composition,
+    line: NAV_LINE.Introspection,
     code: 'AP',
-    label: 'COMPOSITION LINE',
+    label: 'INTROSPECTION LINE',
   },
   [ROUTE_NAME.Benchmark]: {
     line: NAV_LINE.Performance,
@@ -123,5 +156,10 @@ export const ROUTE_LINE_INFO: Record<ITourRouteName, INavLineInfo> = {
     line: NAV_LINE.Styling,
     code: 'ST',
     label: 'STYLING LINE',
+  },
+  [ROUTE_NAME.Reanimated]: {
+    line: NAV_LINE.Performance,
+    code: 'RA',
+    label: 'PERFORMANCE LINE',
   },
 };

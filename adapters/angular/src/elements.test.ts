@@ -23,6 +23,7 @@ import {
 import {
   createLiveTree,
   installRecordingFabric,
+  seedWindowDimensions,
 } from '@symbiote-native/test-utils';
 // SIDE-EFFECT IMPORT: `register.ts` installs the host behaviors, whose `foldPayload` is the bare
 // path's only source for the folds a wrapper would otherwise apply.
@@ -47,10 +48,10 @@ const ts: {
   flattenDiagnosticMessageText: (text: unknown, sep: string) => string;
 } = require_('typescript');
 
-interface IDiagnostic {
+type IDiagnostic = {
   messageText: unknown;
   file?: { fileName: string };
-}
+};
 
 // Under `build/`, which is gitignored AND excluded from the vitest run — a fixture written into
 // `src/` would be collected as a test file of its own on the next run.
@@ -65,11 +66,11 @@ import { SYMBIOTE_ELEMENTS } from '../../src';
 export class ${name} { value = 'x'; ${body} hit(): void {} }
 `;
 
-interface ICase {
+type ICase = {
   source: string;
   /** Substring every diagnostic list must contain, or `undefined` for "must compile clean". */
   expect: string | undefined;
-}
+};
 
 const CASES: Record<string, ICase> = {
   // The whole point of the route, in one template: no schema anywhere, props bound by name.
@@ -258,15 +259,15 @@ type ISnapshotNode = {
 };
 
 const MAX_SETTLE_TICKS = 20;
-async function flushUntilSettled(): Promise<void> {
-  let previous = -1;
-  for (let index = 0; index < MAX_SETTLE_TICKS; index += 1) {
-    await new Promise(resolve => setTimeout(resolve, 0));
-    const current = fabric.commits;
-    if (current === previous && current > 0) return;
-    previous = current;
-  }
-  throw new Error('the tree never settled');
+async function flushUntilSettled(
+  previous = -1,
+  ticksLeft = MAX_SETTLE_TICKS,
+): Promise<void> {
+  if (ticksLeft === 0) throw new Error('the tree never settled');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const current = fabric.commits;
+  if (current === previous && current > 0) return;
+  await flushUntilSettled(current, ticksLeft - 1);
 }
 
 async function mountTemplate(
@@ -304,11 +305,16 @@ async function mountTemplate(
 const propsOf = (
   all: ISnapshotNode[],
   testID: string,
-): Record<string, unknown> =>
-  all.find(node => node.payload.testID === testID)?.payload ?? {};
+): Record<string, unknown> => {
+  const found = all.find(node => node.payload.testID === testID);
+  return found === undefined ? {} : found.payload;
+};
 
 describe('what the element directives commit', () => {
-  beforeEach(() => fabric.reset());
+  beforeEach(() => {
+    fabric.reset();
+    seedWindowDimensions();
+  });
 
   // why: the deciding fact of the whole route. A binding a directive input CLAIMS never reaches
   // `Renderer2.setProperty` on its own, so without the base's one generic `ngOnChanges` loop a
@@ -333,17 +339,8 @@ describe('what the element directives commit', () => {
     expect(propsOf(all, 'probe').onLayout).toBe(true);
   });
 
-  // The OBSERVABLE changed and the question did not. This asserts that a bare tag gets its host
-  // behavior attached; it used to read `submitBehavior`, which was a fold output, and that fold is
-  // the engine's now (`foldTextInputAliases`, `SymbioteFabricProps.cpp`) — invisible to a recording
-  // host, which reports props as the OPS named them.
-  //
-  // `mostRecentEventCount` is the right observable and arguably always was: the MACHINE writes it,
-  // at attach, as a real prop op. It proves the thing the test is named for rather than a rule that
-  // happened to run nearby. Switch's `value` followed text-input's into the engine one commit
-  // later (`foldSwitchProps`), so the second tag is now here for the mechanism — two tags is what
-  // makes this a claim about the REGISTRY rather than about text-input — and its payload is
-  // asserted in `core/engine/cpp/tests/js/switch-payload.itest.ts`.
+  // `mostRecentEventCount` is written by the attached machine at attach, a fold output would be
+  // invisible to a recording host. Two tags make it a claim about the registry, not text-input
   it('still attaches the host behavior to a bare tag', async () => {
     const { all } = await mountTemplate(
       `<text-input [testID]="'probe'"></text-input><switch [testID]="'sw'"></switch>`,
@@ -352,10 +349,8 @@ describe('what the element directives commit', () => {
     expect(propsOf(all, 'sw').testID).toBe('sw');
   });
 
-  // why: the transitional state, and it is reachable today — `ViewHost` matches the tag itself and is exported as `View` for an app's `imports:`, so
-  // an app that has both in `imports` has a component
-  // AND a directive matching one tag. Angular allows that, and both write the same prop through
-  // the same renderer, so the node must not end up with a doubled or dropped payload.
+  // An app importing `ViewHost` too has a component and a directive on one tag, both writing the
+  // same prop, so the payload must not double or drop
   it('coexists with the primitive host component on the same tag', async () => {
     const { all } = await mountTemplate(
       `<view [testID]="'probe'" [id]="'probe-id'"></view>`,
@@ -381,11 +376,8 @@ describe('what the element directives commit', () => {
       // An anchor host commits nothing, so `node` would be undefined — a bare viewName comparison
       // would then pass for both an anchor and a wrong view.
       expect(node).toBeDefined();
-      // A COMPOSED primitive redirects every prop it does not keep — `testID` included — onto the
-      // node its behavior built, exactly as RN's wrappers do (`ImageBackground.js:81` spreads
-      // `...props` onto the inner Image, `ActivityIndicator.js:99` onto the spinner). So the probe
-      // may sit one level below the tag. ONE hop via `parentOf` — the engine's own answer, not a
-      // `children`-includes scan, which a live getter's fresh-array-per-read defeats.
+      // A composed primitive redirects `testID` onto the node it built, as RN's wrappers do, so
+      // the probe may sit one hop below the tag (`parentOf`, a `children` scan never matches)
       const parentHandle =
         node === undefined ? undefined : parentOf(node.handle);
       const parent = all.find(candidate => candidate.handle === parentHandle);

@@ -1,69 +1,39 @@
-// Root menu for the @symbiote-native/navigation demo suite: one row per navigator/feature, each
-// pushing its own screen onto the same root Stack. Rows are grouped into 7 thematic "lines"
-// (navigation-lines.ts's ROUTE_LINE_INFO) — a color + 2-letter badge per line, carried onto each
-// demo screen's own line tag — so the tour reads as one system rather than a bag of test screens.
-//
-// The rows come from routes.ts's MENU_ROWS, not from JSX: a new demo screen is one array entry plus
-// one <Stack.Screen> marker, never an edit in here.
-//
-// <For> is imported explicitly. An un-imported control-flow name resolves against the RENDERER
-// module and reads back `undefined`, which builds fine and throws at runtime
-// (.claude/rules/solid-descriptor-bridge.md §3).
-
 import { For } from 'solid-js';
 import { useStackNavigation } from '@symbiote-native/navigation/solid';
-import { MENU_ROWS } from '../routes';
-import { ROUTE_LINE_INFO } from '../navigation-lines';
+import { MENU_SECTIONS } from '../menu-sections';
+import { MenuRow } from './MenuRow';
 import './MenuScreen.css';
 
+// Root menu, one row per section, each pushes its hub screen with the section's stops
 export function MenuScreen() {
-  // An ACCESSOR, not a handle: this screen's body runs once, and a nested navigator can re-scope
-  // the owner chain underneath it. Called at each use site, never destructured.
   const navigation = useStackNavigation();
-
   return (
     <safe-area-view class="screen">
-      <scroll-view
-        testID="menu-scroll"
-        class="screen"
-        contentContainerStyle="menu-content"
-      >
-        <view class="menu-hero">
-          <text class="menu-eyebrow">NAVIGATION DEMO SUITE</text>
-          <text class="menu-hero-title">Twelve stops along the stack</text>
-          <text class="menu-hero-subtitle">
-            Each row below drives a different line of
-            @symbiote-native/navigation — Primitives, Presentation, Structure,
-            Introspection, Routing — on a real native stack, plus a Performance
-            stop timing the engine's own commit path and a Styling stop showing
-            the whole CSS compiler surface.
-          </text>
+      <scroll-view testID="menu-scroll" class="screen">
+        <view class="scroll-content">
+          <view class="menu-hero">
+            <text class="menu-eyebrow">SYMBIOTE NATIVE DEMO SUITE</text>
+            <text class="menu-hero-title">Four sections to explore</text>
+            <text class="menu-hero-subtitle">
+              Framework covers primitives, Solid APIs and CSS styling.
+              Navigation drives @symbiote-native/navigation on a real native
+              stack. Packages shows the companion libraries. Benchmarks times
+              the engine's own commit path.
+            </text>
+          </view>
+          <For each={MENU_SECTIONS}>
+            {section => (
+              <MenuRow
+                testID={`menu-row-${section.route}`}
+                line={section.line}
+                code={section.code}
+                label={section.title}
+                hint={section.hint}
+                onPress={() => navigation().push(section.route)}
+              />
+            )}
+          </For>
         </view>
-
-        <For each={MENU_ROWS}>
-          {row => {
-            // Safe as a plain const: <For>'s map fn runs once per key under its own root, and
-            // MENU_ROWS is a module constant, so there is nothing here to keep reactive.
-            const lineInfo = ROUTE_LINE_INFO[row.route];
-            return (
-              <pressable
-                testID={`menu-row-${row.route}`}
-                class={`menu-row menu-row-${lineInfo.line}`}
-                onPress={() => navigation().push(row.route)}
-              >
-                <view class={`menu-badge menu-badge-${lineInfo.line}`}>
-                  <text class="menu-badge-text">{lineInfo.code}</text>
-                </view>
-                <view class="menu-row-copy">
-                  <text class="menu-row-label">{row.label}</text>
-                  <text class={`menu-row-hint menu-row-hint-${lineInfo.line}`}>
-                    {row.blurb}
-                  </text>
-                </view>
-              </pressable>
-            );
-          }}
-        </For>
       </scroll-view>
     </safe-area-view>
   );

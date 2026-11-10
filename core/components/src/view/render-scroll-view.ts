@@ -72,7 +72,7 @@ const STICKY_JS_SCROLL_THROTTLE = 16;
 // in an Animated.event that drives the value each JS frame.
 export type IScrollForwardMode = 'plain' | 'sticky-native' | 'sticky-js';
 
-export interface IScrollForwardingInputs {
+export type IScrollForwardingInputs = {
   hasStickyHeaders: boolean;
   // hasStickyHeaders && isNativeAnimatedAvailable(), computed by the adapter, passed in so this
   // stays pure.
@@ -82,17 +82,17 @@ export interface IScrollForwardingInputs {
   // Presence-checked only (unknown so every adapter's raw prop/attr shape passes with no cast).
   maintainVisibleContentPosition: unknown;
   snapToAlignment: unknown;
-}
+};
 
 // The scroll-forwarding decisions, framework-invariant. Returns decisions, not built handlers:
 // Angular caches handlers by identity to dodge a re-clone cascade, while React/Vue allocate
 // fresh each render — a shared helper returning built handlers would regress Angular.
-export interface IScrollForwarding {
+export type IScrollForwarding = {
   mode: IScrollForwardMode;
   scrollEventThrottle: number | undefined;
   capturesViewportHeight: boolean;
   collapsableChildren: boolean;
-}
+};
 
 // maintainVisibleContentPosition/snapToAlignment anchor against mounted cells; Android Fabric
 // view-flattens layout-only cells away, so RN keeps them real with collapsableChildren={false}
@@ -125,13 +125,13 @@ export function resolveScrollForwarding(
       collapsableChildren,
     };
   }
-  const capturesViewportHeight = inputs.invertStickyHeaders === true;
+  const isInverted = inputs.invertStickyHeaders === true;
   if (inputs.nativeStickyAvailable) {
     return {
       mode: 'sticky-native',
       scrollEventThrottle:
         inputs.scrollEventThrottle ?? STICKY_NATIVE_SCROLL_THROTTLE,
-      capturesViewportHeight,
+      capturesViewportHeight: isInverted,
       collapsableChildren,
     };
   }
@@ -139,20 +139,7 @@ export function resolveScrollForwarding(
     mode: 'sticky-js',
     scrollEventThrottle:
       inputs.scrollEventThrottle ?? STICKY_JS_SCROLL_THROTTLE,
-    capturesViewportHeight,
+    capturesViewportHeight: isInverted,
     collapsableChildren,
   };
-}
-
-// The last-seen content size, kept by the adapter (in a ref) to dedupe onContentSizeChange.
-export type IContentSize = { width: number; height: number };
-
-// onContentSizeChange synthesizes from the content view's onLayout, which fires on every layout
-// pass — RN dedupes so the user handler only sees real size changes.
-export function didContentSizeChange(
-  last: IContentSize | null,
-  next: IContentSize,
-): boolean {
-  if (last === null) return true;
-  return last.width !== next.width || last.height !== next.height;
 }

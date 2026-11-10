@@ -6,10 +6,14 @@ import { descriptorToVue } from '@symbiote-native/vue';
 import { dlog } from '@symbiote-native/engine';
 import {
   RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME,
+  RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME,
   RNS_SCREEN_STACK_VIEW_NAME,
   RNS_SCREEN_VIEW_NAME,
   buildStackHostProps,
   mergeScreenOptions,
+  resolveCustomHeaderSubviewElements,
+  resolveNativeContainerProps,
+  resolveSheetFooterElements,
   resolveStackRoutePlan,
 } from '../../core';
 import type {
@@ -18,6 +22,8 @@ import type {
   INavigatorState,
   IRoute,
   IScreenRenderPlan,
+  ITransitionProgress,
+  ITransitionProgressStore,
 } from '../../core';
 import { NavigationScope } from '../navigation-context';
 import type { INavigationScopeValue } from '../navigation-context';
@@ -40,6 +46,7 @@ type IRouteScreenInput = {
   parent: INavigationScopeValue | undefined;
   onPop: () => void;
   loggedPropKeys: Set<string>;
+  transitionProgress: ITransitionProgress;
 };
 
 export type IStackRenderInput = {
@@ -51,6 +58,8 @@ export type IStackRenderInput = {
   emitterFor: (routeKey: string) => INavigationEmitter;
   onPop: () => void;
   loggedPropKeys: Set<string>;
+  transitionProgress: ITransitionProgressStore;
+  nativeContainerStyle: unknown;
 };
 
 // Must stay a real view (`collapsable: false`): native finds this class to size a `formSheet`
@@ -60,28 +69,51 @@ function buildScreenContent(
   input: IRouteScreenInput,
 ): VNode {
   const { route, navigation, emitter, parent, component } = input;
-  const scope = { route, navigation, emitter, parent };
+  const scope = {
+    route,
+    navigation,
+    emitter,
+    parent,
+    transitionProgress: input.transitionProgress,
+    edgeInsets: plan.edgeInsets,
+  };
+  const content = h(NavigationScope, { value: scope }, () => h(component));
+  const { safeAreaHost } = plan;
   return h(RNS_SCREEN_CONTENT_WRAPPER_VIEW_NAME, plan.contentWrapperProps, [
-    h(NavigationScope, { value: scope }, () => h(component)),
+    safeAreaHost === undefined
+      ? content
+      : h(safeAreaHost.viewName, safeAreaHost.props, [content]),
   ]);
 }
 
 // A modal or `formSheet` screen has no navigation controller on iOS, so an inner stack hosts the
 // header bar. Its screen mirrors `activityState`, else native parks it off the bottom edge
-function wrapInModalStack(
-  plan: IScreenRenderPlan,
-  header: VNode,
-  content: VNode,
-): VNode[] {
+function wrapInModalStack(plan: IScreenRenderPlan, body: VNode[]): VNode[] {
   return [
     h(RNS_SCREEN_STACK_VIEW_NAME, { style: plan.innerStackStyle }, [
-      h(
-        RNS_SCREEN_VIEW_NAME,
-        { style: plan.innerScreenStyle, activityState: plan.activityState },
-        [header, content],
-      ),
+      h(RNS_SCREEN_VIEW_NAME, plan.innerScreenProps, body),
     ]),
   ];
+}
+
+// Only a `formSheet` has a footer, core says when, the app function supplies what goes inside
+function buildSheetFooter(options: IVueScreenOptions): VNode[] {
+  return resolveSheetFooterElements(options, (host, content) =>
+    h(host.viewName, { key: host.viewName, ...host.props }, [content]),
+  );
+}
+
+// The search bar subview comes from core's descriptor, these sit beside it in the header config
+function buildCustomSubviews(options: IVueScreenOptions): VNode[] {
+  return resolveCustomHeaderSubviewElements(options, {
+    subview: (host, content) =>
+      h(
+        RNS_SCREEN_STACK_HEADER_SUBVIEW_VIEW_NAME,
+        { key: host.kind, ...host.props },
+        [content],
+      ),
+    image: props => h('image', props),
+  });
 }
 
 function renderRouteScreen(input: IRouteScreenInput): VNode {
@@ -94,17 +126,26 @@ function renderRouteScreen(input: IRouteScreenInput): VNode {
     emitter: input.emitter,
     onPop: input.onPop,
     loggedKeys: input.loggedPropKeys,
+    parentScope: input.parent,
+    transitionProgress: input.transitionProgress,
     assignSearchBarHandle: handle => {
       const appRef = options.headerSearchBarOptions?.ref;
       if (appRef !== undefined) appRef.value = handle;
     },
   });
-  const header = descriptorToVue(plan.headerConfig);
-  const content = buildScreenContent(plan, input);
+  const header = descriptorToVue(
+    plan.headerConfig,
+    buildCustomSubviews(options),
+  );
+  const body = [
+    header,
+    buildScreenContent(plan, input),
+    ...buildSheetFooter(options),
+  ];
   return h(
     plan.screenViewName,
     { key: route.key, ...plan.screenProps },
-    plan.inModal ? wrapInModalStack(plan, header, content) : [header, content],
+    plan.inModal ? wrapInModalStack(plan, body) : body,
   );
 }
 
@@ -112,6 +153,7 @@ const STACK_PROPS = buildStackHostProps();
 
 export function renderStack(input: IStackRenderInput): VNode {
   const { registry, current, screenOptions, navigation } = input;
+  input.transitionProgress.keepOnly(current.routes.map(route => route.key));
   const children = current.routes.map((route, index) => {
     const entry = registry.get(route.name);
     if (entry === undefined) {
@@ -133,7 +175,12 @@ export function renderStack(input: IStackRenderInput): VNode {
       parent: input.parent,
       onPop: input.onPop,
       loggedPropKeys: input.loggedPropKeys,
+      transitionProgress: input.transitionProgress.forRoute(route.key),
     });
   });
-  return h(RNS_SCREEN_STACK_VIEW_NAME, STACK_PROPS, children);
+  const stackProps = {
+    ...STACK_PROPS,
+    ...resolveNativeContainerProps(input.nativeContainerStyle),
+  };
+  return h(RNS_SCREEN_STACK_VIEW_NAME, stackProps, children);
 }

@@ -15,19 +15,6 @@ entry points are plain re-exports of the same `core`.
 Nothing is ever sent on the user's behalf. Both platforms open their own composer with the draft
 in it; the user presses send, edits it, or throws it away.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 ## Installation
 
 ```sh
@@ -38,26 +25,26 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --s
 `add --sms` in an existing app) installs and wires this for you — see
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
-`expo-sms` and `expo-modules-core` come along as regular dependencies, pinned to exact versions —
-never install either yourself, and never add the `expo` meta-package to your project (it bundles
-its own Metro/Babel pipeline, which conflicts with this project's own).
+`expo-sms` and `expo-modules-core` come along as regular dependencies, pinned to exact versions.
+Never install either yourself. Never add the `expo` meta-package to your project either, as it bundles
+its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-sms`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
 
 Beyond that one-time wiring there is nothing to configure. This is the lightest native footprint
 of the Expo wrappers documented here: no runtime permission on either platform, no `Info.plist`
-usage-description key, no manifest edit — `expo-sms` ships its own `<queries>` block declaring the
-`SEND`/`SENDTO` intents it resolves under Android 11+ package-visibility rules, and it merges into
-your app automatically — and no config plugin at all upstream. `symbiote-expo-link` generates the
+usage-description key, no manifest edit, and no config plugin at all upstream. `expo-sms` ships its
+own `<queries>` block declaring the `SEND`/`SENDTO` intents it resolves under Android 11+
+package-visibility rules, and it merges into your app automatically. `symbiote-expo-link` generates the
 Android registration from the package's `native-link.json` on install.
 
 ## Usage
@@ -308,8 +295,9 @@ packages/sms/src/
 
 Same shape as [secure store](/docs/packages/secure-store/)'s and
 [local auth](/docs/packages/local-auth/)'s adapter entries: single-file re-exports with no
-lifecycle code, since every export is a stateless free function — there is nothing for a hook,
+lifecycle code, since every export is a stateless free function.
+There is nothing for a hook,
 composable, or service to subscribe to or clean up. Upstream's web variant is not ported; this
-project ships iOS and Android only. The native code itself is never vendored or copied —
+project ships iOS and Android only. The native code itself is never vendored or copied:
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
 guide](/docs/howtos/expo-native-module-setup/)).

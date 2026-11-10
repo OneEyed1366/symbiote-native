@@ -1,0 +1,9 @@
+/* Declared here and used from ReanimatedScreen.css, to show keyframes shared between files */
+@keyframes ra-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

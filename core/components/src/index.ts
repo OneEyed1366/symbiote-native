@@ -29,6 +29,10 @@ export type {
 export { resolveAccessibilityProps } from './accessibility-props';
 export type { IEllipsizeMode } from './text-props';
 export type {
+  IScrollViewNativeOnlyProps,
+  ITextNativeOnlyProps,
+} from './native-only-props';
+export type {
   IAccessibilityProps,
   IAriaProps,
   IAccessibilityRole,
@@ -75,12 +79,10 @@ export type { ISwitchState, ISwitchAction } from './state/switch';
 export {
   selectScrollIntrinsics,
   readLayoutDimension,
-  didContentSizeChange,
   resolveScrollForwarding,
 } from './view/render-scroll-view';
 export type {
   IScrollIntrinsics,
-  IContentSize,
   IScrollForwarding,
   IScrollForwardingInputs,
   IScrollForwardMode,
@@ -115,11 +117,13 @@ export {
   createInitialStickyState,
   stickyEffectSignature,
 } from './state/sticky-header-reducer';
+export { buildStickyPin } from './state/sticky-pin';
 export type {
   IStickyHeaderState,
   IStickyReducerInputs,
   IStickyAction,
   IStickyEffect,
+  IStickyHideOffset,
   IStickyReduceResult,
 } from './state/sticky-header-reducer';
 
@@ -334,8 +338,28 @@ export {
   readLayoutLength,
   readLayoutOffset,
   buildOffsets,
-  computeWindow,
-  throttleWindow,
+  deriveWindow,
+  SEPARATOR_SIDE,
+  LIST_SEGMENT_KIND,
+  runListEffects,
+  clearTimers,
+  buildListHandle,
+  buildListReducerInputs,
+  buildSeparatorHandles,
+  buildSeparatorProps,
+  buildListScrollProps,
+  planFromMetrics,
+  scrollActionOf,
+  layoutActionOf,
+  contentSizeActionOf,
+  measureActionOf,
+  scrollTargetOf,
+  cellStyleOf,
+  counterFlipStyle,
+  listStyleOf,
+  contentContainerStyleOf,
+  spacerStyleOf,
+  maintainPositionForScroll,
   isCellViewable,
   offsetForIndex,
   averageMeasuredLength,
@@ -348,7 +372,6 @@ export {
   diffViewable,
   maxMinimumViewTime,
   buildListPlan,
-  computeMvcpAdjustment,
   resolveItemKey,
   indexOfItem,
   offsetForEnd,
@@ -359,11 +382,10 @@ export {
   resolveAverageLength,
 } from './state/virtualized-list';
 export type {
-  IMvcpAction,
-  IMvcpAdjustmentParams,
-  IMvcpAdjustmentResult,
   ICellLayout,
+  ICellRendererBaseProps,
   ISeparators,
+  ISeparatorSide,
   ISeparatorProps,
   IViewToken,
   IViewableItemsChangedInfo,
@@ -371,7 +393,16 @@ export type {
   IViewabilityConfigCallbackPair,
   IVirtualizedListHandle,
   IViewableSetParams,
-  IListCellPlan,
+  IEffectHost,
+  IListCallbacks,
+  IListInputsSource,
+  IListScrollProps,
+  IListScrollSource,
+  IWindowPlan,
+  ITimerSlot,
+  ICellSegment,
+  ISpacerSegment,
+  IListSegment,
   IListPlan,
   IListPlanParams,
 } from './state/virtualized-list';
@@ -402,6 +433,7 @@ export type {
 
 export {
   SINGLE_COLUMN,
+  arrayLikeLength,
   chunkIntoRows,
   rowKeyExtractor,
   expandRowToken,
@@ -412,17 +444,50 @@ export {
 } from './state/flat-list';
 export type { IRow } from './state/flat-list';
 
+export { routeScrollHandle } from './state/route-scroll-handle';
+export { createListNesting } from './state/list-nesting';
+export { viewPropsOf } from './state/list-scroll-props';
+export { createListHandlers } from './state/list-handlers';
+export { createKeyboardAvoidingModel } from './view/keyboard-avoiding-model';
+export { warnAboutModalProps } from './state/modal-warnings';
+export { ITEM_RENDERER, pickItemRenderer } from './state/list-item-renderer';
+export { drawItem } from './state/list-draw-item';
+export type { IListHandlers, IUserScrollHandlers } from './state/list-handlers';
+export { listHasMore } from './state/list-derive';
+export type {
+  IListNesting,
+  IListScope,
+  INestedChild,
+  INestedHandlers,
+  IScopeMetrics,
+} from './state/list-nesting';
 export {
+  cellGapsFor,
   flattenSections,
-  unwrapEntryItem,
   sectionEntryKey,
+  sectionGapFor,
+  layoutOverSections,
+  SECTION_ENTRY_KIND,
+  SEPARATOR_GAP_KIND,
+  renderSectionEntry,
+  resolveScrollLocation,
   scrollLocationToFlatIndex,
 } from './state/section-list';
 export type {
   ISection,
   ISectionEntry,
+  ISeparatorGap,
+  ISeparatorGapProps,
   IVirtualizedSectionListHandle,
 } from './state/section-list';
+export { createSeparatorBoard } from './state/section-separator-board';
+export { createCellSeparators } from './state/cell-separators';
+export type { ICellIdentity } from './state/cell-separators';
+export type {
+  ICellSeparatorState,
+  ISeparatorBoard,
+  ISeparatorUpdate,
+} from './state/section-separator-board';
 export {
   registerPressableBehavior,
   PRESSABLE_TAG,
@@ -489,8 +554,15 @@ export {
 } from './behaviors/input-accessory-view';
 
 export {
+  LAYOUT_CONFORMANCE_TAG,
+  registerLayoutConformanceBehavior,
+} from './behaviors/layout-conformance';
+export type { ILayoutConformanceMode } from './behaviors/layout-conformance';
+
+export {
   registerTextInputBehavior,
   buildTextInputHandle,
+  textInputOf,
   TEXT_INPUT_TAG,
   TEXT_INPUT_MULTILINE_TAG,
 } from './behaviors/text-input';
@@ -516,3 +588,4 @@ export {
   SCROLL_VIEW_TAG,
   STICKY_HEADER_TAG,
 } from './behaviors/scroll-view';
+export type { IInnerViewRef } from './behaviors/scroll-view';

@@ -1,87 +1,11 @@
-// VirtualizedList: real windowing over the `scroll-view` TAG. Only the cells
-// whose computed offset falls inside the visible window (plus a leading/trailing
-// buffer) are rendered; everything above and below is collapsed into two spacer
-// Views whose sizes sum to the off-screen extent, so the scroll thumb and total
-// content size stay correct without mounting all N rows.
-//
-// The orchestration — window recompute, edge-reached, viewability, batch fill, MVCP, the
-// imperative scrolls — is the framework-agnostic `reduceList` state machine in
-// @symbiote-native/components (state/virtualized-list-reducer), shared verbatim with Vue and Angular.
-// React supplies ONLY its lifecycle: it turns native events into ACTIONS, holds ONE state cell,
-// runs the returned EFFECTS with React primitives (a native scrollTo, a callback, a setTimeout, a
-// forced re-render), and builds the per-cell elements (createElement). The single derive-per-render
-// invariant is a `refresh-metrics` dispatched from the render body; the after-commit effects come
-// from a `commit` dispatched in a layout effect (before paint, so MVCP's shift lands without a
-// visible jump). Lists have no Descriptor render fn — the cell content is React's own children.
-//
-// Imperative scrolling resolves to an offset in the reducer and rides the scroll node's native
-// scrollTo command, animated by default. The `contentOffset` prop is only a fallback for the
-// pre-mount window (the node not yet attached).
-//
-// WHAT IS STILL THIS COMPONENT'S, now that the scroll view is a tag and the engine owns its
-// content node, its sticky seam and its RefreshControl placement — checked rather than assumed,
-// because "the wrapper is gone" and "nothing is left" are different claims:
-//
-//   the WINDOW           `reduceList` decides which indices are in view, and this file is what
-//                        turns that into elements. The output SHAPE is decided in JS from the
-//                        app's own data through `renderItem` — the one disqualifier that no
-//                        engine seam removes (`.claude/rules/host-primitive-tier.md`, tier 3).
-//   the CELL WRAPPERS    a measuring `view` per cell with the inversion counter-flip, the two
-//                        spacers, the header/footer/empty slots, the separator INSIDE the cell.
-//   the LIFECYCLE        native events -> actions, effects run with React primitives (timers, a
-//                        forced re-render, a layout effect for MVCP), one state cell.
-//   the HANDLE           `buildScrollViewHandle` over the node a `ref` hands back, plus the list's
-//                        own imperative surface on top of it.
-//
-// What is NOT: the content node, `contentContainerStyle`'s routing, where a RefreshControl goes
-// per platform, and how a sticky header pins. The list names `sticky-header` on a cell and knows
-// nothing else about it.
+// VirtualizedList over the `scroll-view` TAG, spacers stand in for the cells outside the window
+// The orchestration is the shared `reduceList` machine, React supplies lifecycle and elements
 
+import { useImperativeHandle, type ReactElement, type Ref } from 'react';
+import { dlog } from '@symbiote-native/engine';
 import {
-  createElement,
-  useCallback,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-  type ComponentType,
-  type ReactElement,
-  type ReactNode,
-  type Ref,
-} from 'react';
-import {
-  dlog,
-  type ISymbioteEvent,
-  type ISymbioteNode,
-} from '@symbiote-native/engine';
-import {
-  DEFAULT_INITIAL_NUM_TO_RENDER,
-  DEFAULT_MAX_TO_RENDER_PER_BATCH,
-  DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
-  DEFAULT_WINDOW_SIZE,
-  EMPTY_OFFSET,
-  FIRST_INDEX,
-  INVERTED_X_STYLE,
-  INVERTED_Y_STYLE,
-  buildListPlan,
-  buildScrollViewHandle,
-  buildViewabilityPairs,
-  createInitialListState,
-  isSeparatorGapInRange,
-  listEffectSignature,
-  readLayoutLength,
-  readLayoutOffset,
-  readScrollOffset,
-  reduceList,
-  resolveItemKey,
+  buildListHandle,
   type ICellLayout,
-  type IListAction,
-  type IListEffect,
-  type IListReducerInputs,
-  type IListState,
   type ISeparators,
   type ISeparatorProps,
   type IViewToken,
@@ -90,19 +14,21 @@ import {
   type IViewabilityConfigCallbackPair,
   type IVirtualizedListHandle,
 } from '@symbiote-native/components';
+import { buildListChildren } from './list-children';
+import { listHostOf } from './list-host';
+import { accessibilityRestOf, buildScrollProps } from './list-scroll-props';
+import { useListParts } from './use-list-parts';
+import { useSeparators } from './use-separators';
 import type {
-  IScrollViewHandle,
-  IScrollViewProps,
-} from '../scroll-view/scroll-view-props';
-import type { IRefreshControlProps } from '../refresh-control-props';
-import type {
-  IAccessibilityProps,
-  IAriaProps,
-} from '@symbiote-native/components';
-import type { IStyleProp, IViewStyle } from '../../utils/styles';
+  ICellRendererComponent,
+  ICellRendererProps,
+  IListItemInfo,
+  IRenderItem,
+  ISeparatorComponent,
+  IVirtualizedListProps,
+} from './virtualized-list-props';
 
-// Re-export the shared list types so flat-list / virtualized-section-list keep importing them
-// from '../virtualized-list' (their import paths are unchanged). One source of truth in core.
+// The shared list types keep their import path for flat-list and the section list
 export type {
   ICellLayout,
   ISeparators,
@@ -113,784 +39,65 @@ export type {
   IViewabilityConfigCallbackPair,
   IVirtualizedListHandle,
 };
+export type {
+  ICellRendererComponent,
+  ICellRendererProps,
+  IListItemInfo,
+  IRenderItem,
+  ISeparatorComponent,
+  IVirtualizedListProps,
+};
 
-type IRenderItem<ItemT> = (info: {
-  item: ItemT;
-  index: number;
-  separators: ISeparators;
-}) => ReactNode;
-
-export interface IVirtualizedListProps<ItemT>
-  extends IAccessibilityProps, IAriaProps {
-  data: unknown;
-  getItem: (data: unknown, index: number) => ItemT;
-  getItemCount: (data: unknown) => number;
-  renderItem: IRenderItem<ItemT>;
-  keyExtractor?: (item: ItemT, index: number) => string;
-  getItemLayout?: (
-    data: unknown,
-    index: number,
-  ) => { length: number; offset: number; index: number };
-  ItemSeparatorComponent?: ComponentType<ISeparatorProps<ItemT>>;
-  ListHeaderComponent?: ComponentType<Record<string, never>> | ReactElement;
-  ListFooterComponent?: ComponentType<Record<string, never>> | ReactElement;
-  ListEmptyComponent?: ComponentType<Record<string, never>> | ReactElement;
-  horizontal?: boolean;
-  inverted?: boolean;
-  // Opaque marker prop: changing it re-renders the list so renderItem closures
-  // that read external state stay fresh. We have no PureComponent cell to bust,
-  // so this is consumed only as a render dependency (RN's extraData).
-  extraData?: unknown;
-  onEndReached?: (info: { distanceFromEnd: number }) => void;
-  onEndReachedThreshold?: number;
-  // Fired once when the scroll position gets within onStartReachedThreshold of the
-  // start (the top edge), mirroring onEndReached for the bottom.
-  onStartReached?: (info: { distanceFromStart: number }) => void;
-  onStartReachedThreshold?: number;
-  // Pull-to-refresh. When onRefresh is set the list writes a `<refresh-control>` as the scroll
-  // tag's first CHILD and the behavior claims it; refreshing is the controlled spinner state
-  // (defaulted to false when nullish), progressViewOffset nudges its rest.
-  onRefresh?: () => void;
-  refreshing?: boolean | null;
-  progressViewOffset?: number;
-  onViewableItemsChanged?: (info: IViewableItemsChangedInfo<ItemT>) => void;
-  viewabilityConfig?: IViewabilityConfig;
-  viewabilityConfigCallbackPairs?: IViewabilityConfigCallbackPair<ItemT>[];
-  // Fired when scrollToIndex targets an unmeasured cell with no getItemLayout to place it
-  // from (RN VirtualizedList.js:184-193): {index, highestMeasuredFrameIndex, averageItemLength}.
-  onScrollToIndexFailed?: (info: {
-    index: number;
-    highestMeasuredFrameIndex: number;
-    averageItemLength: number;
-  }) => void;
-  initialNumToRender?: number;
-  initialScrollIndex?: number;
-  maxToRenderPerBatch?: number;
-  updateCellsBatchingPeriod?: number;
-  windowSize?: number;
-  // Data indices (into the item stream) that should stick to the top as they scroll off.
-  // VirtualizedSectionList passes its section-header indices here; we forward the in-window
-  // ones to the ScrollView, mapped to their child position.
-  stickyHeaderIndices?: number[];
-  // Keep the visually-anchored item in place when content is prepended (RN's
-  // maintainVisibleContentPosition). RN both forwards this to native AND shifts scroll in JS;
-  // we do both (the JS shift covers the off-window leading spacer native cannot see).
-  maintainVisibleContentPosition?: {
-    minIndexForVisible: number;
-    autoscrollToTopThreshold?: number;
-  };
-  // Scroll-driven UI hook. RN's _onScroll runs its windowing bookkeeping AND then calls
-  // this.props.onScroll(e): the user's handler COMPOSES with the internal one, never replaces
-  // it. We destructure it out so it cannot arrive raw via ...accessibilityRest, then chain both.
-  onScroll?: (event: ISymbioteEvent) => void;
-  // Scroll-lifecycle callbacks forwarded to the inner ScrollView (RN VirtualizedList.js:1096-1099).
-  onScrollBeginDrag?: (event: ISymbioteEvent) => void;
-  onScrollEndDrag?: (event: ISymbioteEvent) => void;
-  onMomentumScrollBegin?: (event: ISymbioteEvent) => void;
-  onMomentumScrollEnd?: (event: ISymbioteEvent) => void;
-  scrollEventThrottle?: number;
-  keyboardShouldPersistTaps?: boolean | 'always' | 'never' | 'handled';
-  keyboardDismissMode?: 'none' | 'on-drag' | 'interactive';
-  removeClippedSubviews?: boolean;
-  nestedScrollEnabled?: boolean;
-  style?: IStyleProp<IViewStyle>;
-  contentContainerStyle?: IStyleProp<IViewStyle>;
-  // Forwarded onto the inner ScrollView like `style` — resolves through the shared style
-  // registry. contentContainerStyle stays JS-only (a plain style-object prop, not style/
-  // className itself).
-  className?: string;
-}
-
-function resolveElement(
-  component: ComponentType<Record<string, never>> | ReactElement | undefined,
-): ReactNode {
-  if (component === undefined) return undefined;
-  if (typeof component === 'function') return createElement(component, {});
-  return component;
-}
-
-// Build the ItemSeparatorComponent element for the gap between leadingItem and trailingItem, with
-// the highlight flag and any handle-pushed overrides merged on top (RN renders
-// `<ItemSeparatorComponent {...separatorProps} />`). A bare element is returned as-is.
-function renderSeparatorElement<ItemT>(
-  component: ComponentType<ISeparatorProps<ItemT>> | undefined,
-  leadingItem: ItemT,
-  trailingItem: ItemT,
-  overrides: Partial<ISeparatorProps<ItemT>> | undefined,
-): ReactNode {
-  if (component === undefined) return undefined;
-  const props: ISeparatorProps<ItemT> = {
-    highlighted: false,
-    leadingItem,
-    trailingItem,
-    ...overrides,
-  };
-  return createElement(component, props);
-}
-
-// React 19 passes `ref` as a regular prop, so a generic function component can
-// expose an imperative handle without forwardRef (which erases the ItemT
-// generic). The ref is destructured here and wired through useImperativeHandle.
+// React 19 passes `ref` as a regular prop, so a generic function component can expose an
+// imperative handle without `forwardRef`, which erases the `ItemT` generic
 export function VirtualizedList<ItemT>(
   props: IVirtualizedListProps<ItemT> & { ref?: Ref<IVirtualizedListHandle> },
 ): ReactElement {
-  const forwardedRef = props.ref;
-  const {
-    data,
-    getItem,
-    getItemCount,
-    renderItem,
-    keyExtractor,
-    getItemLayout,
-    ItemSeparatorComponent,
-    ListHeaderComponent,
-    ListFooterComponent,
-    ListEmptyComponent,
-    horizontal = false,
-    inverted = false,
-    extraData,
-    onEndReached,
-    onEndReachedThreshold,
-    onStartReached,
-    onStartReachedThreshold,
-    onRefresh,
-    refreshing,
-    progressViewOffset,
-    onViewableItemsChanged,
-    viewabilityConfig,
-    viewabilityConfigCallbackPairs,
-    onScrollToIndexFailed,
-    initialNumToRender = DEFAULT_INITIAL_NUM_TO_RENDER,
-    initialScrollIndex,
-    maxToRenderPerBatch = DEFAULT_MAX_TO_RENDER_PER_BATCH,
-    updateCellsBatchingPeriod = DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
-    windowSize = DEFAULT_WINDOW_SIZE,
-    stickyHeaderIndices,
-    maintainVisibleContentPosition,
-    style,
-    contentContainerStyle,
-    // Pulled out of the rest so the user's onScroll does NOT arrive raw via
-    // ...accessibilityRest and overwrite the internal windowing handler. Composed below.
-    onScroll: userOnScroll,
-    onScrollBeginDrag,
-    onScrollEndDrag,
-    onMomentumScrollBegin,
-    onMomentumScrollEnd,
-    scrollEventThrottle,
-    keyboardShouldPersistTaps,
-    keyboardDismissMode,
-    // The accessibility surface rides down to the underlying ScrollView, which runs
-    // resolveAccessibilityProps itself; ref is pulled separately above, re-listed here only
-    // to keep it out of the forwarded rest.
-    ref: _ref,
-    ...accessibilityRest
-  } = props;
-
-  // The single-config and pairs forms both feed one viewability pass (RN supports either).
-  const viewabilityPairs = useMemo(
-    (): IViewabilityConfigCallbackPair<ItemT>[] =>
-      buildViewabilityPairs(
-        onViewableItemsChanged,
-        viewabilityConfig,
-        viewabilityConfigCallbackPairs,
-      ),
-    [onViewableItemsChanged, viewabilityConfig, viewabilityConfigCallbackPairs],
-  );
-
-  // The framework-agnostic reducer inputs (props + defaults). Rebuilt each render; the handlers read
-  // it through inputsRef so they stay stable.
-  const inputs: IListReducerInputs<ItemT> = {
-    data,
-    getItem,
-    getItemCount,
-    keyExtractor,
-    getItemLayout,
-    horizontal,
-    windowSize,
-    initialNumToRender,
-    maxToRenderPerBatch,
-    updateCellsBatchingPeriod,
-    onEndReachedThreshold,
-    onStartReachedThreshold,
-    onEndReachedActive: onEndReached !== undefined,
-    onStartReachedActive: onStartReached !== undefined,
-    viewabilityPairs,
-    maintainVisibleContentPosition,
-    initialScrollIndex,
-  };
-  const inputsRef = useRef(inputs);
-  inputsRef.current = inputs;
-
-  // The effect executors read the latest callbacks off this ref (the reducer never sees them).
-  const handlersRef = useRef({
-    onEndReached,
-    onStartReached,
-    onScrollToIndexFailed,
-    viewabilityPairs,
-  });
-  handlersRef.current = {
-    onEndReached,
-    onStartReached,
-    onScrollToIndexFailed,
-    viewabilityPairs,
-  };
-
-  // The one folded state cell (RN's scattered refs collapsed into IListState). Lazily created once.
-  const stateRef = useRef<IListState<ItemT> | null>(null);
-  const state = (stateRef.current ??= createInitialListState<ItemT>());
-
-  const [, forceRender] = useReducer((tick: number): number => tick + 1, 0);
-
-  // The offset we are imperatively driving native to (scrollTo* before the handle attaches). Pushed
-  // down as the ScrollView's contentOffset prop; fresh object identity each time. undefined = none.
-  const [commandedOffset, setCommandedOffset] = useState<
-    { x: number; y: number } | undefined
-  >(undefined);
-  // The engine node of the scroll TAG. A `ref` on an intrinsic hands back the host instance, so
-  // there is no wrapper left to run a `useImperativeHandle` — `buildScrollViewHandle` is what turns
-  // the node into RN's scroll surface, and it is the same function every other adapter feeds from
-  // its own host-instance accessor. Lazy getter: the node is null until commit.
-  const scrollNodeRef = useRef<ISymbioteNode | null>(null);
-  const scrollHandle = useMemo<IScrollViewHandle>(
-    () => buildScrollViewHandle(() => scrollNodeRef.current),
-    [],
-  );
-  // Pending minimumViewTime debounce timer / the incremental-fill timer (adapter owns the timers;
-  // the reducer only asks for a delay).
-  const viewableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const batchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Per-gap separator overrides (keyed by the LEADING cell index of the gap) stay adapter-side: they
-  // are render state read directly in the cell walk, not part of the windowing orchestration.
-  const separatorOverridesRef = useRef<
-    Map<number, Partial<ISeparatorProps<ItemT>>>
-  >(new Map());
-  const [, setSeparatorVersion] = useState(EMPTY_OFFSET);
-
-  // Drive a native scroll (or, before the handle attaches, the contentOffset fallback).
-  const scrollToPixel = useCallback(
-    (offset: number, animated: boolean): void => {
-      const clamped = Math.max(EMPTY_OFFSET, offset);
-      const isHorizontal = inputsRef.current.horizontal;
-      const target = isHorizontal
-        ? { x: clamped, y: EMPTY_OFFSET }
-        : { x: EMPTY_OFFSET, y: clamped };
-      if (scrollNodeRef.current !== null) {
-        dlog(
-          `VirtualizedList scrollTo offset=${clamped} animated=${animated} (horizontal=${isHorizontal})`,
-        );
-        scrollHandle.scrollTo({ x: target.x, y: target.y, animated });
-        return;
-      }
-      dlog(
-        `VirtualizedList scrollTo offset=${clamped} pending-ref (horizontal=${isHorizontal})`,
-      );
-      setCommandedOffset(target);
-    },
-    [scrollHandle],
-  );
-
-  // dispatch and runEffects are mutually recursive (a schedule-refill / fire-viewable effect
-  // dispatches a follow-up action), so runEffects reaches dispatch through a ref.
-  const dispatchRef = useRef<(action: IListAction<ItemT>) => void>(() => {});
-
-  const runEffects = useCallback(
-    (effects: IListEffect<ItemT>[]): void => {
-      const handlers = handlersRef.current;
-      for (const effect of effects) {
-        switch (effect.kind) {
-          case 'scroll-to':
-            scrollToPixel(effect.offset, effect.animated);
-            break;
-          case 'fire-end-reached':
-            handlers.onEndReached?.({
-              distanceFromEnd: effect.distanceFromEnd,
-            });
-            break;
-          case 'fire-start-reached':
-            handlers.onStartReached?.({
-              distanceFromStart: effect.distanceFromStart,
-            });
-            break;
-          case 'fire-scroll-to-index-failed':
-            handlers.onScrollToIndexFailed?.({
-              index: effect.index,
-              highestMeasuredFrameIndex: effect.highestMeasuredFrameIndex,
-              averageItemLength: effect.averageItemLength,
-            });
-            break;
-          case 'schedule-refill': {
-            if (batchTimerRef.current !== null)
-              clearTimeout(batchTimerRef.current);
-            batchTimerRef.current = setTimeout(() => {
-              batchTimerRef.current = null;
-              dispatchRef.current({ kind: 'batch-tick' });
-            }, effect.delay);
-            break;
-          }
-          case 'fire-viewable': {
-            const pairs = handlers.viewabilityPairs;
-            const info = effect.info;
-            const map = effect.map;
-            const fire = (): void => {
-              for (const pair of pairs) {
-                pair.onViewableItemsChanged({
-                  ...info,
-                  viewabilityConfig: pair.viewabilityConfig,
-                });
-              }
-              dispatchRef.current({ kind: 'viewable-fired', map });
-            };
-            if (viewableTimerRef.current !== null) {
-              clearTimeout(viewableTimerRef.current);
-              viewableTimerRef.current = null;
-            }
-            if (effect.delay > EMPTY_OFFSET) {
-              viewableTimerRef.current = setTimeout(() => {
-                viewableTimerRef.current = null;
-                fire();
-              }, effect.delay);
-            } else {
-              fire();
-            }
-            break;
-          }
-        }
-      }
-    },
-    [scrollToPixel],
-  );
-
-  const dispatch = useCallback(
-    (action: IListAction<ItemT>): void => {
-      const current = stateRef.current;
-      if (current === null) return;
-      const result = reduceList(current, action, inputsRef.current);
-      runEffects(result.effects);
-      if (result.changed) forceRender();
-    },
-    [runEffects],
-  );
-  dispatchRef.current = dispatch;
-
-  // The single derive-per-render: recompute the window off the current state before reading it.
-  reduceList(state, { kind: 'refresh-metrics' }, inputs);
-  const m = state.metrics;
-  const { count, offsets, lengths, total, first, last } = m;
-  const commitSignature = listEffectSignature(state);
-
-  dlog(
-    `VirtualizedList window [${first}, ${last}] of ${count} ` +
-      `(offset=${state.scrollOffset}, viewport=${state.viewportLength}, rendered=${Math.max(0, last - first + 1)})`,
-  );
-
-  const onScroll = useCallback(
-    (event: ISymbioteEvent): void => {
-      const offset = readScrollOffset(event, horizontal);
-      if (offset === undefined) return;
-      dlog(`VirtualizedList onScroll offset=${offset}`);
-      // A real user/native scroll supersedes any pending commanded offset.
-      setCommandedOffset(undefined);
-      dispatch({ kind: 'scroll', offset });
-      // Compose, don't clobber: internal windowing ran first, now the user's onScroll.
-      if (userOnScroll !== undefined) userOnScroll(event);
-    },
-    [horizontal, userOnScroll, dispatch],
-  );
-
-  const onViewportLayout = useCallback(
-    (event: ISymbioteEvent): void => {
-      const length = readLayoutLength(event, horizontal);
-      if (length === undefined) return;
-      dlog(`VirtualizedList onLayout viewport=${length}`);
-      dispatch({ kind: 'layout', length });
-    },
-    [horizontal, dispatch],
-  );
-
-  const makeCellMeasure = useCallback(
-    (index: number) =>
-      (event: ISymbioteEvent): void => {
-        const length = readLayoutLength(event, horizontal);
-        if (length === undefined) return;
-        const offset = readLayoutOffset(event, horizontal);
-        dlog(
-          `VirtualizedList cell ${index} measured length=${length} offset=${offset ?? 'none'}`,
-        );
-        dispatch({ kind: 'measure', index, length, offset });
-      },
-    [horizontal, dispatch],
-  );
-
-  // Merge an override onto the separator at a given gap and request a re-render. A gap index
-  // outside [0, count-2] has no separator, so the write is a no-op (RN bails the same way).
-  const mergeSeparator = useCallback(
-    (gapIndex: number, patch: Partial<ISeparatorProps<ItemT>>): void => {
-      if (!isSeparatorGapInRange(gapIndex, count)) return;
-      const overrides = separatorOverridesRef.current;
-      overrides.set(gapIndex, { ...overrides.get(gapIndex), ...patch });
-      setSeparatorVersion(version => version + 1);
-    },
-    [count],
-  );
-
-  // The ISeparators handle for the cell at `index` (RN CellRenderer._separators).
-  const makeSeparators = useCallback(
-    (index: number): ISeparators => ({
-      highlight: (): void => {
-        dlog(`VirtualizedList separator highlight cell=${index}`);
-        mergeSeparator(index - 1, { highlighted: true });
-        mergeSeparator(index, { highlighted: true });
-      },
-      unhighlight: (): void => {
-        dlog(`VirtualizedList separator unhighlight cell=${index}`);
-        mergeSeparator(index - 1, { highlighted: false });
-        mergeSeparator(index, { highlighted: false });
-      },
-      updateProps: (
-        select: 'leading' | 'trailing',
-        newProps: Record<string, unknown>,
-      ): void => {
-        mergeSeparator(select === 'leading' ? index - 1 : index, newProps);
-      },
-    }),
-    [mergeSeparator],
-  );
-
-  const keyForIndex = useCallback(
-    (index: number): string =>
-      resolveItemKey(getItem(data, index), index, keyExtractor),
-    [getItem, data, keyExtractor],
-  );
-
+  const { config, driver, nesting, handlers } = useListParts(props);
+  const { state, dispatch, scroll } = driver;
+  const metrics = state.metrics;
+  const separators = useSeparators<ItemT>(metrics.count);
   useImperativeHandle(
-    forwardedRef ?? null,
-    () => ({
-      // RN animates every imperative scroll unless the caller passes animated: false. Each resolves
-      // to an offset (or a scroll-to-index failure) inside the reducer, then rides scroll-to.
-      scrollToOffset: (params: {
-        offset: number;
-        animated?: boolean;
-      }): void => {
-        dispatch({
-          kind: 'scroll-to-offset',
-          offset: params.offset,
-          animated: params.animated ?? true,
-        });
-      },
-      scrollToIndex: (params: {
-        index: number;
-        animated?: boolean;
-        viewOffset?: number;
-        viewPosition?: number;
-      }): void => {
-        dispatch({
-          kind: 'scroll-to-index',
-          index: params.index,
-          animated: params.animated ?? true,
-          viewPosition: params.viewPosition ?? FIRST_INDEX,
-          viewOffset: params.viewOffset ?? EMPTY_OFFSET,
-        });
-      },
-      scrollToItem: (params: {
-        item: unknown;
-        animated?: boolean;
-        viewPosition?: number;
-      }): void => {
-        dispatch({
-          kind: 'scroll-to-item',
-          item: params.item,
-          animated: params.animated ?? true,
-          viewPosition: params.viewPosition ?? FIRST_INDEX,
-        });
-      },
-      scrollToEnd: (params?: { animated?: boolean }): void => {
-        dispatch({ kind: 'scroll-to-end', animated: params?.animated ?? true });
-      },
-      flashScrollIndicators: (): void => {
-        scrollHandle.flashScrollIndicators?.();
-      },
-      // Null until the tag commits, so these keep RN's "no scroll view yet" answer rather than
-      // handing back a handle that would silently no-op.
-      getNativeScrollRef: (): IScrollViewHandle | null =>
-        scrollNodeRef.current !== null ? scrollHandle : null,
-      getScrollableNode: (): IScrollViewHandle | null =>
-        scrollNodeRef.current !== null ? scrollHandle : null,
-      getScrollResponder: (): IScrollViewHandle | null =>
-        scrollNodeRef.current !== null ? scrollHandle : null,
-      getScrollNode: (): ISymbioteNode | null => scrollNodeRef.current,
-      // Manual trigger for RN's recordInteraction: flip the interaction flag so
-      // waitForInteraction viewability configs start reporting.
-      recordInteraction: (): void => {
-        dispatch({ kind: 'record-interaction' });
-      },
+    props.ref ?? null,
+    () =>
+      buildListHandle({
+        dispatch,
+        scrollHandle: scroll.handle,
+        getNode: () => scroll.nodeRef.current,
+      }),
+    [dispatch, scroll.handle, scroll.nodeRef],
+  );
+  dlog(
+    `VirtualizedList window [${metrics.first}, ${metrics.last}] of ${metrics.count} ` +
+      `(offset=${state.scrollOffset}, viewport=${state.viewportLength})`,
+  );
+
+  const accessibilityRest = accessibilityRestOf(props);
+  return listHostOf({
+    config,
+    nesting,
+    accessibilityRest,
+    nodeRef: scroll.nodeRef,
+    children: buildListChildren({
+      config,
+      metrics,
+      separators,
+      measureCell: handlers.measureCell,
+      focusCell: handlers.focusCell,
     }),
-    [dispatch, scrollHandle],
-  );
-
-  // After-commit pass: run the deferred effects (batch fill, edge-reached, viewability,
-  // initial-scroll, MVCP) in a LAYOUT effect so MVCP's shift lands before paint. Re-runs only when
-  // the windowing signature changed — the same dedup key every adapter shares.
-  useLayoutEffect(() => {
-    const current = stateRef.current;
-    if (current === null) return;
-    const result = reduceList(current, { kind: 'commit' }, inputsRef.current);
-    runEffects(result.effects);
-  }, [commitSignature, runEffects]);
-
-  // Clear any pending timers on unmount (RN ViewabilityHelper.dispose + the fill timer).
-  useEffect(() => {
-    return () => {
-      if (viewableTimerRef.current !== null)
-        clearTimeout(viewableTimerRef.current);
-      if (batchTimerRef.current !== null) clearTimeout(batchTimerRef.current);
-    };
-  }, []);
-
-  // ---- assemble the windowed child list ----------------------------------
-
-  // extraData needs no wiring: this component is not memoized, so any prop change (including
-  // extraData) already re-renders and re-runs renderItem. Voided to mark the deliberate no-op.
-  void extraData;
-
-  const children: ReactNode[] = [];
-  const stickySet =
-    stickyHeaderIndices !== undefined
-      ? new Set(stickyHeaderIndices)
-      : undefined;
-
-  const header = resolveElement(ListHeaderComponent);
-  if (header !== undefined) {
-    children.push(createElement('view', { key: 'list-header' }, header));
-  }
-
-  if (count === FIRST_INDEX) {
-    const empty = resolveElement(ListEmptyComponent);
-    if (empty !== undefined) {
-      children.push(createElement('view', { key: 'list-empty' }, empty));
-    }
-  } else {
-    // The shared plan: spacer extents, in-window cell keys, and the sticky child positions.
-    const plan = buildListPlan({
-      count,
-      first,
-      last,
-      offsets,
-      lengths,
-      total,
-      keyFor: keyForIndex,
-      stickyIndices: stickySet,
-      hasHeader: header !== undefined,
-    });
-    // `plan.stickyChildPositions` is deliberately NOT read. It was the input to the wrapper's own
-    // JS sticky pass, and the behavior honours `stickyHeaderIndices` by numbering the OWNER's paint
-    // children — which a windowed list cannot supply: it paints a header, a spacer and a slice, so
-    // data index 3 is almost never paint child 3, and the positions would have to be recomputed
-    // every time the window slides. The cells that should pin carry the `sticky-header` TAG
-    // instead, which pins by document order and survives windowing.
-
-    if (plan.leadingExtent > EMPTY_OFFSET) {
-      children.push(
-        createElement('view', {
-          key: 'spacer-leading',
-          style: horizontal
-            ? { width: plan.leadingExtent }
-            : { height: plan.leadingExtent },
-        }),
-      );
-    }
-
-    // The force-mounted sticky cell (RN _ensureClosestStickyHeader): the nearest sticky index
-    // below the window, kept alive outside [first,last] so it never gets destroyed/recreated
-    // as the window slides back over its origin index. Rendered exactly like an in-window
-    // cell — same measuring wrapper, same key format (so a transition between forced and
-    // in-window rendering of the SAME index keeps the same React key and never remounts).
-    if (plan.forcedStickyCell !== undefined) {
-      const forcedIndex = plan.forcedStickyCell.index;
-      const forcedItem = getItem(data, forcedIndex);
-      const forcedCell = renderItem({
-        item: forcedItem,
-        index: forcedIndex,
-        separators: makeSeparators(forcedIndex),
-      });
-      children.push(
-        createElement(
-          // Sticky by construction — `forcedStickyCell` exists only for an index in `stickySet` —
-          // and the SAME tag the in-window branch below uses, so a cell crossing between the two
-          // keeps its element type as well as its key and never remounts.
-          'sticky-header',
-          {
-            key: `cell-${plan.forcedStickyCell.key}`,
-            onLayout: makeCellMeasure(forcedIndex),
-            style: inverted
-              ? horizontal
-                ? INVERTED_X_STYLE
-                : INVERTED_Y_STYLE
-              : undefined,
-          },
-          forcedCell,
-        ),
-      );
-    }
-
-    if (plan.gapExtent > EMPTY_OFFSET) {
-      children.push(
-        createElement('view', {
-          key: 'spacer-gap',
-          style: horizontal
-            ? { width: plan.gapExtent }
-            : { height: plan.gapExtent },
-        }),
-      );
-    }
-
-    for (const planCell of plan.cells) {
-      const item = getItem(data, planCell.index);
-      // renderItem gets a separators handle so a row can highlight/update its own dividers.
-      const cell = renderItem({
-        item,
-        index: planCell.index,
-        separators: makeSeparators(planCell.index),
-      });
-      // The separator lives INSIDE the cell's own measuring wrapper, not as a sibling: a sibling
-      // is an extra flex child, so a leading-spacer collapse would land every cell below it short
-      // by (separator + gap). See .claude/rules/list-geometry-feedback-loop.md.
-      const separator =
-        // Gated on the last index of the DATA, not the WINDOW: since the separator lives inside
-        // the measuring wrapper, gating on the window would make a cell's own measured height
-        // change as the window slides past it.
-        planCell.index < count - 1
-          ? renderSeparatorElement(
-              ItemSeparatorComponent,
-              item,
-              getItem(data, planCell.index + 1),
-              separatorOverridesRef.current.get(planCell.index),
-            )
-          : undefined;
-      // Wrap each cell in a measuring View. When inverted, each cell carries the counter-flip so
-      // its content reads upright inside the flipped content container.
-      //
-      // A cell the app flagged sticky is wrapped in the `sticky-header` TAG instead — same
-      // position, same key, same `onLayout` (the behavior forwards it rather than replacing it),
-      // and the engine finds this scroll view by walking up. Nothing here computes a child index:
-      // the collision point comes from the owner's DOCUMENT order, which is the one form that
-      // survives windowing.
-      children.push(
-        createElement(
-          stickySet?.has(planCell.index) === true ? 'sticky-header' : 'view',
-          {
-            key: `cell-${planCell.key}`,
-            onLayout: makeCellMeasure(planCell.index),
-            style: inverted
-              ? horizontal
-                ? INVERTED_X_STYLE
-                : INVERTED_Y_STYLE
-              : undefined,
-          },
-          cell,
-          separator,
-        ),
-      );
-    }
-
-    if (plan.trailingExtent > EMPTY_OFFSET) {
-      children.push(
-        createElement('view', {
-          key: 'spacer-trailing',
-          style: horizontal
-            ? { width: plan.trailingExtent }
-            : { height: plan.trailingExtent },
-        }),
-      );
-    }
-  }
-
-  const footer = resolveElement(ListFooterComponent);
-  if (footer !== undefined) {
-    children.push(createElement('view', { key: 'list-footer' }, footer));
-  }
-
-  // A horizontal list pins the content container to the full row width so the row overflows for
-  // iOS to scroll. The inversion flip rides ONLY the outer ScrollView style and each cell, never
-  // the content container (flipping it too would cancel the ScrollView flip).
-  const resolvedContentContainerStyle: IStyleProp<IViewStyle> = horizontal
-    ? [contentContainerStyle, { width: total }]
-    : contentContainerStyle;
-  // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
-  const resolvedStyle: IStyleProp<IViewStyle> | undefined = inverted
-    ? [horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE, style]
-    : style;
-
-  const scrollProps: IScrollViewProps & {
-    onLayout: (event: ISymbioteEvent) => void;
-    isInvertedVirtualizedList?: boolean;
-  } = {
-    // The list's accessibility surface rides down onto the ScrollView. Spread first so the
-    // explicit windowing props below always win.
-    ...accessibilityRest,
-    style: resolvedStyle,
-    contentContainerStyle: resolvedContentContainerStyle,
-    onScroll,
-    onLayout: onViewportLayout,
-  };
-  // `horizontal` is NOT in the bag: the axis is the TAG (`horizontal-scroll-view`), because Android
-  // scrolls the two axes with different native ViewManagers. The behavior's own fold deletes the
-  // prop and rewrites it from the tag, so passing it would be at best redundant and at worst a
-  // contradiction it has to warn about.
-  // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
-  if (inverted) scrollProps.isInvertedVirtualizedList = true;
-  if (onScrollBeginDrag !== undefined)
-    scrollProps.onScrollBeginDrag = onScrollBeginDrag;
-  if (onScrollEndDrag !== undefined)
-    scrollProps.onScrollEndDrag = onScrollEndDrag;
-  if (onMomentumScrollBegin !== undefined)
-    scrollProps.onMomentumScrollBegin = onMomentumScrollBegin;
-  if (onMomentumScrollEnd !== undefined)
-    scrollProps.onMomentumScrollEnd = onMomentumScrollEnd;
-  if (scrollEventThrottle !== undefined)
-    scrollProps.scrollEventThrottle = scrollEventThrottle;
-  if (keyboardShouldPersistTaps !== undefined)
-    scrollProps.keyboardShouldPersistTaps = keyboardShouldPersistTaps;
-  if (keyboardDismissMode !== undefined)
-    scrollProps.keyboardDismissMode = keyboardDismissMode;
-  // A pending imperative/initial scroll rides down as contentOffset (fresh identity each push).
-  if (commandedOffset !== undefined)
-    scrollProps.contentOffset = commandedOffset;
-  // Forward maintainVisibleContentPosition to the native ScrollView so it anchors in-window cells.
-  // minIndexForVisible is bumped by 1 when a ListHeaderComponent occupies child 0.
-  if (maintainVisibleContentPosition !== undefined) {
-    scrollProps.maintainVisibleContentPosition = {
-      ...maintainVisibleContentPosition,
-      minIndexForVisible:
-        maintainVisibleContentPosition.minIndexForVisible +
-        (header !== undefined ? 1 : 0),
-    };
-  }
-
-  // Pull-to-refresh: when onRefresh is set, the RefreshControl is an ordinary FIRST CHILD on both
-  // platforms rather than a prop. The scroll behavior CLAIMS it, so the engine keeps it beside the
-  // content view on iOS and inverts the tree on Android; everything after it lands in the content
-  // node the behavior built. refreshing is RN-required alongside onRefresh, default false.
-  const refreshControl =
-    onRefresh !== undefined
-      ? createElement('refresh-control', {
-          key: 'refresh-control',
-          refreshing: refreshing ?? false,
-          onRefresh,
-          progressViewOffset,
-        } satisfies IRefreshControlProps & { key: string })
-      : undefined;
-  if (refreshControl !== undefined) {
-    dlog('VirtualizedList wiring RefreshControl (onRefresh provided)');
-  }
-
-  // The scroll TAG, not a wrapper: the engine builds the content node, carries
-  // `contentContainerStyle` onto it and places the refresh control. `ref` hands back the engine
-  // node, which is what `buildScrollViewHandle` drives for the imperative scrolls.
-  return createElement(
-    horizontal ? 'horizontal-scroll-view' : 'scroll-view',
-    { ...scrollProps, ref: scrollNodeRef },
-    refreshControl,
-    ...children,
-  );
+    scrollProps: buildScrollProps({
+      config,
+      accessibilityRest,
+      total: metrics.total,
+      onScroll: handlers.onScroll,
+      onScrollBeginDrag: handlers.onScrollBeginDrag,
+      onScrollEndDrag: handlers.onScrollEndDrag,
+      onMomentumScrollBegin: handlers.onMomentumScrollBegin,
+      onMomentumScrollEnd: handlers.onMomentumScrollEnd,
+      onContentSizeChange: handlers.onContentSizeChange,
+      onLayout: handlers.onViewportLayout,
+      commandedOffset: scroll.commandedOffset,
+      hasHeader: config.ListHeaderComponent !== undefined,
+    }),
+  });
 }

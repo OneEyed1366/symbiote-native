@@ -1,12 +1,6 @@
-// Stack, driven through the REAL compiled index.svelte/stack-screen.svelte against a fake
-// Fabric. What this proves that `tsc --build` structurally cannot:
-//  - the context-based screen collector actually populates the route list during the SAME
-//    synchronous mount pass that paints it (Svelte hands a component an opaque Snippet, so this
-//    replaces React's/Vue's children scan and is the single riskiest piece of the port),
-//  - `<svelte:element this={'RNSScreen'}>` + an `{@attach hostProps(...)}` really does create the
-//    capitalized react-native-screens views and land the object bag on them,
-//  - the `export function` navigator handle reached through `bind:this` drives push/pop/replace,
-//  - the search bar's imperative ref attachment dispatches real native view commands.
+// `Stack` through the compiled `index.svelte` and `stack-screen.svelte` against a fake Fabric
+// Covers what `tsc --build` cannot: the screen collector filling routes in the paint pass,
+// `hostProps` landing on the capitalized views, the `bind:this` handle and the search bar ref
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -14,6 +8,7 @@ import { installRecordingFabric } from '@symbiote-native/test-utils';
 import { setNativeViewConfigSource } from '@symbiote-native/engine';
 import type { INativeViewConfig } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
+import type { ILiveNode } from '@symbiote-native/test-utils';
 import type { INavigatorHandle } from '../../core';
 import type { ISearchBarCommands } from '../../core';
 import { createNavigationLiveTree } from '../fabric-tree.test-helper';
@@ -67,7 +62,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     directEventTypes: {
       topFinishTransitioning: directEvent('onFinishTransitioning'),
     },
-    validAttributes: {},
+    validAttributes: { nativeContainerBackgroundColor: true },
   },
   RNSScreenStackHeaderConfig: {
     directEventTypes: {
@@ -89,6 +84,10 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     validAttributes: { placeholder: true },
   },
   RNSScreenContentWrapper: {
+    directEventTypes: {},
+    validAttributes: { collapsable: true },
+  },
+  RNSScreenFooter: {
     directEventTypes: {},
     validAttributes: { collapsable: true },
   },
@@ -131,10 +130,8 @@ const HOME_SOURCE = `<script lang="ts">
 
 const DETAILS_SOURCE = `<view p={{ testID: 'details' }} />`;
 
-// The app-level markers are written on SEPARATE LINES on purpose: that is how any reasonable
-// author formats them, and it is exactly the shape svelte-adapter-dom-shim skill §16 turns into
-// stray single-space text nodes. Rendering them inside the collapsed `text` registry
-// host is what keeps that legal - the assertion on the committed outline below is what proves it.
+// The markers sit on separate lines on purpose, the usual formatting that Svelte turns into
+// stray text nodes. The collapsed `text` registry host keeps that legal, the outline asserts it
 function appSource(stackAttributes: string, screenAttributes: string): string {
   return `<script lang="ts">
      import Stack from './index.svelte';
@@ -160,9 +157,8 @@ function isNavigatorHandle(value: unknown): value is INavigatorHandle {
   );
 }
 
-// `variant` gives each differently-configured fixture its OWN compiled filename: Node caches
-// `import()` by path, so writing new content to a path an earlier test already imported hands
-// back the STALE module (svelte-adapter-dom-shim skill §15).
+// `variant` gives each fixture its own compiled filename, as Node caches `import()` by path
+// and a reused path would hand back the stale module
 async function mountStack(
   variant = 'default',
   stackAttributes = '',
@@ -188,6 +184,49 @@ async function mountStack(
   if (!isNavigatorHandle(handle))
     throw new Error('Stack did not expose a navigator handle');
   return handle;
+}
+
+type IHeaderControls = { show: () => void };
+
+function isHeaderControls(value: unknown): value is IHeaderControls {
+  return typeof value === 'object' && value !== null && 'show' in value;
+}
+
+// One home route whose options come from the test. `snippets` sit beside the marker, as an app
+// declares header views, and `isShown` lets an option appear after mount
+async function mountWithHeaderViews(
+  variant: string,
+  snippets: string,
+  options: string,
+): Promise<IHeaderControls> {
+  const dir = __dirname;
+  harness.compileSource(dir, 'home-fixture', HOME_SOURCE);
+  const app = harness.compileSource(
+    dir,
+    `stack-header-${variant}`,
+    `<script lang="ts">
+     import Stack from './index.svelte';
+     import Screen from '../screen.svelte';
+     import Home from './home-fixture.svelte';
+     let { onControls }: { onControls?: (controls: unknown) => void } = $props();
+     let isShown = $state(false);
+     onControls?.({ show: () => { isShown = true; } });
+   </script>
+   ${snippets}
+   <Stack><Screen name="home" component={Home} options={${options}} /></Stack>`,
+  );
+  const App = await loadComponent(app);
+  let controls: unknown = null;
+  mount(ROOT_TAG, App, {
+    onControls: (value: unknown) => {
+      controls = value;
+    },
+  });
+  await tick();
+  await tick();
+  if (!isHeaderControls(controls))
+    throw new Error('the header fixture exposed no controls');
+  return controls;
 }
 
 // A fixture whose marker set SHRINKS at runtime - the Svelte shape of "a <Screen> behind an
@@ -255,26 +294,17 @@ async function mountDynamicStack(): Promise<{
   return { handle, hideDetails: controls.hideDetails };
 }
 
-// No product-level Negative group: every export here (push/pop/replace/canGoBack, screen
-// registration, options folding) accepts whatever it's given and composes it - there is no
-// user-input validation path in this Svelte lifecycle layer that is meant to reject/throw
-// (unlike runes/runes.smoke.test.ts's requireNavigationScope guards, or the core reducer's own
-// tests). `mountStack`'s `isNavigatorHandle` check above is a TEST-HARNESS safeguard against a
-// broken fixture, not a product contract under test, so it stays out of the grouping below.
+// No Negative group: nothing in this lifecycle layer is meant to reject or throw
+// The `isNavigatorHandle` check in `mountStack` guards a broken fixture, not a product contract
 describe('Stack (real compiled index.svelte)', () => {
   describe('Positive', () => {
     it('paints the react-native-screens chrome for the initial route', async () => {
-      // why: the lone RCTRawText is the whitespace between the two `<Screen>` markers in the
-      // fixture - it must land inside the collapsed RCTText registry host (../registry-host.ts)
-      // rather than become an illegal raw-text child of RNSScreenStack, and the initial route's
-      // screen must paint as RNSScreen > RNSScreenStackHeaderConfig + RNSScreenContentWrapper.
+      // The lone `RCTRawText` is the whitespace between the markers, it must sit in the collapsed
+      // registry host and not become a raw-text child of `RNSScreenStack`
       await mountStack();
 
-      // The root line reads `#surface` rather than `RCTView`, and the change is a CORRECTION.
-      // The app root is the surface node; it is created as an `RCTView` and then set to the
-      // surface component, so `componentOf` says `#surface` and Fabric commits it as `RootView`.
-      // The stand-in tree kept the creation name — a third answer, and the only one nothing
-      // downstream agrees with. Everything below the root is unchanged.
+      // The root reads `#surface`, the app root is created as `RCTView` and then set to the
+      // surface component, which is what Fabric commits
       expect(outline(appRoot())).toEqual([
         '#surface',
         '  RCTView',
@@ -290,10 +320,8 @@ describe('Stack (real compiled index.svelte)', () => {
     });
 
     it('registers every marker and can push/pop the second route through bind:this', async () => {
-      // why: the context-based screen collector must populate the registry during the SAME
-      // synchronous mount pass that paints it (this file's header comment) - proven by push
-      // immediately reaching a route the collector registered moments earlier - and the exported
-      // handle's push/pop must move canGoBack() in lockstep with the actual RNSScreen count.
+      // A push that reaches a route registered moments earlier proves the collector fills the
+      // registry in the paint pass, and `canGoBack()` must follow the `RNSScreen` count
       const handle = await mountStack();
       expect(countLive(appRoot(), 'RNSScreen')).toBe(1);
 
@@ -324,6 +352,16 @@ describe('Stack (real compiled index.svelte)', () => {
       expect(screen?.children?.[0]?.props?.testID).toBe('details');
     });
 
+    it('paints the stack container with nativeContainerStyle.backgroundColor', async () => {
+      await mountStack(
+        'container-style',
+        `nativeContainerStyle={{ backgroundColor: '#112233' }}`,
+      );
+
+      const stack = findLive(appRoot(), 'RNSScreenStack');
+      expect(stack?.props?.nativeContainerBackgroundColor).toBeDefined();
+    });
+
     it('honours initialRouteName over registration order', async () => {
       // why: initialRouteName must win over "whichever <Screen> registered first" - the second
       // registered screen ("details") mounts as the initial route when named explicitly.
@@ -346,10 +384,27 @@ describe('Stack (real compiled index.svelte)', () => {
       expect(header?.props?.largeTitle).toBe(true);
     });
 
+    // A demo panel steers the header with route params, so `setParams` has to re-run the resolver
+    it('setParams re-runs an options resolver, the header follows the params', async () => {
+      const handle = await mountStack(
+        'resolver',
+        '',
+        'options={({ route }) => ({ title: String(route.params ?? "none") })}',
+      );
+      expect(
+        findLive(appRoot(), 'RNSScreenStackHeaderConfig')?.props?.title,
+      ).toBe('none');
+
+      handle.setParams('second');
+      await tick();
+      await tick();
+      expect(
+        findLive(appRoot(), 'RNSScreenStackHeaderConfig')?.props?.title,
+      ).toBe('second');
+    });
+
     it('drives useIsFocused from the native onAppear/onDisappear events', async () => {
-      // why: useIsFocused has no synthetic timer of its own (see use-is-focused.svelte.ts) - it
-      // must track the REAL native RNSScreen onAppear/onDisappear events one-to-one, starting
-      // false, since a route genuinely isn't focused at the instant it mounts.
+      // `useIsFocused` follows the native appear and disappear events one to one, starting false
       await mountStack();
       expect(
         findLiveByTestId(appRoot(), 'home')?.props?.accessibilityLabel,
@@ -375,9 +430,7 @@ describe('Stack (real compiled index.svelte)', () => {
     });
 
     it('pops one route when the native screen reports a dismissal', async () => {
-      // why: an iOS swipe-back or native back-button press reports `topDismissed` on the native
-      // screen, not a JS-driven pop() call - the stack must still respond by popping exactly one
-      // route, keeping JS state in sync with what the user already saw happen natively.
+      // A swipe-back reports `topDismissed` with no JS pop call, the stack must pop one route
       const handle = await mountStack();
       handle.push('details');
       await tick();
@@ -394,9 +447,7 @@ describe('Stack (real compiled index.svelte)', () => {
     });
 
     it('mounts the search bar and wires its imperative ref to real view commands', async () => {
-      // why: `headerSearchBarOptions.ref` is an ESCAPE HATCH into imperative native view commands
-      // (setText etc.) - this proves the ref actually resolves to a live RNSSearchBar tag and that
-      // calling a method on it dispatches a REAL Fabric command, not a no-op stub.
+      // The ref must resolve to the live `RNSSearchBar` and dispatch a real Fabric command
       const searchBarRef: { current: ISearchBarCommands | null } = {
         current: null,
       };
@@ -421,15 +472,174 @@ describe('Stack (real compiled index.svelte)', () => {
 
       const searchBar = findLive(appRoot(), 'RNSSearchBar');
       expect(searchBar?.props?.placeholder).toBe('Find');
-      expect(
-        findLive(appRoot(), 'RNSScreenStackHeaderSubview')?.props?.type,
-      ).toBe('searchBar');
+      const subview = findLive(appRoot(), 'RNSScreenStackHeaderSubview');
+      expect(subview?.props?.type).toBe('searchBar');
+      expect(subview?.props?.style).toContainEqual({
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+      });
 
       expect(searchBarRef.current).not.toBeNull();
       searchBarRef.current?.setText('hello');
       expect(fabric.commands).toHaveLength(1);
       expect(fabric.commands[0]?.commandName).toBe('setText');
       expect(fabric.commands[0]?.args).toEqual(['hello']);
+    });
+
+    describe('custom header views', () => {
+      const subviewOfType = (type: string): ILiveNode | undefined =>
+        findAllLive(appRoot(), 'RNSScreenStackHeaderSubview').find(
+          node => node.props.type === type,
+        );
+
+      it.each([
+        ['headerLeft', 'left'],
+        ['headerRight', 'right'],
+        ['headerTitle', 'center'],
+      ] as const)(
+        'mounts the %s snippet inside a %s subview',
+        async (option, type) => {
+          await mountWithHeaderViews(
+            option,
+            `{#snippet view()}<view p={{ testID: 'custom' }} />{/snippet}`,
+            `{ ${option}: view }`,
+          );
+
+          const subview = subviewOfType(type);
+          expect(subview?.children?.[0]?.props?.testID).toBe('custom');
+        },
+      );
+
+      it('sends the side priority and background options to the matching subview', async () => {
+        await mountWithHeaderViews(
+          'side-options',
+          `{#snippet view()}<view p={{ testID: 'more' }} />{/snippet}`,
+          `{ headerRight: view, headerRightVisibilityPriority: 'low', headerRightBackgroundVisible: false }`,
+        );
+
+        expect(subviewOfType('right')?.props?.visibilityPriority).toBe('low');
+        expect(subviewOfType('right')?.props?.hidesSharedBackground).toBe(true);
+      });
+
+      it('hosts the back image source in a back subview holding an image', async () => {
+        await mountWithHeaderViews(
+          'back-image',
+          '',
+          `{ headerBackImageSource: { uri: 'https://example.test/b.png' } }`,
+        );
+
+        expect(
+          subviewOfType('back')?.children.map(child => child.viewName),
+        ).toEqual(['RCTImageView']);
+      });
+
+      it('keeps the search bar subview next to a custom one', async () => {
+        await mountWithHeaderViews(
+          'with-search',
+          `{#snippet view()}<view p={{ testID: 'menu' }} />{/snippet}`,
+          `{ headerLeft: view, headerSearchBarOptions: { placeholder: 'Search' } }`,
+        );
+
+        expect(subviewOfType('left')).toBeDefined();
+        expect(subviewOfType('searchBar')).toBeDefined();
+      });
+
+      it('adds no subview when the app sets no custom view', async () => {
+        await mountWithHeaderViews('none', '', `{ title: 'Home' }`);
+
+        expect(findAllLive(appRoot(), 'RNSScreenStackHeaderSubview')).toEqual(
+          [],
+        );
+      });
+
+      it('adds the subview when a view option appears after mount', async () => {
+        const controls = await mountWithHeaderViews(
+          'late',
+          `{#snippet view()}<view p={{ testID: 'late' }} />{/snippet}`,
+          `{ headerRight: isShown ? view : undefined }`,
+        );
+        expect(subviewOfType('right')).toBeUndefined();
+
+        controls.show();
+        await tick();
+        await tick();
+
+        expect(subviewOfType('right')?.children?.[0]?.props?.testID).toBe(
+          'late',
+        );
+      });
+    });
+
+    describe('sheet footer', () => {
+      const FOOTER_SNIPPET = `{#snippet footer()}<view p={{ testID: 'bar' }} />{/snippet}`;
+      const footerNode = (): ILiveNode | undefined =>
+        findLive(appRoot(), 'RNSScreenFooter');
+      const kidNames = (viewName: string): string[] =>
+        findLive(appRoot(), viewName)?.children.map(kid => kid.viewName) ?? [];
+
+      it('mounts the footer snippet inside a native footer on a form sheet', async () => {
+        await mountWithHeaderViews(
+          'footer',
+          FOOTER_SNIPPET,
+          `{ stackPresentation: 'formSheet', sheetFooter: footer }`,
+        );
+
+        expect(footerNode()?.children?.[0]?.props?.testID).toBe('bar');
+      });
+
+      it('keeps the footer a real view, as native finds it by class', async () => {
+        await mountWithHeaderViews(
+          'footer-real',
+          FOOTER_SNIPPET,
+          `{ stackPresentation: 'formSheet', sheetFooter: footer }`,
+        );
+
+        expect(footerNode()?.props?.collapsable).toBe(false);
+      });
+
+      it('puts the footer in the inner screen that holds the header', async () => {
+        await mountWithHeaderViews(
+          'footer-inner',
+          FOOTER_SNIPPET,
+          `{ stackPresentation: 'formSheet', sheetFooter: footer }`,
+        );
+
+        expect(kidNames('RNSScreen')).toContain('RNSScreenFooter');
+      });
+
+      it('puts the footer straight in the screen when the header is hidden', async () => {
+        await mountWithHeaderViews(
+          'footer-hidden',
+          FOOTER_SNIPPET,
+          `{ stackPresentation: 'formSheet', headerShown: false, sheetFooter: footer }`,
+        );
+
+        expect(kidNames('RNSModalScreen')).toContain('RNSScreenFooter');
+      });
+
+      it.each(['push', 'modal', 'pageSheet'] as const)(
+        'has no footer on a %s screen',
+        async stackPresentation => {
+          await mountWithHeaderViews(
+            `footer-${stackPresentation}`,
+            FOOTER_SNIPPET,
+            `{ stackPresentation: '${stackPresentation}', sheetFooter: footer }`,
+          );
+
+          expect(footerNode()).toBeUndefined();
+        },
+      );
+
+      it('has no footer when the sheet sets none', async () => {
+        await mountWithHeaderViews(
+          'footer-none',
+          '',
+          `{ stackPresentation: 'formSheet' }`,
+        );
+
+        expect(footerNode()).toBeUndefined();
+      });
     });
 
     it('nests an inner stack so a modally presented screen can host a header', async () => {
@@ -460,11 +670,8 @@ describe('Stack (real compiled index.svelte)', () => {
     });
 
     it('drops a pushed route whose <Screen> marker unregisters', async () => {
-      // why: the route list is navigation HISTORY, not a projection of the registered markers, so
-      // a marker unregistering (its `{#if}` going false, onDestroy firing) while its route is still
-      // pushed used to leave a phantom entry - a route nothing can render, which the user cannot
-      // see but every back press has to walk through. Reconciling against the registry must drop it
-      // and leave the user on a real screen.
+      // A marker that unregisters while its route is pushed must not leave a phantom entry
+      // that every back press walks through, reconciling against the registry drops it
       const { handle, hideDetails } = await mountDynamicStack();
       handle.push('details');
       await tick();
@@ -482,9 +689,8 @@ describe('Stack (real compiled index.svelte)', () => {
     });
 
     it('keeps the pruned history when a new route is pushed afterwards', async () => {
-      // why: the pruning must be PERSISTED, not just derived for the paint - a phantom left in the
-      // pushed state has the next push rebuild the stack on top of it, and the user then has to
-      // press back TWICE to leave a route they only visited once.
+      // The pruning must reach the pushed state, else the next push rebuilds on the phantom and
+      // back needs two presses
       const { handle, hideDetails } = await mountDynamicStack();
       handle.push('details');
       await tick();
@@ -505,10 +711,8 @@ describe('Stack (real compiled index.svelte)', () => {
     });
   });
 
-  // Not a Positive/Negative behavior scenario - the tree-shape invariant the navigator templates
-  // rely on: they are formatted normally, so Svelte emits a ' ' text node between sibling tags,
-  // and only the shim's parent check keeps it out of Fabric (svelte-adapter-dom-shim §16b). The
-  // modal variant is mounted too, because stack-screen's inModal branch is a separate template.
+  // Tree-shape invariant, not a behavior scenario: Svelte emits a space text node between sibling
+  // tags and only the shim keeps it out of Fabric. The modal route mounts too, its branch differs
   describe('committed-tree hygiene', () => {
     it('commits no raw text outside a text container', async () => {
       await mountStack();

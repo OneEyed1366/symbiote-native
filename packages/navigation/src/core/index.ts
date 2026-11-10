@@ -1,10 +1,6 @@
-// @symbiote-native/navigation (core): the framework-agnostic half of the native stack navigator -
-// a pure route-stack reducer plus the react-native-screens prop folds and native-leaf prop
-// resolvers. symbiote ships zero runtime metadata for RNSScreen/RNSScreenStack/
-// RNSScreenStackHeaderConfig - the engine derives their events and color processors from
-// react-native-screens' own ViewConfig - so this layer is the pure JS every adapter reuses
-// verbatim, supplying only its lifecycle (route-key generation, useReducer/reactive state) and
-// the descriptor bridge.
+// Framework-agnostic half of the native stack navigator: a pure route-stack reducer and the prop
+// folds for the screens views. The engine derives their events and color processors from the
+// library's own ViewConfig, so adapters add only a lifecycle and the descriptor bridge
 
 export * from './constants';
 
@@ -30,6 +26,7 @@ export type {
   IStackPresentation,
   IHeaderBackButtonDisplayMode,
   IHeaderUserInterfaceStyle,
+  IHeaderDirection,
   IOptionalBooleanNativeProp,
   ISheetAllowedDetents,
   ISheetLargestUndimmedDetent,
@@ -47,6 +44,7 @@ export type {
   ISearchBarOptions,
   IScreenOrientation,
   IScreenOptions,
+  INativeContainerStyle,
   INavigatorPlatform,
   IScreenViewProps,
   IHeaderConfigViewProps,
@@ -60,6 +58,135 @@ export {
   resolveSearchBarView,
 } from './screen-options';
 
+export {
+  resolveCustomHeaderSubviewElements,
+  resolveCustomHeaderSubviews,
+  resolveCustomHeaderViews,
+  resolveHeaderSubviewProps,
+} from './header-subviews';
+export type {
+  IHeaderSubviewFactory,
+  IHeaderSubviewHost,
+  IHeaderSubviewKind,
+  IHeaderSubviewOptions,
+  IHeaderViewOptions,
+} from './header-subviews';
+
+export { resolveFullWindowOverlay } from './full-window-overlay';
+export type { IFullWindowOverlayProps } from './full-window-overlay';
+
+export {
+  resolveSheetFooterElements,
+  resolveSheetFooterHost,
+} from './screen-footer';
+export type {
+  ISheetFooterHost,
+  ISheetFooterInput,
+  ISheetFooterOptions,
+} from './screen-footer';
+
+export { resolveScreenContainerViewName } from './screen-container';
+export {
+  compatibilityFlags,
+  enableScreens,
+  executeNativeBackPress,
+  featureFlags,
+  isSearchBarAvailableForCurrentPlatform,
+  screensEnabled,
+} from './screens-config';
+export type {
+  IScreenContainerInput,
+  IScreenContainerProps,
+} from './screen-container';
+
+export {
+  readMoreTabSelected,
+  resolveNativeTabsEvents,
+  wireTabsEvent,
+} from './native-tabs-events';
+export type {
+  IMoreTabSelectedEvent,
+  INativeTabsEventCallbacks,
+  ITabActionOrigin,
+  ITabRejectionReason,
+  ITabSelectedEvent,
+  ITabSelectionPreventedEvent,
+  ITabSelectionRejectedEvent,
+} from './native-tabs-events';
+
+export { resolveNativeTabsHost } from './native-tabs-host';
+export type {
+  INativeTabsHost,
+  INativeTabsHostAndroid,
+  INativeTabsHostIOS,
+  INativeTabsHostOptions,
+  ITabBarControllerMode,
+  ITabBarMinimizeBehavior,
+  ITabBarSidebarPlacement,
+  ITabsColorScheme,
+  ITabsDirection,
+} from './native-tabs-host';
+
+export { resolveNativeTabScreen } from './native-tab-screen';
+export type {
+  INativeTabScreen,
+  INativeTabScreenAndroid,
+  INativeTabScreenIOS,
+  INativeTabScreenOptions,
+  ITabOrientation,
+  ITabRole,
+  ITabSpecialEffects,
+  ITabSystemItem,
+  ITabUserInterfaceStyle,
+} from './native-tab-screen';
+
+export { resolveTabIconsAndroid, resolveTabIconsIOS } from './native-tab-icons';
+export type {
+  ITabIconAndroid,
+  ITabIconImageRenderingMode,
+  ITabIconIOS,
+  ITabIconSymbolRenderingMode,
+  ITabIconTinting,
+} from './native-tab-icons';
+
+export {
+  resolveTabAppearanceAndroid,
+  resolveTabAppearanceIOS,
+} from './native-tab-appearance';
+export type {
+  ITabAppearanceAndroid,
+  ITabAppearanceIOS,
+  ITabBlurEffect,
+  ITabItemAppearanceIOS,
+  ITabItemStateAppearanceAndroid,
+  ITabItemStateAppearanceIOS,
+  ITabLabelVisibilityMode,
+} from './native-tab-appearance';
+
+export {
+  createInitialNativeTabState,
+  nativeTabReducer,
+  reconcileNativeTabRoutes,
+} from './native-tab-state';
+export type { INativeTabAction, INativeTabState } from './native-tab-state';
+
+export { resolveNativeTabsView } from './render-native-tabs';
+export type {
+  INativeTabsView,
+  INativeTabsViewHostOptions,
+  INativeTabsViewInput,
+  INativeTabsViewScreenOptions,
+} from './render-native-tabs';
+
+export { resolveTabsBottomAccessory } from './native-tabs-bottom-accessory';
+export type {
+  ITabsBottomAccessory,
+  ITabsBottomAccessoryContent,
+  ITabsBottomAccessoryEnvironment,
+  ITabsBottomAccessoryEnvironmentEvent,
+  ITabsBottomAccessoryInput,
+} from './native-tabs-bottom-accessory';
+
 export { buildSearchBarHandle } from './search-bar-commands';
 export type { ISearchBarCommands } from './search-bar-commands';
 
@@ -68,7 +195,6 @@ export {
   resolveStackProps,
   renderHeaderConfig,
   resolveSearchBarProps,
-  resolveScreenContentWrapperStyle,
   resolveScreenViewName,
   isHeaderInModal,
   resolveHeaderInModalStackStyle,
@@ -95,8 +221,20 @@ export {
   createFocusTracker,
   routeByKey,
 } from './route-tracking';
+export type { IFixedRouter } from './fixed-router';
 export { buildStackHostProps, resolveStackRoutePlan } from './screen-wiring';
 export type { IStackRoutePlanInput } from './screen-wiring';
+export {
+  createTransitionProgress,
+  createTransitionProgressStore,
+  requireTransitionProgress,
+} from './transition-progress';
+export type {
+  ITransitionProgress,
+  ITransitionProgressStore,
+} from './transition-progress';
+export type { IEdgeInsetScope, IEdgeInsetState } from './edge-insets';
+export { resolveNativeContainerProps } from './stack-container';
 export {
   buildInitialState,
   createEmitterStore,
@@ -129,9 +267,8 @@ export type {
   IFocusTransition,
 } from './navigation-events';
 
-// Runtime guards shared across core (and re-exported for adapters narrowing their own untyped
-// inputs - vnode props, gesture/event data, persisted JSON) - see guards.ts's header for which
-// call sites this consolidates and why array-exclusion is the right default everywhere it's used.
+// Runtime guards shared across core, adapters also use them to narrow vnode props, event data
+// and persisted JSON
 export { isRecord } from './guards';
 
 // Bottom-tabs navigator: a FOCUSED-INDEX router (not a stack - see tab-router-state.ts) driving
@@ -154,9 +291,8 @@ export type { ITabBarItemView, ITabBarViewProps } from './render-tabs';
 export { resolveRouteFromUrl, resolveUrlFromRoute } from './linking-config';
 export type { ILinkingConfig, IScreenLinkingConfig } from './linking-config';
 
-// Drawer navigator: an OPEN/CLOSED-flag router over a fixed route list (see
-// drawer-router-state.ts's header for why it isn't a push/pop stack), a pure swipe/geometry math
-// module, and a Descriptor render fn - all framework-agnostic, shared verbatim by every adapter.
+// Drawer navigator: an open or closed flag router over a fixed route list, swipe geometry math
+// and a `Descriptor` render function, shared by every adapter
 export {
   createInitialDrawerRouterState,
   drawerRouterReducer,

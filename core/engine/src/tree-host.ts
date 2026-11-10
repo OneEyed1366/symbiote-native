@@ -33,13 +33,17 @@ export type ICommittedRecord = {
   handle: object;
   tag: number;
   rootTag: IRootTag;
+  // Fabric families minted so far, a change means registries keyed by the old family went stale
+  familyGeneration?: number;
 };
 
-// A structural census of the host's tree: nodes held and nodes the commit skips
-// Plus the width of every parent with a skipped child, which the child-set build re-scans
+// A structural census of the host's tree: how many nodes it holds, how many the commit skips, and
+// the width of every parent with a skipped child — exactly what the child-set build re-scans
+// every time that parent reconciles.
 
-// Anchor count is an adapter property, not an app one
-// Angular binds a component to a host element and always allocates one, the others do not
+// Anchor count is an adapter property, not an app one: Angular's components bind to a host element
+// and always allocate one, where React/Vue/Svelte/Solid don't — the same screen is anchor-free
+// under four adapters and carries one per instance under the fifth.
 export type ITreeCensus = {
   nodes: number;
   anchors: number;
@@ -78,6 +82,9 @@ export type ITreeHost = {
   // with a DERIVED payload has; see `markPropsDirty` (node.ts).
   markPropsDirty: (handle: object) => void;
   committedRecordOf: (handle: object) => ICommittedRecord | undefined;
+  // `ShadowNodeWrapper` over the committed node, what Fabric-level native libraries take for a view
+  // NOTE: a snapshot that pins its revision, so drop it together with the binding
+  shadowNodeWrapperOf?: (handle: object) => object | undefined;
   // A test read: the payload the last commit handed Fabric for this node, undefined before one.
   // Exists because the alternative reads are blind — Props::getDebugProps() is hand-written per
   // component, and RN's rawProps needs a flag that doesn't compile on a host build.

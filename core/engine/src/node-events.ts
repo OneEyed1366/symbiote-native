@@ -5,6 +5,7 @@ import { isContainer } from './container-tracking';
 import { recordSetOwnedListener } from './mutation-buffer';
 import {
   appListenerFor,
+  attachLazyHostBehavior,
   hasHostBehaviors,
   notifyOwnedListenerChange,
   ownsListener,
@@ -37,6 +38,8 @@ const GATED_EVENT_PROPS: ReadonlyMap<string, string> = new Map([
   ['magicTap', 'onMagicTap'],
   ['accessibilityEscape', 'onAccessibilityEscape'],
   ['accessibilityAction', 'onAccessibilityAction'],
+  ['click', 'onClick'],
+  ['clickCapture', 'onClickCapture'],
 ]);
 
 // Install a listener the BEHAVIOR owns, bypassing the ownership check, т.к. `setEventListener`
@@ -138,7 +141,7 @@ export function setEventListener(
   value: unknown,
 ): void {
   const isHandler = typeof value === 'function';
-  if (hasHostBehaviors() && ownsListener(node, name)) {
+  if (isOwnedByBehavior(node, name, isHandler)) {
     stashOwnedListener(node, name, value, isHandler);
     return;
   }
@@ -150,10 +153,31 @@ export function setEventListener(
   }
   if (isHandler) {
     const handler = value;
+    if (TOUCH_PROP_NAMES.has(name)) touchPropWired = true;
     listenersOf(node).set(name, (event: ISymbioteEvent) => handler(event));
   } else {
     node.listeners?.delete(name);
   }
+  syncEventFlags(node, name, isHandler);
+}
+
+// The behavior that owns `name`, attaching a lazy one first: its trigger is the very write that
+// brings the name, so the check has to come before the owned-or-not decision
+function isOwnedByBehavior(
+  node: ISymbioteNode,
+  name: string,
+  isHandler: boolean,
+): boolean {
+  if (isHandler && attachLazyHostBehavior(node, name)) return true;
+  return hasHostBehaviors() && ownsListener(node, name);
+}
+
+// Kept apart so `setEventListener` stays readable: the props a listener's presence implies
+function syncEventFlags(
+  node: ISymbioteNode,
+  name: string,
+  isHandler: boolean,
+): void {
   const flagProp = GATED_EVENT_PROPS.get(name);
   if (flagProp !== undefined)
     setProp(node, flagProp, gateValue(node, name, isHandler));
@@ -182,6 +206,31 @@ export function listenerName(propName: string): string {
   return propName.charAt(2).toLowerCase() + propName.slice(3);
 }
 
+// `onTouchStart` and its siblings, `Capture` twins included: RN's base ViewConfig bubbles the raw
+// touch events to any view, so they are listeners on every node whatever its component
+const TOUCH_PROP_EVENTS = [
+  'touchStart',
+  'touchStartCapture',
+  'touchMove',
+  'touchMoveCapture',
+  'touchEnd',
+  'touchEndCapture',
+  'touchCancel',
+  'touchCancelCapture',
+] as const;
+type ITouchPropEvent = (typeof TOUCH_PROP_EVENTS)[number];
+const TOUCH_PROP_NAMES: ReadonlySet<string> = new Set<ITouchPropEvent>(
+  TOUCH_PROP_EVENTS,
+);
+
+// Monotone, like `hasAttached`: once an app wires one, every touch frame asks the tree for the
+// path, and an app that never does pays one boolean read per frame
+let touchPropWired = false;
+
+export function hasTouchPropListeners(): boolean {
+  return touchPropWired;
+}
+
 // PanResponder's `panHandlers`: a JS-side protocol synthesized from raw touches, not Fabric
 // ViewConfig events, so `isEventFor` never reports them. Treated as listeners on any node so the
 // handlers attach instead of reaching Fabric as dead props
@@ -198,4 +247,5 @@ export const RESPONDER_EVENTS: ReadonlySet<string> = new Set([
   'responderRelease',
   'responderTerminate',
   'responderTerminationRequest',
+  ...TOUCH_PROP_EVENTS,
 ]);

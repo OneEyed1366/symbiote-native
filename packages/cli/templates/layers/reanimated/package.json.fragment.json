@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@symbiote-native/reanimated": "latest",
+    "react-native-reanimated": "4.7.1",
+    "react-native-worklets": "0.13.0"
+  }
+}

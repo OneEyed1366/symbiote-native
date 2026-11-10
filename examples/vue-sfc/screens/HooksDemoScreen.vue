@@ -1,30 +1,33 @@
-<!--
-  Hooks demo: useFocusEffect increments a counter every time this screen (re)gains focus and logs
-  the moment it loses it; useIsFocused visibly renders the live true/false; useNavigationState
-  selects the whole route-name stack straight out of the root Stack's reducer state and renders it
-  as a list — navigate away and back (or push another screen) to watch all three update.
-  useFocusEffect's `effect` closure needs no memoization here (unlike React's useCallback
-  requirement) — Vue's setup() runs exactly once, so the composable reads it once by value and
-  closes over it directly (see composables/use-focus-effect.ts). Vue SFC twin of
-  .examples/react/screens/HooksDemoScreen.tsx.
--->
+<!-- One recipe per question: a one-time mount value against the focus hooks and the route stack -->
 <script setup lang="ts">
 import { ref } from 'vue';
 import {
   useFocusEffect,
   useIsFocused,
   useNavigationState,
+  useStackNavigation,
 } from '@symbiote-native/navigation/vue';
+import ActionButton from '../components/ActionButton.vue';
+import Recipe from '../components/Recipe.vue';
+import ScreenHero from '../components/ScreenHero.vue';
+import { recipeById } from '../navigation-recipes';
+import { LINE_COLOR } from '../navigation-lines';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 
+const effectOnce = recipeById('hooks-effect-once');
+const isFocusedRecipe = recipeById('hooks-is-focused');
+const stateRecipe = recipeById('hooks-navigation-state');
+const paramsRecipe = recipeById('hooks-route-params');
+const COLOR = LINE_COLOR.introspection;
+
+const navigation = useStackNavigation();
+const mountedAt = new Date().toLocaleTimeString();
 const focusCount = ref(0);
 const lastBlurAt = ref<number | undefined>(undefined);
 const isFocused = useIsFocused();
 const routeNames = useNavigationState(state =>
   state.routes.map(route => route.name),
 );
-const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HooksDemo];
 
 useFocusEffect(() => {
   focusCount.value += 1;
@@ -36,50 +39,65 @@ useFocusEffect(() => {
 
 <template>
   <safe-area-view class="screen">
-    <view class="section">
-      <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
-      </view>
-      <view class="hero-card">
-        <view
-          class="hero-badge"
-          :style="{ backgroundColor: LINE_COLOR.introspection }"
-        >
-          <text class="hero-badge-text"> HK </text>
-        </view>
-        <view class="hero-copy">
-          <text class="hero-title"> Hooks </text>
-          <text class="hero-body">
-            useFocusEffect, useIsFocused, and useNavigationState — introspecting
-            the navigator's own live state from inside a screen.
+    <scroll-view testID="hooks-scroll" class="screen">
+      <view class="scroll-content">
+        <ScreenHero
+          :route="ROUTE_NAME.HooksDemo"
+          title="Hooks"
+          body="Focus and state hooks of the navigator, each one answering a question people search for."
+        />
+        <Recipe :recipe="effectOnce">
+          <text testID="hooks-mounted-at" class="info-text">
+            {{ `mounted once, at ${mountedAt}` }}
           </text>
-        </view>
+          <text testID="hooks-focus-count" class="info-text">
+            {{ `useFocusEffect ran: ${focusCount}` }}
+          </text>
+          <text class="info-text">
+            {{
+              lastBlurAt === undefined
+                ? 'not blurred yet'
+                : `last blurred at ${lastBlurAt}`
+            }}
+          </text>
+          <ActionButton
+            testID="hooks-push-details"
+            title="Push Details"
+            :onPress="() => navigation.push(ROUTE_NAME.Details)"
+            :color="COLOR"
+          />
+        </Recipe>
+        <Recipe :recipe="isFocusedRecipe">
+          <text testID="hooks-is-focused" class="info-text">
+            {{ `useIsFocused(): ${isFocused}` }}
+          </text>
+        </Recipe>
+        <Recipe :recipe="stateRecipe">
+          <text
+            v-for="(name, index) in routeNames"
+            :key="`${name}-${index}`"
+            class="list-row-text"
+          >
+            {{ `${index}. ${name}` }}
+          </text>
+          <ActionButton
+            testID="hooks-push-self"
+            title="Push this screen again"
+            :onPress="() => navigation.push(ROUTE_NAME.HooksDemo)"
+            :color="COLOR"
+          />
+        </Recipe>
+        <Recipe :recipe="paramsRecipe">
+          <ActionButton
+            testID="hooks-push-details-params"
+            title="Push Details with params"
+            :onPress="
+              () => navigation.push(ROUTE_NAME.Details, { openedFrom: 'hooks' })
+            "
+            :color="COLOR"
+          />
+        </Recipe>
       </view>
-      <text testID="hooks-is-focused" class="info-text">
-        {{ `useIsFocused(): ${isFocused}` }}
-      </text>
-      <text testID="hooks-focus-count" class="info-text">
-        {{ `useFocusEffect focus count: ${focusCount}` }}
-      </text>
-      <text class="info-text">
-        {{
-          lastBlurAt === undefined
-            ? 'not blurred yet'
-            : `last blurred at ${lastBlurAt}`
-        }}
-      </text>
-      <text class="section-label">
-        useNavigationState() · current route stack
-      </text>
-      <text
-        v-for="(name, index) in routeNames"
-        :key="`${name}-${index}`"
-        class="list-row-text"
-      >
-        {{ `${index}. ${name}` }}
-      </text>
-    </view>
+    </scroll-view>
   </safe-area-view>
 </template>

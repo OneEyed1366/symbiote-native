@@ -1,77 +1,69 @@
-import { Component } from '@angular/core';
+import { Component, computed } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
 import {
   Drawer,
   DrawerScreenDirective,
   injectDrawerNavigation,
 } from '@symbiote-native/navigation/angular';
-import type { IDrawerContentContext } from '@symbiote-native/navigation/angular';
+import type {
+  IAngularScreenOptions,
+  IDrawerContentContext,
+  IDrawerScreenOptions,
+} from '@symbiote-native/navigation/angular';
 import type { IRoute } from '@symbiote-native/navigation';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+import { LINE_COLOR } from '../navigation-lines';
 import { ActionButton } from '../components/ActionButton';
+import { ScreenHero } from '../components/ScreenHero';
+import { DrawerRecipes } from './drawer/DrawerRecipes';
+import { drawerPanelProvider, injectDrawerPanel } from './drawer/drawer-panel';
+import { drawerPropsOf } from './drawer/drawer-settings';
 
-const drawerLineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
-const drawerLineTagClass = `line-tag line-tag-${drawerLineInfo.line}`;
-const drawerLineTagLabel = `${drawerLineInfo.code} · ${drawerLineInfo.label}`;
+export const drawerDemoScreenOptions: IAngularScreenOptions = {
+  title: 'Drawer Demo',
+  headerShown: true,
+  headerTintColor: LINE_COLOR.structure,
+  headerTranslucent: true,
+  headerTitleColor: '#ffffff',
+  headerStyle: { backgroundColor: '#0b1622' },
+  headerUserInterfaceStyle: 'dark',
+};
+
+const DRAWER_STYLE = { backgroundColor: '#13243a' };
+
+const homeOptions: IDrawerScreenOptions = {
+  title: 'Home',
+  drawerLabel: 'Home',
+};
+
+const settingsOptions: IDrawerScreenOptions = {
+  title: 'Settings',
+  drawerLabel: 'Settings',
+};
 
 @Component({
   selector: 'DrawerHomeScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [DrawerRecipes, ScreenHero, SYMBIOTE_ELEMENTS],
   template: `
-    <safe-area-view class="screen">
-      <view class="section">
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
-        </view>
-        <view class="hero-card">
-          <view class="hero-badge" [style]="heroBadgeStyle">
-            <text class="hero-badge-text">DR</text>
-          </view>
-          <view class="hero-copy">
-            <text class="hero-title">Drawer</text>
-            <text class="hero-body">
-              A swipeable drawer sliding in from the right, driven by the
-              navigator's own gesture handler.
-            </text>
-          </view>
-        </view>
-        <text class="info-text">
-          drawerPosition: right · drawerType: slide — swipe from the RIGHT edge,
-          or use a button
-        </text>
-        <ActionButton
-          testID="drawer-open"
-          title="Open drawer"
-          (press)="openDrawer()"
-          [color]="lineColorStructure"
-        ></ActionButton>
-        <ActionButton
-          testID="drawer-toggle"
-          title="Toggle drawer"
-          (press)="toggleDrawer()"
-          [color]="lineColorStructure"
-        ></ActionButton>
+    <scroll-view
+      testID="drawer-scroll"
+      class="screen"
+      contentInsetAdjustmentBehavior="automatic"
+    >
+      <view class="scroll-content">
+        <ScreenHero
+          [route]="route"
+          title="Drawer"
+          body="A swipeable drawer driven by the navigator's own gesture handler. Change its props below and swipe from the chosen edge."
+        ></ScreenHero>
+        <DrawerRecipes></DrawerRecipes>
       </view>
-    </safe-area-view>
+    </scroll-view>
   `,
 })
 export class DrawerHomeScreen {
-  private readonly navigation = injectDrawerNavigation();
-
-  readonly lineTagClass = drawerLineTagClass;
-  readonly lineTagLabel = drawerLineTagLabel;
-  readonly lineColorStructure = LINE_COLOR.structure;
-  readonly heroBadgeStyle = { backgroundColor: LINE_COLOR.structure };
-
-  openDrawer(): void {
-    this.navigation.openDrawer();
-  }
-
-  toggleDrawer(): void {
-    this.navigation.toggleDrawer();
-  }
+  readonly route = ROUTE_NAME.DrawerDemo;
 }
 
 @Component({
@@ -79,54 +71,42 @@ export class DrawerHomeScreen {
   standalone: true,
   imports: [ActionButton, SYMBIOTE_ELEMENTS],
   template: `
-    <safe-area-view class="screen">
-      <view class="section">
-        <view [class]="lineTagClass">
-          <text class="line-tag-text">{{ lineTagLabel }}</text>
-        </view>
+    <scroll-view class="screen" contentInsetAdjustmentBehavior="automatic">
+      <view class="scroll-content">
         <text class="section-label">Drawer demo · Settings</text>
         <ActionButton
           testID="drawer-close-from-settings"
           title="Close drawer"
-          (press)="closeDrawer()"
-          [color]="lineColorStructure"
+          (press)="navigation.closeDrawer()"
+          [color]="color"
         ></ActionButton>
       </view>
-    </safe-area-view>
+    </scroll-view>
   `,
 })
 export class DrawerSettingsScreen {
-  private readonly navigation = injectDrawerNavigation();
-
-  readonly lineTagClass = drawerLineTagClass;
-  readonly lineTagLabel = drawerLineTagLabel;
-  readonly lineColorStructure = LINE_COLOR.structure;
-
-  closeDrawer(): void {
-    this.navigation.closeDrawer();
-  }
+  readonly navigation = injectDrawerNavigation();
+  readonly color = LINE_COLOR.structure;
 }
 
-/**
- * Drawer demo: a swipeable Drawer navigator with 2 Drawer screens, a non-default
- * drawerPosition ('right') and drawerType ('slide') to prove those props actually flow through
- * to render-drawer.ts's geometry, plus imperative open/toggle/close buttons alongside the swipe
- * gesture. The `#drawerContent` template supplies the menu panel (Drawer ships no built-in one) —
- * Angular's own idiom for a caller-supplied template needing live data (TemplateRef +
- * NgTemplateOutlet with a context object), the twin of React's renderDrawerContent render-prop
- * callback (see drawer.ts's own header comment on this split). Angular twin of
- * ../../react/screens/DrawerDemoScreen.tsx.
- */
+// The panel lives here, above the Drawer, so its two screens share it and it outlives a switch
 @Component({
   selector: 'DrawerDemoScreen',
   standalone: true,
   imports: [Drawer, DrawerScreenDirective, SYMBIOTE_ELEMENTS],
+  providers: [drawerPanelProvider],
   template: `
     <Drawer
       initialRouteName="Home"
-      drawerPosition="right"
-      drawerType="slide"
-      [drawerStyle]="drawerPanelStyle"
+      [drawerType]="props().drawerType"
+      [drawerPosition]="props().drawerPosition"
+      [drawerWidth]="props().drawerWidth"
+      [overlayColor]="props().overlayColor"
+      [swipeEnabled]="props().swipeEnabled"
+      [swipeEdgeWidth]="props().swipeEdgeWidth"
+      [swipeMinDistance]="props().swipeMinDistance"
+      [swipeMinVelocity]="props().swipeMinVelocity"
+      [drawerStyle]="drawerStyle"
     >
       <ng-template
         symbioteDrawerScreen
@@ -163,11 +143,14 @@ export class DrawerSettingsScreen {
   `,
 })
 export class DrawerDemoScreen {
+  private readonly settings = injectDrawerPanel().settings;
+
   readonly drawerHomeScreen = DrawerHomeScreen;
   readonly drawerSettingsScreen = DrawerSettingsScreen;
-  readonly homeOptions = { title: 'Home', drawerLabel: 'Home' };
-  readonly settingsOptions = { title: 'Settings', drawerLabel: 'Settings' };
-  readonly drawerPanelStyle = { backgroundColor: '#13243a' };
+  readonly homeOptions = homeOptions;
+  readonly settingsOptions = settingsOptions;
+  readonly drawerStyle = DRAWER_STYLE;
+  readonly props = computed(() => drawerPropsOf(this.settings()));
 
   drawerLabelFor(
     descriptors: IDrawerContentContext['$implicit']['descriptors'],

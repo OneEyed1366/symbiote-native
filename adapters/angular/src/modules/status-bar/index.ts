@@ -1,21 +1,20 @@
-// StatusBar, the Angular lifecycle half. The native StatusBarManager driving, the imperative
-// statics, and the Android bar-height constant all live in @symbiote-native/engine, shared verbatim with
-// React and Vue; Metro selects the engine's platform variant. Angular supplies only the
-// declarative shape: a component that renders nothing and re-applies the props through
-// ngOnChanges on mount + every prop change. Imperative statics are attached to the component
-// object the same way RN does.
+// Angular half of StatusBar, the props stack, statics and Android bar-height constant live in
+// @symbiote-native/engine. It renders nothing, keeps one stack entry through `ngOnChanges` and
+// releases it in `ngOnDestroy`
 
 import {
   Component,
   Input,
   type OnChanges,
-  type SimpleChanges,
+  type OnDestroy,
+  type OnInit,
 } from '@angular/core';
 import {
-  applyStatusBarProps,
+  createStatusBarEntry,
   statusBarImperative,
   statusBarCurrentHeight,
   type IColorValue,
+  type IStatusBarAnimation,
   type IStatusBarProps,
   type IStatusBarStyle,
 } from '@symbiote-native/engine';
@@ -27,16 +26,29 @@ export type { IStatusBarProps, IStatusBarStyle } from '@symbiote-native/engine';
   standalone: true,
   template: '',
 })
-class StatusBarComponent implements OnChanges {
+class StatusBarComponent implements OnInit, OnChanges, OnDestroy {
   @Input() barStyle?: IStatusBarStyle;
   @Input() hidden?: boolean;
   @Input() animated?: boolean;
+  @Input() showHideTransition?: IStatusBarAnimation;
   @Input() networkActivityIndicatorVisible?: boolean;
   @Input() backgroundColor?: IColorValue;
   @Input() translucent?: boolean;
 
-  ngOnChanges(_changes: SimpleChanges): void {
-    applyStatusBarProps(this.buildProps());
+  private readonly entry = createStatusBarEntry();
+
+  // `ngOnChanges` never runs without bound inputs, the bar still takes its place in the stack
+  ngOnInit(): void {
+    this.entry.apply(this.buildProps());
+  }
+
+  ngOnChanges(): void {
+    this.entry.apply(this.buildProps());
+  }
+
+  // Popping restores what the stack held below this entry
+  ngOnDestroy(): void {
+    this.entry.release();
   }
 
   private buildProps(): IStatusBarProps {
@@ -44,6 +56,7 @@ class StatusBarComponent implements OnChanges {
       barStyle: this.barStyle,
       hidden: this.hidden,
       animated: this.animated,
+      showHideTransition: this.showHideTransition,
       networkActivityIndicatorVisible: this.networkActivityIndicatorVisible,
       backgroundColor: this.backgroundColor,
       translucent: this.translucent,

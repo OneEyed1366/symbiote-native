@@ -1,0 +1,9 @@
+{
+  "allow": [
+    {
+      "path": "examples/angular/src/screens/reanimated/Section.ts",
+      "id": "decorator-input",
+      "why": "the package demo test mounts this component in JIT, which has no signal input transform"
+    }
+  ]
+}

@@ -104,6 +104,13 @@ export class ActivityIndicatorHost extends SymbiotePrimitiveHost {}
 export class SafeAreaViewHost extends SymbiotePrimitiveHost {}
 
 @Component({
+  selector: 'layout-conformance',
+  standalone: true,
+  template: '<ng-content></ng-content>',
+})
+export class LayoutConformanceHost extends SymbiotePrimitiveHost {}
+
+@Component({
   selector: 'modal',
   standalone: true,
   template: '<ng-content></ng-content>',

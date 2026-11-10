@@ -1,81 +1,123 @@
-// Drawer demo: a swipeable Drawer navigator with 2 Drawer.Screens, a non-default drawerPosition
-// ('right') and drawerType ('slide') so those props are proven to reach render-drawer.ts's
-// geometry, plus imperative open/toggle/close buttons (DrawerHomeScreen/DrawerSettingsScreen)
-// beside the swipe gesture. `drawerContent` supplies the menu panel — Drawer ships none.
-//
-// THE SOLID SHAPE OF drawerContent. React passes the slot as a VALUE (`renderDrawerContent({state,
-// descriptors, navigation})`), Vue as a scoped slot, Svelte as a snippet parameter. Here it is an
-// ACCESSOR, and the navigator calls it ONCE, untracked
-// (.claude/rules/solid-descriptor-bridge.md §4). Two consequences drive everything below:
-//
-//   - nothing may read `slot()` at this function's top level — that read is frozen, and at the
-//     moment it runs the <Drawer.Screen> markers have not registered yet, so it would snapshot an
-//     empty router;
-//   - every `slot()` read therefore sits in a JSX attribute or child position, where the compiler
-//     wraps it in its own memo. `<For each={slot().state.routes}>` keeps the row list live, and
-//     the label expression re-reads `descriptors` on its own.
-//
-// <For> is imported explicitly: an un-imported control-flow name resolves against the RENDERER
-// module, reads back `undefined`, builds fine and throws at runtime (same rules file, §3).
-
 import { For } from 'solid-js';
-import { Drawer } from '@symbiote-native/navigation/solid';
-import type { IDrawerScreenOptions } from '@symbiote-native/navigation/solid';
-import { DrawerHomeScreen } from './DrawerHomeScreen';
-import { DrawerSettingsScreen } from './DrawerSettingsScreen';
-import './DrawerDemoScreen.css';
+import { Drawer, useDrawerNavigation } from '@symbiote-native/navigation/solid';
+import type { Accessor } from 'solid-js';
+import type {
+  IDrawerContentSlotProps,
+  IDrawerScreenOptions,
+  ISolidScreenOptions,
+} from '@symbiote-native/navigation/solid';
+import { ROUTE_NAME } from '../routes';
+import { LINE_COLOR } from '../navigation-lines';
+import { ActionButton } from '../components/ActionButton';
+import { ScreenHero } from '../components/ScreenHero';
+import { DrawerRecipes } from './drawer/DrawerRecipes';
+import { DrawerPanelContext } from './drawer/drawer-panel';
+import {
+  DEFAULT_DRAWER_SETTINGS,
+  drawerPropsOf,
+} from './drawer/drawer-settings';
+import { createPanelState } from './panel';
 
-// The panel's own background is an RN style prop on the navigator, not a class — the drawer view
-// is the navigator's, not this screen's. App.css's card colour, so it reads as a raised surface.
-const DRAWER_STYLE = { backgroundColor: '#151c33' };
+export const drawerDemoScreenOptions: ISolidScreenOptions = {
+  title: 'Drawer Demo',
+  headerShown: true,
+  headerTintColor: LINE_COLOR.structure,
+  headerTranslucent: true,
+  headerTitleColor: '#ffffff',
+  headerStyle: { backgroundColor: '#0b1622' },
+  headerUserInterfaceStyle: 'dark',
+};
 
-const drawerHomeOptions: IDrawerScreenOptions = {
+const DRAWER_STYLE = { backgroundColor: '#13243a' };
+
+const homeOptions: IDrawerScreenOptions = {
   title: 'Home',
   drawerLabel: 'Home',
 };
 
-const drawerSettingsOptions: IDrawerScreenOptions = {
+const settingsOptions: IDrawerScreenOptions = {
   title: 'Settings',
   drawerLabel: 'Settings',
 };
 
-export function DrawerDemoScreen() {
+// `useDrawerNavigation()` reads the handle of the enclosing Drawer from context
+function DrawerHomeScreen() {
   return (
-    <Drawer
-      initialRouteName="Home"
-      drawerPosition="right"
-      drawerType="slide"
-      drawerStyle={DRAWER_STYLE}
-      drawerContent={slot => (
-        <safe-area-view testID="drawer-panel" class="drawer-panel">
-          <text class="section-label">Menu</text>
-          <For each={slot().state.routes}>
-            {route => (
-              <pressable
-                testID={`drawer-menu-${route.name}`}
-                class="drawer-menu-row"
-                onPress={() => slot().navigation.jumpTo(route.name)}
-              >
-                <text class="drawer-menu-row-label">
-                  {slot().descriptors[route.key]?.options.drawerLabel ??
-                    route.name}
-                </text>
-              </pressable>
-            )}
-          </For>
-        </safe-area-view>
-      )}
-    >
-      <Drawer.Screen
-        name="Home"
-        component={DrawerHomeScreen}
-        options={drawerHomeOptions}
-      />
-      <Drawer.Screen
-        name="Settings"
-        component={DrawerSettingsScreen}
-        options={drawerSettingsOptions}
-      />
-    </Drawer>
+    <scroll-view class="screen" contentInsetAdjustmentBehavior="automatic">
+      <view class="scroll-content">
+        <ScreenHero
+          route={ROUTE_NAME.DrawerDemo}
+          title="Drawer"
+          body="A swipeable drawer driven by the navigator's own gesture handler. Change its props below and swipe from the chosen edge."
+        />
+        <DrawerRecipes />
+      </view>
+    </scroll-view>
+  );
+}
+
+function DrawerSettingsScreen() {
+  const navigation = useDrawerNavigation();
+  return (
+    <scroll-view class="screen" contentInsetAdjustmentBehavior="automatic">
+      <view class="scroll-content">
+        <text class="section-label">Drawer demo · Settings</text>
+        <ActionButton
+          testID="drawer-close-from-settings"
+          title="Close drawer"
+          onPress={() => navigation().closeDrawer()}
+          color={LINE_COLOR.structure}
+        />
+      </view>
+    </scroll-view>
+  );
+}
+
+// The navigator calls this once and untracked, so every `slot()` read sits in JSX
+function renderDrawerContent(slot: Accessor<IDrawerContentSlotProps>) {
+  return (
+    <safe-area-view testID="drawer-panel" class="section-tight drawer-panel">
+      <text class="section-label">Menu</text>
+      <For each={slot().state.routes}>
+        {route => (
+          <pressable
+            testID={`drawer-menu-${route.name}`}
+            class="menu-row"
+            onPress={() => slot().navigation.jumpTo(route.name)}
+          >
+            <text class="menu-row-label">
+              {slot().descriptors[route.key]?.options.drawerLabel ??
+                route.name}
+            </text>
+          </pressable>
+        )}
+      </For>
+    </safe-area-view>
+  );
+}
+
+// The panel lives here, above the Drawer, so its two screens share it and it outlives a switch
+export function DrawerDemoScreen() {
+  const panel = createPanelState(DEFAULT_DRAWER_SETTINGS);
+  return (
+    <DrawerPanelContext.Provider value={panel}>
+      <Drawer
+        initialRouteName="Home"
+        {...drawerPropsOf(panel.settings())}
+        drawerStyle={DRAWER_STYLE}
+        drawerContent={renderDrawerContent}
+      >
+        <Drawer.Screen
+          name="Home"
+          component={DrawerHomeScreen}
+          options={homeOptions}
+        />
+        <Drawer.Screen
+          name="Settings"
+          component={DrawerSettingsScreen}
+          options={settingsOptions}
+        />
+      </Drawer>
+    </DrawerPanelContext.Provider>
   );
 }

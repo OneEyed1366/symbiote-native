@@ -7,23 +7,10 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
 `@symbiote-native/clipboard` wraps [`expo-clipboard`](https://github.com/expo/expo/tree/main/packages/expo-clipboard)
 so every SymbioteNative adapter can read and write the clipboard. Like [sensors](/docs/packages/sensors/)
-and [local auth](/docs/packages/local-auth/), it's built on `expo-modules-core`; unlike
-local-auth's pure free functions or sensors' fully-subscription-based API, clipboard mixes both —
+and [local auth](/docs/packages/local-auth/), it's built on `expo-modules-core`. Unlike
+local-auth's pure free functions or sensors' fully-subscription-based API, clipboard mixes both:
 most of the surface is stateless one-shot async calls, plus exactly **one** listener-based
 subscription, `addClipboardListener`.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 <Aside type="caution" title="The URL functions are iOS-only">
   `getUrlAsync`, `setUrlAsync`, and `hasUrlAsync` exist only on iOS —
@@ -43,16 +30,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --c
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-clipboard` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-clipboard`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every future `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -354,8 +341,8 @@ initial read of whatever's already on the clipboard, only new changes going forw
 ## Notes
 
 - **On Android the change listener is paused while the app is backgrounded.** The native module
-  pauses on activity-background and resumes on activity-foreground, with no catch-up event — a copy
-  made in another app is never delivered, and (combined with the no-initial-read behavior above)
+  pauses on activity-background and resumes on activity-foreground, with no catch-up event. A copy
+  made in another app is never delivered. Combined with the no-initial-read behavior above,
   `useClipboard` is still `null` when the user comes back. Read the clipboard explicitly on resume
   if you need what happened while you were away.
 - **`hasStringAsync`/`hasImageAsync` do not trigger Android 12+'s "pasted from clipboard" toast;
@@ -384,10 +371,10 @@ Sources: [Expo docs: Clipboard](https://docs.expo.dev/versions/latest/sdk/clipbo
 
 ## How the wrapper works
 
-`@symbiote-native/clipboard` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-clipboard` itself** —
-that package's own types file hard-imports from the `expo` meta-package (which this project never
-installs), so its functions, enums, and option/result types are hand-ported, verbatim, into this
-package's own `core/`, changing only the native-module resolution to go through
+`@symbiote-native/clipboard` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-clipboard` itself**.
+That package's own types file hard-imports from the `expo` meta-package, which this project never
+installs. So its functions, enums, and option/result types are hand-ported, verbatim, into this
+package's own `core/`. Only the native-module resolution changes: it goes through
 `expo-modules-core`'s `requireNativeModule` instead:
 
 ```
@@ -402,11 +389,11 @@ packages/clipboard/src/
 ```
 
 The stateless functions are plain re-exports with no lifecycle code, same as
-[local-auth](/docs/packages/local-auth/); `addClipboardListener` itself lives once in `core/`,
-and each adapter's `useClipboard`/`ClipboardService` is a thin lifecycle wrapper — subscribe on
-mount, unsubscribe on unmount — over that same subscription, the same logic/lifecycle split as
+[local-auth](/docs/packages/local-auth/). `addClipboardListener` itself lives once in `core/`,
+and each adapter's `useClipboard`/`ClipboardService` is a thin lifecycle wrapper (subscribe on
+mount, unsubscribe on unmount) over that same subscription. It is the same logic/lifecycle split as
 every other SymbioteNative component (see [how it works](/docs/how-it-works/)). The native code
-itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
+itself is never vendored or copied: `expo-modules-autolinking` resolves it straight out of
 `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).
 
 `ClipboardPasteButton` (the `UIPasteControl` view, iOS 16+) is ported on every adapter. It is an

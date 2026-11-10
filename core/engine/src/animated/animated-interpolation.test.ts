@@ -229,54 +229,56 @@ describe('AnimatedInterpolation — Negative (the throw IS the contract)', () =>
     ).toThrow();
   });
 
-  // why: a string output range mixing a color entry with a non-color entry can't be
-  // interpolated channel-wise (colors decompose to 4 fixed channels, templates to however many
-  // numeric tokens they contain) — rejecting the mix avoids silently interpolating mismatched
-  // slots.
+  // Как в RN, ошибка в диапазоне летит сразу из конструктора
   it('throws when the output range mixes a color entry with a non-color entry', () => {
     const source = new AnimatedValue(0.5);
-    const mixed = source.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['#000000', '10deg'],
-    });
-    expect(() => mixed.__getValue()).toThrow(
+    expect(() =>
+      source.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['#000000', '10deg'],
+      }),
+    ).toThrow(
       /All elements of output range should either be a color or a string with numeric components/,
     );
   });
 
-  // why: two non-color template strings with a DIFFERENT number of numeric tokens have no
-  // shared per-token interpolation to build — '0deg' has 1 token, '0px 0px' has 2.
   it('throws when non-color output strings have different numbers of numeric components', () => {
     const source = new AnimatedValue(0.5);
-    const mismatched = source.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '0px 0px'],
-    });
-    expect(() => mismatched.__getValue()).toThrow(
+    expect(() =>
+      source.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '0px 0px'],
+      }),
+    ).toThrow(
       /All elements of output range should have the same number of components/,
     );
   });
 
-  // why: a string output value with no numeric token and no parseable color has nothing for the
-  // per-token interpolation to drive — RN treats this as a config error, not a silent identity
-  // template.
   it('throws when an output string has no numeric component and is not a color', () => {
     const source = new AnimatedValue(0.5);
-    const noNumber = source.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['none', 'auto'],
-    });
-    expect(() => noNumber.__getValue()).toThrow(
-      /outputRange must contain color or value with numeric component/,
+    expect(() =>
+      source.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['none', 'auto'],
+      }),
+    ).toThrow(/outputRange must contain color or value with numeric component/);
+  });
+
+  it('throws when the non-numeric parts of the output strings differ', () => {
+    const source = new AnimatedValue(0.5);
+    expect(() =>
+      source.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['20deg', '30rad'],
+      }),
+    ).toThrow(
+      /All elements of output range should have the same non-numeric components/,
     );
   });
 
-  // why: interpolation only makes sense over a NUMERIC parent value — chaining off a node whose
-  // value is a composite (e.g. AnimatedColor's rgba() string) must fail loudly rather than
-  // silently coerce the string.
+  // Родитель со строковым значением не интерполируется
   it('throws when the parent node resolves to a non-number (e.g. chained off a color-like node)', () => {
-    // A bare AnimatedNode subclass whose __getValue() is a string, so this reaches the guard
-    // through a real (if minimal) node — no `as` cast needed to fake a non-number parent.
+    // Минимальный узел со строкой в `__getValue`, без `as`
     class StringValuedNode extends AnimatedNode {
       override __getValue(): string {
         return 'not-a-number';

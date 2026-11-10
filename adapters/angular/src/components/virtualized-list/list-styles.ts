@@ -4,6 +4,7 @@
 import {
   INVERTED_X_STYLE,
   INVERTED_Y_STYLE,
+  cellStyleOf,
 } from '@symbiote-native/components';
 import {
   flattenStyle,
@@ -23,6 +24,8 @@ export type IListStyleInput = {
   hasHeader: boolean;
   style: IStyleProp<IViewStyle> | undefined;
   contentContainerStyle: IStyleProp<IViewStyle> | undefined;
+  listHeaderComponentStyle: IStyleProp<IViewStyle> | undefined;
+  listFooterComponentStyle: IStyleProp<IViewStyle> | undefined;
   // The class-derived style of the list's own anchor host
   anchorStyle: unknown;
   maintainVisibleContentPosition: IMaintainVisibleContentPosition | undefined;
@@ -34,8 +37,19 @@ export type IListStyles = {
   style: IViewStyle | undefined;
   contentContainerStyle: IStyleProp<IViewStyle> | undefined;
   cellStyle: IViewStyle | undefined;
+  // The slot wrappers counter-flip with an inverted list, then take the slot's own style
+  headerStyle: IViewStyle | undefined;
+  footerStyle: IViewStyle | undefined;
   maintainVisibleContentPosition: IMaintainVisibleContentPosition | undefined;
 };
+
+function slotStyle(
+  isInverted: boolean,
+  inversion: IViewStyle,
+  style: IStyleProp<IViewStyle> | undefined,
+): IViewStyle | undefined {
+  return flattenStyle(isInverted ? [inversion, style] : style);
+}
 
 export function resolveListStyles(input: IListStyleInput): IListStyles {
   const inversion = input.isHorizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE;
@@ -49,7 +63,22 @@ export function resolveListStyles(input: IListStyleInput): IListStyles {
       input.anchorStyle,
       input.isInverted ? [inversion, input.style] : input.style,
     ]),
-    cellStyle: input.isInverted ? inversion : undefined,
+    cellStyle: flattenStyle(
+      cellStyleOf({
+        horizontal: input.isHorizontal,
+        inverted: input.isInverted,
+      }),
+    ),
+    headerStyle: slotStyle(
+      input.isInverted,
+      inversion,
+      input.listHeaderComponentStyle,
+    ),
+    footerStyle: slotStyle(
+      input.isInverted,
+      inversion,
+      input.listFooterComponentStyle,
+    ),
     maintainVisibleContentPosition:
       mvcp === undefined
         ? undefined

@@ -23,12 +23,10 @@ import { getContext, onDestroy, setContext } from 'svelte';
 import type { Component } from 'svelte';
 import { dlog } from '@symbiote-native/engine';
 
-export type INavigatorKind = 'stack' | 'tab' | 'drawer';
+export type INavigatorKind = 'stack' | 'tab' | 'drawer' | 'nativeTab';
 
-// Every field is a GETTER on the marker's own `$props()` bindings, so an app that reassigns
-// `options`/`component` on an already-mounted marker keeps the navigator's view of it live -
-// the same reason Angular's Stack stores the ScreenDirective INSTANCE rather than a snapshot of
-// its fields. `name` is read live too, so renaming a screen re-keys it rather than going stale.
+// Every field is a getter on the marker's `$props()`, so a reassigned `options`, `component` or
+// `name` on a mounted marker stays live for the navigator, as in Angular's Stack with its directive
 export type IRegisteredScreen<TOptions> = {
   readonly name: string;
   readonly component: Component;
@@ -77,10 +75,30 @@ export function collectScreen<TOptions>(
   onDestroy(() => collector.unregister(screen));
 }
 
-// The navigator side of the pair: a plain, non-reactive list plus the two mutators the collector
-// exposes. The navigator holds the list in `$state.raw` and reassigns it (never mutates in place)
-// so a component reference - a plain function - is never wrapped in a deep reactive proxy, which
-// would break both the getters above and Svelte's own component identity checks.
+// The body of every `<*.Screen>` marker: `read` returns the marker's current `$props()` bindings
+// Each field is a getter over it, so a reassigned prop reaches the navigator without re-registering
+export function collectScreenMarker<TOptions>(
+  kind: INavigatorKind,
+  read: () => IRegisteredScreen<TOptions>,
+): void {
+  collectScreen(kind, {
+    get name(): string {
+      return read().name;
+    },
+    get component(): Component {
+      return read().component;
+    },
+    get options(): TOptions | undefined {
+      return read().options;
+    },
+    get initialParams(): unknown {
+      return read().initialParams;
+    },
+  });
+}
+
+// The navigator keeps its list in `$state.raw` and reassigns it, never mutates in place
+// A deep proxy around a component would break the getters above and Svelte's identity checks
 export function withoutScreen<TOptions>(
   screens: readonly IRegisteredScreen<TOptions>[],
   screen: IRegisteredScreen<TOptions>,

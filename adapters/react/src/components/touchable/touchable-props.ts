@@ -11,6 +11,7 @@
 // does not get to drive one off press state.
 import type { ReactNode } from 'react';
 import type { IPressTimingProps } from '@symbiote-native/components';
+import type { IColorValue } from '@symbiote-native/engine';
 import type { IStyleProp, IViewStyle } from '../../utils/styles';
 import type { IPressableProps } from '../pressable/pressable-props';
 
@@ -20,13 +21,13 @@ export type ITouchableBaseProps = Omit<IPressableProps, 'style' | 'children'> &
     children?: ReactNode;
   };
 
-export interface ITouchableOpacityProps extends ITouchableBaseProps {
+export type ITouchableOpacityProps = ITouchableBaseProps & {
   activeOpacity?: number;
-}
+};
 
-export interface ITouchableHighlightProps extends ITouchableBaseProps {
+export type ITouchableHighlightProps = ITouchableBaseProps & {
   activeOpacity?: number;
-  underlayColor?: string;
+  underlayColor?: IColorValue;
   // TouchableHighlight.js:205 — forwarded to Pressability as `android_disableSound`. Named
   // differently from Pressable's own `android_disableSound`, matching vendor.
   touchSoundDisabled?: boolean;
@@ -37,4 +38,4 @@ export interface ITouchableHighlightProps extends ITouchableBaseProps {
   // RN's own underlay notifications (TouchableHighlight.js), fired on a real transition only.
   onShowUnderlay?: () => void;
   onHideUnderlay?: () => void;
-}
+};

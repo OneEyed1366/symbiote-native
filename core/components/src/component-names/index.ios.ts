@@ -39,6 +39,7 @@ const IOS_NAMES: Readonly<Record<ISymbioteIntrinsic, string>> = {
   'activity-indicator': 'RCTView',
   'activity-indicator-spinner': 'ActivityIndicatorView',
   'safe-area-view': 'SafeAreaView',
+  'layout-conformance': 'LayoutConformance',
   modal: 'ModalHostView',
   'refresh-control': 'PullToRefreshView',
   'sticky-header': 'RCTView',

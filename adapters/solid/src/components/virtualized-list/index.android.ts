@@ -12,6 +12,8 @@ import { createVirtualizedList } from './shared';
 export type {
   IVirtualizedListProps,
   IVirtualizedListComponent,
+  ICellRendererComponent,
+  ICellRendererProps,
   IVirtualizedListCellInfo,
   IVirtualizedListRenderItem,
   IVirtualizedListHandle,

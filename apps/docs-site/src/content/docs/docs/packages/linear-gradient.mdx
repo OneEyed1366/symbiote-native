@@ -11,19 +11,6 @@ that paints a gradient behind its children, so every SymbioteNative adapter can 
 React. The props, the point normalization and the per-platform structure are written once and
 shared by all five adapters.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -167,13 +154,15 @@ rendering at the cost of visible banding.
 **Why does `colors` need two entries?** A gradient needs two stops. For a single color set
 `style.backgroundColor` on a `View`.
 
-Sources: [Expo docs: LinearGradient](https://docs.expo.dev/versions/latest/sdk/linear-gradient/),
-[expo/expo#7418 LinearGradient transparent to white is wrong on iOS](https://github.com/expo/expo/issues/7418),
-[CSS-Tricks: what to know about gradients toward transparent black](https://css-tricks.com/thing-know-gradients-transparent-black/),
-[expo/expo#25595 start and end mismatch between iOS and Android](https://github.com/expo/expo/issues/25595),
-[expo/expo#32934 LinearGradient with MaskedView on Android](https://github.com/expo/expo/issues/32934),
-[expo/expo#29408 animating colors with Reanimated on Android](https://github.com/expo/expo/issues/29408),
-[expo/expo#23861 renders very slow on Android](https://github.com/expo/expo/issues/23861).
+Sources:
+
+- [Expo docs: LinearGradient](https://docs.expo.dev/versions/latest/sdk/linear-gradient/)
+- [expo/expo#7418 LinearGradient transparent to white is wrong on iOS](https://github.com/expo/expo/issues/7418)
+- [CSS-Tricks: what to know about gradients toward transparent black](https://css-tricks.com/thing-know-gradients-transparent-black/)
+- [expo/expo#25595 start and end mismatch between iOS and Android](https://github.com/expo/expo/issues/25595)
+- [expo/expo#32934 LinearGradient with MaskedView on Android](https://github.com/expo/expo/issues/32934)
+- [expo/expo#29408 animating colors with Reanimated on Android](https://github.com/expo/expo/issues/29408)
+- [expo/expo#23861 renders very slow on Android](https://github.com/expo/expo/issues/23861)
 
 ## How the wrapper works
 

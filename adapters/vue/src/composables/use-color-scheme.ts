@@ -12,9 +12,11 @@ import {
   type IEventSubscription,
 } from '@symbiote-native/engine';
 
-export function useColorScheme(): Ref<IColorSchemeName | null> {
+export function useColorScheme(): Ref<IColorSchemeName | null | undefined> {
   // A plain ref: the value is a string|null, not an engine node, so no shallowRef needed.
-  const colorScheme = ref<IColorSchemeName | null>(Appearance.getColorScheme());
+  const colorScheme = ref<IColorSchemeName | null | undefined>(
+    Appearance.getColorScheme(),
+  );
   let subscription: IEventSubscription | undefined;
 
   onMounted(() => {

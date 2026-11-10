@@ -1,26 +1,15 @@
-// Solid canary app entry: composes the native stack navigator (@symbiote-native/navigation/solid,
-// driven by react-native-screens' RNSScreen/RNSScreenStack native views) over the demo screen
-// surface. Menu is the initial route; Canary — the app's whole former root content, the
-// every-primitive tab surface — is the menu's first row. Details carries no menu row: it is the
-// DeepLinking stop's resolution target (symbiotecanarysolid://details/:id) and nothing else.
-//
-// SCREEN DISCOVERY, as on Svelte: Solid cannot inspect its children, so <Stack.Screen> markers
-// register THEMSELVES on a collector the navigator publishes on context. The registry is therefore
-// still empty while the Stack body runs — the navigator seeds lazily from it, which is why marker
-// order in here is declaration order and nothing else (packages/navigation/src/solid/stack, note 1).
-//
-// THE LINKING HANDLE. Neither the React nor the Svelte shape ports:
-//   - React mounts a separate <LinkingRunner> child once the ref lands, because a ref is null on
-//     the first render pass and React gets a SECOND pass to mount it on. Solid has no second pass.
-//   - Svelte hands a GETTER over `bind:this` and re-runs an $effect when the binding resolves,
-//     because `bind:this` only lands during mount.
-// Solid needs neither, and the reason is an ordering guarantee the other two lack:
-// createLinkingIntegration takes an Accessor and reads it inside onMount, while a `ref` on a
-// component is invoked during that component's own creation — strictly before any effect runs. So
-// the signal is already populated by the time linking reads it, and one plain signal wired straight
-// through is the whole answer. It is called BEFORE the JSX below only because onMount just queues.
+// Solid canary app entry: the native stack navigator over every demo screen, starting at Menu
+// Menu lists four sections, each opens a hub with its stops; Details is reached only by deep link
 
-import { createSignal, onMount } from 'solid-js';
+// SCREEN DISCOVERY, as on Svelte: Solid cannot inspect its children
+// `<Stack.Screen>` markers register themselves on a collector the navigator publishes on context
+// The registry is still empty while the Stack body runs, so marker order is declaration order
+
+// THE LINKING HANDLE, which neither the React nor the Svelte shape ports
+// `createLinkingIntegration` reads an Accessor in `onMount`, and a `ref` is called while its
+// component is created, before any effect, so one plain signal wired through is enough
+
+import { createSignal, For, onMount } from 'solid-js';
 import {
   Stack,
   createLinkingIntegration,
@@ -33,35 +22,34 @@ import { hide } from '@symbiote-native/splash-screen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
 import { CanaryScreen } from './screens/CanaryScreen';
-import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
 import { DetailsScreen } from './screens/DetailsScreen';
-import { DrawerDemoScreen } from './screens/DrawerDemoScreen';
-import { HeaderOptionsScreen } from './screens/HeaderOptionsScreen';
-import { headerOptionsScreenOptions } from './screens/header-options-screen-options';
+import {
+  HeaderOptionsScreen,
+  headerOptionsScreenOptions,
+} from './screens/HeaderOptionsScreen';
+import { DEMO_SCREENS } from './screens/demo-screens';
 import { HooksDemoScreen } from './screens/HooksDemoScreen';
 import { MenuScreen } from './screens/MenuScreen';
-import { NestedNavigatorsScreen } from './screens/NestedNavigatorsScreen';
+import { HUB_SCREENS } from './screens/SectionHubScreen';
 import {
   SheetDemoScreen,
   sheetDemoScreenOptions,
 } from './screens/SheetDemoScreen';
-import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
+import { ReanimatedScreen } from './screens/ReanimatedScreen';
 import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
-import { TabsDemoScreen } from './screens/TabsDemoScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
 import { LINE_COLOR } from './navigation-lines';
 import './App.css';
+import './navigation.css';
+// Holds `scroll-content`, `text-input` and other classes every screen uses, and a screen's own
+// import runs only on its first render, as Metro inlines the require
+import './screens/CanaryScreen.css';
 
-// App.css's ground color, so a translucent header blends into the screen behind it instead of
-// banding against it.
-const HEADER_BACKGROUND = '#0b1020';
+const HEADER_BACKGROUND = '#0b1622';
 const DETAILS_TRANSITION_DURATION_MS = 300;
 
-// Nine of the thirteen headers differ only in title and tint, so they share this builder. Menu
-// (no tint, no headerShown) and Details (a pinned transition) deviate below; HeaderOptions and
-// SheetDemo own their options next to their screens, because those bags carry behavior — a live
-// navigation handle and the formSheet detents — rather than just chrome.
+// Six of the headers differ only in title and tint, so they share this builder
 function darkHeader(title: string, tint: string): ISolidScreenOptions {
   return {
     title,
@@ -82,37 +70,20 @@ const menuScreenOptions: ISolidScreenOptions = {
   headerUserInterfaceStyle: 'dark',
 };
 
-const canaryScreenOptions = darkHeader(
-  'Symbiote Canary',
-  LINE_COLOR.primitives,
-);
+const canaryScreenOptions = darkHeader('Symbiote Canary', LINE_COLOR.primitives);
+const hooksDemoScreenOptions = darkHeader('Hooks Demo', LINE_COLOR.introspection);
 const apiPlaygroundScreenOptions = darkHeader(
   'API Playground',
-  LINE_COLOR.primitives,
-);
-const tabsDemoScreenOptions = darkHeader('Tabs Demo', LINE_COLOR.structure);
-const drawerDemoScreenOptions = darkHeader('Drawer Demo', LINE_COLOR.structure);
-const nestedNavigatorsScreenOptions = darkHeader(
-  'Nested Navigators',
-  LINE_COLOR.structure,
-);
-const hooksDemoScreenOptions = darkHeader(
-  'Hooks Demo',
   LINE_COLOR.introspection,
 );
-const deepLinkingScreenOptions = darkHeader('Deep Linking', LINE_COLOR.routing);
-const statePersistenceScreenOptions = darkHeader(
-  'State Persistence',
-  LINE_COLOR.routing,
-);
+const reanimatedScreenOptions = darkHeader('Reanimated', LINE_COLOR.performance);
 const benchmarkScreenOptions = darkHeader('Benchmark', LINE_COLOR.performance);
 const styleShowcaseScreenOptions = darkHeader(
-  'Styling Showcase',
+  'Styling showcase',
   LINE_COLOR.styling,
 );
 
-// Not darkHeader(): Details is the one screen arrived at by deep link rather than by tap, so it
-// pins its own push animation instead of inheriting whatever the OS default is.
+// Pinned, `default` resolves to a native transition of about 480ms
 const detailsScreenOptions: ISolidScreenOptions = {
   title: 'Navigation Demo',
   headerTranslucent: true,
@@ -131,10 +102,8 @@ export default function App() {
 
   createLinkingIntegration(APP_LINKING_CONFIG, stackHandle);
 
-  // Bare hide(), matching examples/react's App.tsx, examples/vue-sfc's App.vue and
-  // examples/svelte's App.svelte — none of the canaries wire the full useHideAnimation fade, so a
-  // plain mount-time hide is the right-sized call. It sits at the root, not in a screen, because
-  // the first route mounted is Menu.
+  // Bare `hide()` as in the other canaries, none of which wires the full `useHideAnimation` fade
+  // It sits at the root, not in a screen, as the first route mounted is Menu
   onMount(() => {
     hide();
   });
@@ -149,20 +118,19 @@ export default function App() {
         component={MenuScreen}
         options={menuScreenOptions}
       />
+      <For each={HUB_SCREENS}>
+        {hub => (
+          <Stack.Screen
+            name={hub.name}
+            component={hub.component}
+            options={hub.options}
+          />
+        )}
+      </For>
       <Stack.Screen
         name={ROUTE_NAME.Canary}
         component={CanaryScreen}
         options={canaryScreenOptions}
-      />
-      <Stack.Screen
-        name={ROUTE_NAME.ApiPlayground}
-        component={ApiPlaygroundScreen}
-        options={apiPlaygroundScreenOptions}
-      />
-      <Stack.Screen
-        name={ROUTE_NAME.StyleShowcase}
-        component={StyleShowcaseScreen}
-        options={styleShowcaseScreenOptions}
       />
       <Stack.Screen
         name={ROUTE_NAME.Details}
@@ -174,25 +142,19 @@ export default function App() {
         component={HeaderOptionsScreen}
         options={headerOptionsScreenOptions}
       />
+      <For each={DEMO_SCREENS}>
+        {demo => (
+          <Stack.Screen
+            name={demo.name}
+            component={demo.component}
+            options={demo.options}
+          />
+        )}
+      </For>
       <Stack.Screen
         name={ROUTE_NAME.SheetDemo}
         component={SheetDemoScreen}
         options={sheetDemoScreenOptions}
-      />
-      <Stack.Screen
-        name={ROUTE_NAME.TabsDemo}
-        component={TabsDemoScreen}
-        options={tabsDemoScreenOptions}
-      />
-      <Stack.Screen
-        name={ROUTE_NAME.DrawerDemo}
-        component={DrawerDemoScreen}
-        options={drawerDemoScreenOptions}
-      />
-      <Stack.Screen
-        name={ROUTE_NAME.NestedNavigators}
-        component={NestedNavigatorsScreen}
-        options={nestedNavigatorsScreenOptions}
       />
       <Stack.Screen
         name={ROUTE_NAME.HooksDemo}
@@ -200,19 +162,24 @@ export default function App() {
         options={hooksDemoScreenOptions}
       />
       <Stack.Screen
-        name={ROUTE_NAME.DeepLinking}
-        component={DeepLinkingScreen}
-        options={deepLinkingScreenOptions}
+        name={ROUTE_NAME.ApiPlayground}
+        component={ApiPlaygroundScreen}
+        options={apiPlaygroundScreenOptions}
       />
       <Stack.Screen
-        name={ROUTE_NAME.StatePersistence}
-        component={StatePersistenceScreen}
-        options={statePersistenceScreenOptions}
+        name={ROUTE_NAME.Reanimated}
+        component={ReanimatedScreen}
+        options={reanimatedScreenOptions}
       />
       <Stack.Screen
         name={ROUTE_NAME.Benchmark}
         component={BenchmarkScreen}
         options={benchmarkScreenOptions}
+      />
+      <Stack.Screen
+        name={ROUTE_NAME.StyleShowcase}
+        component={StyleShowcaseScreen}
+        options={styleShowcaseScreenOptions}
       />
     </Stack>
   );

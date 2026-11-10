@@ -1,12 +1,23 @@
-// @symbiote-native/navigation/vue: the Vue native-stack navigator over react-native-screens'
-// native view primitives. Importing this barrel first registers the native views' ViewConfigs
-// (../register, a side-effect import of the three codegen specs - never react-native-screens' own
-// React components), then exposes Stack (with Stack.Screen attached) and the navigator handle.
+// `@symbiote-native/navigation/vue`: the Vue native-stack navigator over the screens views
+// Importing this barrel first registers their ViewConfigs through `../register`
+// It then exposes `Stack` with `Stack.Screen` attached and the navigator handle
 
 import '../register';
 
 export { Stack } from './stack';
 export type { INavigatorHandle, IStackProps } from './stack';
+export { FullWindowOverlay } from './full-window-overlay';
+export { ScreenFooter } from './screen-footer';
+export { ScreenContainer } from './screen-container';
+export type { IScreenContainerProps } from '../core';
+export {
+  compatibilityFlags,
+  enableScreens,
+  executeNativeBackPress,
+  featureFlags,
+  isSearchBarAvailableForCurrentPlatform,
+  screensEnabled,
+} from '../core';
 export { Screen } from './screen';
 export type {
   IScreenOptionsArgs,
@@ -30,7 +41,9 @@ export {
   useIsFocused,
   useFocusEffect,
   useNavigationState,
+  useTransitionProgress,
 } from './composables';
+export type { ITransitionProgress } from '../core';
 export type {
   INavigationHandle,
   IStackNavigationHandle,
@@ -45,8 +58,7 @@ export type {
 export { useLinkingIntegration } from './linking';
 export type { ILinkingConfig, IScreenLinkingConfig } from '../core';
 
-// Tab: the bottom-tabs navigator, a PURE-JS UI (no react-native-screens views involved, so no
-// extra ViewConfig registration is needed beyond the ../register import above).
+// Tab: the bottom-tabs navigator, pure JS with no screens views, so nothing more to register
 export { Tab } from './tabs';
 export type { ITabNavigatorHandle, ITabProps } from './tabs';
 export { TabScreen } from './tab-screen';
@@ -57,10 +69,22 @@ export type {
 } from './tab-screen';
 export type { ITabOptions, ITabBarIcon } from '../core';
 
-// Drawer: the swipeable drawer navigator, a PURE-JS UI (PanResponder + Animated, no
-// react-native-screens views involved, so no extra ViewConfig registration is needed beyond the
-// ../register import above). See drawer.ts's header for the feasibility note re:
-// react-native-gesture-handler / react-native-reanimated parity gaps.
+// NativeTab: the native tab bar host, every route mounted in its own native screen
+export { NativeTab } from './native-tabs';
+export type { INativeTabNavigatorHandle, INativeTabProps } from './native-tabs';
+export { NativeTabScreen } from './native-tab-screen';
+export type {
+  INativeTabScreenOptionsArgs,
+  INativeTabScreenOptionsResolver,
+  INativeTabScreenProps,
+} from './native-tab-screen';
+export type {
+  INativeTabsViewHostOptions,
+  INativeTabsViewScreenOptions,
+} from '../core';
+
+// Drawer: the swipeable drawer navigator, pure JS over `PanResponder` and `Animated`
+// The header of `drawer.ts` notes the gesture handler and reanimated parity gaps
 export { Drawer } from './drawer';
 export type {
   IDrawerContentSlotProps,

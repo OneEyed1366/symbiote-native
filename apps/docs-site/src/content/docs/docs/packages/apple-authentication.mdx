@@ -8,20 +8,7 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 `@symbiote-native/apple-authentication` wraps
 [`expo-apple-authentication`](https://docs.expo.dev/versions/latest/sdk/apple-authentication/), so
 every SymbioteNative adapter can offer Sign in with Apple, not just React. The credential flow is
-shared code; each adapter supplies only the button.
-
-| OS platform | Support                         |
-| ----------- | ------------------------------- |
-| iOS         | live                            |
-| Android     | `isAvailableAsync()` is `false` |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
+shared code; each adapter supplies only the button. On Android `isAvailableAsync()` is `false`.
 
 ## Installation
 
@@ -237,14 +224,16 @@ only happens inside Expo Go, which this project never uses.
 **What about Android and web?** Not supported by `expo-apple-authentication`, and not here. Use a
 web-based flow such as [`@symbiote-native/auth-session`](/docs/packages/auth-session/) for those.
 
-Sources: [Expo docs: AppleAuthentication](https://docs.expo.dev/versions/latest/sdk/apple-authentication/),
-[expo/expo#11476 unable to authenticate in the iOS simulator](https://github.com/expo/expo/issues/11476),
-[expo/expo#11995 signInAsync never resolves](https://github.com/expo/expo/issues/11995),
-[expo/expo#5781 AuthorizationError 1000 in a standalone app](https://github.com/expo/expo/issues/5781),
-[expo/expo#8341 never returns ERR_CANCELED](https://github.com/expo/expo/issues/8341),
-[expo/expo#5690 AppleAuthenticationButton not showing up](https://github.com/expo/expo/issues/5690),
-[expo/expo#7129 changing the button text](https://github.com/expo/expo/issues/7129),
-[expo/expo#16162 wrong audience in the identity token on Expo Go](https://github.com/expo/expo/issues/16162).
+Sources:
+
+- [Expo docs: AppleAuthentication](https://docs.expo.dev/versions/latest/sdk/apple-authentication/)
+- [expo/expo#11476 unable to authenticate in the iOS simulator](https://github.com/expo/expo/issues/11476)
+- [expo/expo#11995 signInAsync never resolves](https://github.com/expo/expo/issues/11995)
+- [expo/expo#5781 AuthorizationError 1000 in a standalone app](https://github.com/expo/expo/issues/5781)
+- [expo/expo#8341 never returns ERR_CANCELED](https://github.com/expo/expo/issues/8341)
+- [expo/expo#5690 AppleAuthenticationButton not showing up](https://github.com/expo/expo/issues/5690)
+- [expo/expo#7129 changing the button text](https://github.com/expo/expo/issues/7129)
+- [expo/expo#16162 wrong audience in the identity token on Expo Go](https://github.com/expo/expo/issues/16162)
 
 ## How the wrapper works
 

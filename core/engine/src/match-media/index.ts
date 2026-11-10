@@ -28,8 +28,10 @@ export class MediaQueryListEvent extends Event {
 
 const CHANGE_EVENT = 'change';
 
-type IListener = (event: Event) => void;
-type IListenerOptions = { once?: boolean; signal?: AbortSignal } | boolean;
+// Read off the base class, so the overrides stay assignable under `lib.dom` and without it
+type IAddListenerArgs = Parameters<EventTarget['addEventListener']>;
+type IListener = NonNullable<IAddListenerArgs[1]>;
+type IListenerOptions = IAddListenerArgs[2];
 // Capture is not tracked: nothing bubbles to a `MediaQueryList`, so it never changes who hears
 type IRegistration = { type: string; listener: IListener; isOnce: boolean };
 

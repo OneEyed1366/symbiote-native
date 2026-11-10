@@ -22,6 +22,19 @@ describe('renderModal — RN defaultProps', () => {
   });
 });
 
+describe('renderModal — deprecated animated prop', () => {
+  // Modal-itest.js "[DEPRECATED] animated": RN reads `animationType` only, `animated` never
+  // reaches the host
+  it('does not forward animated to the host', () => {
+    const props = renderModal(
+      baseProps({ passthrough: { animated: true, testID: 'm' } }),
+    ).props;
+
+    expect(props).not.toHaveProperty('animated');
+    expect(props.testID).toBe('m');
+  });
+});
+
 describe('renderModal — default shape (RN Modal-itest.js "default values")', () => {
   it('paints an absolutely-positioned modal host wrapping a flex-filling white container', () => {
     const descriptor = renderModal(baseProps());

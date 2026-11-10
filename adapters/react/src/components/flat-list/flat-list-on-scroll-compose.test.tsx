@@ -109,10 +109,9 @@ describe('FlatList user onScroll composes with internal windowing (Positive)', (
     if (isRecord(offset)) expect(offset.y).toBe(ITEM_HEIGHT * 100);
   });
 
-  it('keeps the internal windowing handler — the window moves on a deep scroll', () => {
-    // why: the flip side of composition — a user onScroll must not SUPPRESS the internal
-    // windowing handler either, or the list stops recycling rows once the app attaches its
-    // own scroll listener.
+  it('keeps the internal windowing handler, the window moves on a deep scroll', () => {
+    // A user `onScroll` must not suppress the internal windowing handler either
+    // or the list stops recycling rows once the app attaches its own scroll listener
     mount(ROOT_TAG, <App />);
     const scrollView = findScrollView();
 
@@ -129,9 +128,9 @@ describe('FlatList user onScroll composes with internal windowing (Positive)', (
     // Control: the pre-scroll window must NOT already contain the deep row, else the test
     // cannot distinguish windowing.
     expect(rowsBeforeScroll.includes('row-100')).toBe(false);
-    // The window moved off the top (internal handler intact).
-    expect(rowsAfterScroll.includes('row-0')).toBe(false);
-    // …and reached the scrolled region.
+    // The window left the top, the initial region stays mounted for scroll-to-top as in RN
+    expect(rowsAfterScroll.includes('row-20')).toBe(false);
+    // and reached the scrolled region
     expect(rowsAfterScroll.includes('row-100')).toBe(true);
   });
 });

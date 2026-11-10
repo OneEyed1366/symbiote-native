@@ -1,19 +1,11 @@
-// Co-located Solid-driven pipeline test, the Solid twin of react/stack.test.tsx and
-// vue/stack/stack.test.ts. Drives REAL compiled Solid JSX (the vitest `solid` project runs the same
-// babel-preset-solid options the app-facing preset pins) through the universal renderer into the
-// fake Fabric slot, against an INJECTED codegen-shaped ViewConfig. Stack is imported from './index'
-// (NOT the package barrel) so the third-party native-spec side-effect (../../register) never loads
-// headless.
-//
-// Route-stack REDUCER logic is core's own responsibility and is covered by core's suite - this file
-// proves Stack's OWN lifecycle wiring, plus the four Solid-specific hazards its header names. The
-// last group is the reason this file is not ceremony: on React and Vue "params reach the screen"
-// and "an options change repaints" are tautologies, because the framework re-runs the component. A
-// Solid component body runs ONCE, so each of those is a real, silently-breakable claim, and each
-// one below fails on the obvious naive port.
-//
-// No Negative group: Stack has no guard clause of its own that throws - "refuses to pop the last
-// route" is a no-op the reducer fails closed on, observed as an unchanged screen count.
+// Solid twin of the React and Vue `Stack` tests, real compiled JSX through the universal renderer
+// into the fake Fabric slot. Imported from `./index`, not the package barrel, so `../../register`
+// never loads headless
+
+// Reducer transitions are core's own tests, this file proves the lifecycle wiring and the
+// Solid-specific hazards named in the `Stack` header
+
+// No Negative group: popping the last route is a no-op the reducer already fails closed on
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -31,13 +23,17 @@ import {
 import { Stack } from './index';
 import type { INavigatorHandle } from './index';
 import { useRoute } from '../primitives';
+import type { ISolidScreenOptions } from '../screen-props';
+import type { IScreenOptionsResolver } from '../../core';
 
-const ROOT_TAG = 7701;
+const ROOT_TAG = 7_701;
 const SCREEN_VIEW = 'RNSScreen';
 const MODAL_SCREEN_VIEW = 'RNSModalScreen';
 const STACK_VIEW = 'RNSScreenStack';
 const HEADER_CONFIG_VIEW = 'RNSScreenStackHeaderConfig';
+const HEADER_SUBVIEW_VIEW = 'RNSScreenStackHeaderSubview';
 const SEARCH_BAR_VIEW = 'RNSSearchBar';
+const SHEET_FOOTER_VIEW = 'RNSScreenFooter';
 
 function directEvent(registrationName: string) {
   return { registrationName };
@@ -77,7 +73,7 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
     directEventTypes: {
       topFinishTransitioning: directEvent('onFinishTransitioning'),
     },
-    validAttributes: {},
+    validAttributes: { nativeContainerBackgroundColor: true },
   },
   [HEADER_CONFIG_VIEW]: {
     directEventTypes: {
@@ -90,6 +86,10 @@ const VIEW_CONFIGS: Record<string, INativeViewConfig> = {
       topChangeText: directEvent('onChangeText'),
     },
     validAttributes: { placeholder: true },
+  },
+  [SHEET_FOOTER_VIEW]: {
+    directEventTypes: {},
+    validAttributes: { collapsable: true },
   },
 };
 
@@ -143,10 +143,8 @@ const DetailsScreen = () => <text>details</text>;
 
 describe('Solid Stack navigator', () => {
   describe('Positive', () => {
-    // why: only the initial route mounts as a real RNSScreen, at the focused activityState (2), and
-    // its header title reaches the native header config - the baseline every other case builds on.
-    // It also proves the INVERTED registry: the markers register after Stack's body has already
-    // run, so a naive eager read of them would leave the stack empty here.
+    // Baseline for the rest: only the initial route mounts, focused, with its header title
+    // Markers register after the `Stack` body ran, so an eager read would leave the stack empty
     it('mounts only the initial route as an RNSScreen, focused', async () => {
       mount(ROOT_TAG, () => (
         <Stack initialRouteName="Home">
@@ -169,8 +167,22 @@ describe('Solid Stack navigator', () => {
       expect(headerConfigOf(screens[0]).props.title).toBe('Home');
     });
 
-    // why: react-native-screens' native RNSScreen asserts an already-mounted screen's activityState
-    // can never decrease - both routes must stay at 2 after a push, not just the new top.
+    it('paints the stack container with nativeContainerStyle.backgroundColor', async () => {
+      mount(ROOT_TAG, () => (
+        <Stack
+          initialRouteName="Home"
+          nativeContainerStyle={{ backgroundColor: '#112233' }}
+        >
+          <Stack.Screen name="Home" component={HomeScreen} />
+        </Stack>
+      ));
+      await flush();
+
+      const stack = fabric.find(node => node.viewName === STACK_VIEW);
+      expect(stack?.props.nativeContainerBackgroundColor).toBeDefined();
+    });
+
+    // Native asserts a mounted screen's `activityState` never decreases, so both routes stay at 2
     it('push() mounts a second RNSScreen and keeps the first at activityState 2', async () => {
       let handle: INavigatorHandle | null = null;
       mount(ROOT_TAG, () => (
@@ -326,9 +338,8 @@ describe('Solid Stack navigator', () => {
   // Everything below would pass trivially on React or Vue - the framework re-runs the screen. On
   // Solid each is a distinct way the port silently freezes or over-rebuilds.
   describe('Solid reactivity', () => {
-    // why: THE central hazard. A screen body runs ONCE, so useRoute() must be an ACCESSOR reading a
-    // live scope. Handing the scope a plain route object (the obvious port of React's context value)
-    // paints the params the screen was pushed with and never updates again.
+    // A screen body runs once, so `useRoute()` must be an accessor over a live scope
+    // A plain route object would paint the pushed params and never update
     it('setParams reaches a mounted screen through useRoute()', async () => {
       let handle: INavigatorHandle | null = null;
       const ParamScreen = () => {
@@ -349,13 +360,34 @@ describe('Solid Stack navigator', () => {
       expect(findAll(node => node.props.text === 'after')).not.toHaveLength(0);
     });
 
-    // why: the flip side of the same hazard, and the one a passing "params reach the screen" test
-    // hides. Keying <For> on the ROUTE OBJECT also makes params reach the screen - by rebuilding the
-    // whole subtree, which destroys node identity (every ref, every native-owned state). The only
-    // headless-observable trace is node churn — asserted here as NODE IDENTITY, which is what
-    // "rebuilt" literally means and is strictly stronger than the create count this read before:
-    // a count holds steady only while nothing is created, identity also catches a node replaced by
-    // an equal-looking one.
+    // A demo panel steers the header with route params, so `setParams` has to re-run the resolver
+    it('setParams re-runs an options resolver, the header follows the params', async () => {
+      let handle: INavigatorHandle | null = null;
+      const resolver: IScreenOptionsResolver = ({ route }) => ({
+        title: String(route.params ?? 'none'),
+      });
+      mount(ROOT_TAG, () => (
+        <Stack ref={h => (handle = h)} initialRouteName="Home">
+          <Stack.Screen name="Home" component={() => <text>home</text>} />
+          <Stack.Screen
+            name="Details"
+            component={() => <text>details</text>}
+            options={resolver}
+          />
+        </Stack>
+      ));
+      await flush();
+      handle?.push('Details', 'first');
+      await flush();
+      expect(headerConfigOf(screenNodes()[1]).props.title).toBe('first');
+
+      handle?.setParams('second');
+      await flush();
+      expect(headerConfigOf(screenNodes()[1]).props.title).toBe('second');
+    });
+
+    // Keying `<For>` on the route object would also deliver params, by rebuilding the subtree
+    // and losing node identity, so the test compares node handles rather than a create count
     it('setParams does not rebuild the screen subtree', async () => {
       let handle: INavigatorHandle | null = null;
       const ParamScreen = () => {
@@ -407,10 +439,8 @@ describe('Solid Stack navigator', () => {
       expect(screenNodes()[0].instanceHandle).toBe(screenBefore);
     });
 
-    // why: the one case where a rebuild IS correct and must be asked for by name. RN treats
-    // RNSModalScreen as a different native view from RNSScreen, and descriptorToSolid fixes a node's
-    // tag at build - without the explicit shape boundary this either paints a modal's props onto a
-    // push screen or throws through the bridge's shape guard.
+    // `RNSModalScreen` is a different native view from `RNSScreen` and `descriptorToSolid` fixes
+    // the tag at build, so a presentation flip needs an explicit rebuild boundary
     it('rebuilds the native screen when the presentation flips it to RNSModalScreen', async () => {
       const [isModal, setIsModal] = createSignal(false);
       mount(ROOT_TAG, () => (
@@ -439,5 +469,185 @@ describe('Solid Stack navigator', () => {
         1,
       );
     });
+  });
+});
+
+describe('Solid Stack custom header views', () => {
+  async function mountHome(options: ISolidScreenOptions): Promise<void> {
+    mount(ROOT_TAG, () => (
+      <Stack initialRouteName="Home">
+        <Stack.Screen name="Home" component={HomeScreen} options={options} />
+      </Stack>
+    ));
+    await flush();
+  }
+
+  const subviewsOf = (): IAuthoredNode[] =>
+    findAll(
+      node => node.viewName === HEADER_SUBVIEW_VIEW,
+      headerConfigOf(screenNodes()[0]).handle,
+    );
+
+  const subviewOfType = (type: string): IAuthoredNode | undefined =>
+    subviewsOf().find(node => node.props.type === type);
+
+  it.each([
+    ['headerLeft', 'left'],
+    ['headerRight', 'right'],
+    ['headerTitle', 'center'],
+  ] as const)(
+    'mounts the %s element inside a %s subview',
+    async (option, type) => {
+      await mountHome({ [option]: () => <text>custom</text> });
+
+      const subview = subviewOfType(type);
+      expect(subview).toBeDefined();
+      expect(
+        subview &&
+          findAll(node => node.props.text === 'custom', subview.handle),
+      ).toHaveLength(1);
+    },
+  );
+
+  it('sends the side priority and background options to the matching subview', async () => {
+    await mountHome({
+      headerRight: () => <text>more</text>,
+      headerRightVisibilityPriority: 'low',
+      headerRightBackgroundVisible: false,
+    });
+
+    expect(subviewOfType('right')?.props.visibilityPriority).toBe('low');
+    expect(subviewOfType('right')?.props.hidesSharedBackground).toBe(true);
+  });
+
+  it('hosts the back image source in a back subview holding an image', async () => {
+    await mountHome({
+      headerBackImageSource: { uri: 'https://example.test/b.png' },
+    });
+
+    const subview = subviewOfType('back');
+    expect(subview).toBeDefined();
+    expect(
+      subview &&
+        findAll(node => node.viewName === 'RCTImageView', subview.handle),
+    ).toHaveLength(1);
+  });
+
+  it('keeps the search bar subview next to a custom one', async () => {
+    await mountHome({
+      headerLeft: () => <text>menu</text>,
+      headerSearchBarOptions: { placeholder: 'Search' },
+    });
+
+    expect(subviewOfType('left')).toBeDefined();
+    expect(subviewOfType('searchBar')).toBeDefined();
+  });
+
+  it('adds no subview when the app sets no custom view', async () => {
+    await mountHome({ title: 'Home' });
+
+    expect(subviewsOf()).toHaveLength(0);
+  });
+
+  it('repaints a live view in place without rebuilding its subview', async () => {
+    const [label, setLabel] = createSignal('first');
+    await mountHome({ headerTitle: () => <text>{label()}</text> });
+    const before = subviewOfType('center')?.instanceHandle;
+
+    setLabel('second');
+    await flush();
+
+    expect(findAll(node => node.props.text === 'second')).not.toHaveLength(0);
+    expect(subviewOfType('center')?.instanceHandle).toBe(before);
+  });
+
+  it('adds the subview when a view option appears after mount', async () => {
+    const [isShown, setIsShown] = createSignal(false);
+    await mountHome({
+      get headerRight() {
+        return isShown() ? () => <text>late</text> : undefined;
+      },
+    });
+    expect(subviewOfType('right')).toBeUndefined();
+
+    setIsShown(true);
+    await flush();
+
+    expect(subviewOfType('right')).toBeDefined();
+  });
+});
+
+describe('Solid Stack sheet footer', () => {
+  async function mountHome(options: ISolidScreenOptions): Promise<void> {
+    mount(ROOT_TAG, () => (
+      <Stack initialRouteName="Home">
+        <Stack.Screen name="Home" component={HomeScreen} options={options} />
+      </Stack>
+    ));
+    await flush();
+  }
+
+  const sheetFooter = () => <text>footer</text>;
+  const footerNodes = (): IAuthoredNode[] =>
+    findAll(node => node.viewName === SHEET_FOOTER_VIEW);
+  const directKids = (node: IAuthoredNode | undefined): IAuthoredNode[] =>
+    node === undefined
+      ? []
+      : childrenOf(node.handle).flatMap(child => {
+          const recorded = fabric.find(one => one.handle === child);
+          return recorded === undefined ? [] : [recorded];
+        });
+
+  it('mounts the footer content inside a native footer on a form sheet', async () => {
+    await mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    expect(footerNodes()).toHaveLength(1);
+    expect(
+      findAll(node => node.props.text === 'footer', footerNodes()[0].handle),
+    ).toHaveLength(1);
+  });
+
+  it('keeps the footer a real view, as native finds it by class', async () => {
+    await mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    expect(footerNodes()[0]?.props.collapsable).toBe(false);
+  });
+
+  it('puts the footer in the inner screen that holds the header', async () => {
+    await mountHome({ stackPresentation: 'formSheet', sheetFooter });
+
+    expect(
+      directKids(screenNodes()[0]).some(
+        kid => kid.viewName === SHEET_FOOTER_VIEW,
+      ),
+    ).toBe(true);
+  });
+
+  it('puts the footer straight in the screen when the header is hidden', async () => {
+    await mountHome({
+      stackPresentation: 'formSheet',
+      headerShown: false,
+      sheetFooter,
+    });
+
+    const modal = findAll(node => node.viewName === MODAL_SCREEN_VIEW)[0];
+    expect(
+      directKids(modal).some(kid => kid.viewName === SHEET_FOOTER_VIEW),
+    ).toBe(true);
+  });
+
+  it.each(['push', 'modal', 'pageSheet'] as const)(
+    'has no footer on a %s screen',
+    async stackPresentation => {
+      await mountHome({ stackPresentation, sheetFooter });
+
+      expect(footerNodes()).toHaveLength(0);
+    },
+  );
+
+  it('has no footer when the sheet sets none', async () => {
+    await mountHome({ stackPresentation: 'formSheet' });
+
+    expect(footerNodes()).toHaveLength(0);
   });
 });

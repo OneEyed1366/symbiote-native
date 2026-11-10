@@ -21,7 +21,7 @@
 // no reachable throwing/rejecting scenario to assert here.
 
 import { useState, type ReactElement } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   Modal,
   mount,
@@ -35,6 +35,7 @@ import {
 } from '@symbiote-native/test-utils';
 
 const ROOT_TAG = 220;
+const USER_STYLE = { backgroundColor: 'red' };
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -64,12 +65,7 @@ function serialize(nodes: ILiveNode[]): string {
 
 describe('React Modal on the engine', () => {
   describe('Positive — commit shape through the real Descriptor->React->Fabric bridge', () => {
-    // why: proves the STRUCTURE renderModal's contract promises — one childSet, the user's
-    // <view/> nested under a single collapsable container, no second root — actually survives
-    // a real commit. The individual style/attribute VALUES (position:absolute, animationType,
-    // presentationStyle default, white backdrop) are the exhaustive-value concern of
-    // renderModal's own core test; spot-checking one of them (visible) here is enough to prove
-    // the props reach the node at all.
+    // The shape survives a real commit, the values are `renderModal`'s own core test
     it('commits a visible modal as ModalHostView(RCTView(RCTView)) with the host visible prop set', () => {
       mount(
         ROOT_TAG,
@@ -83,7 +79,7 @@ describe('React Modal on the engine', () => {
       expect(modalNode().payload.visible).toBe(true);
     });
 
-    // why: Modal.js `defaultProps.visible = true` — a `<Modal>` without `visible` shows.
+    // RN `defaultProps.visible` is true
     it('shows a modal written without visible, as RN defaults it', () => {
       mount(
         ROOT_TAG,
@@ -94,9 +90,7 @@ describe('React Modal on the engine', () => {
       expect(modalNode().payload.visible).toBe(true);
     });
 
-    // why: shouldRenderModal's boolean result is core-tested directly; this proves the React
-    // FC's `if (!shouldRenderModal(...)) return null` line actually removes the node from a
-    // real commit rather than rendering an empty/placeholder host.
+    // A hidden modal leaves no node behind, not an empty host
     it('commits no modal node when visible is false', () => {
       mount(
         ROOT_TAG,
@@ -108,11 +102,7 @@ describe('React Modal on the engine', () => {
       expect(fabric.find(n => n.viewName === 'ModalHostView')).toBeUndefined();
     });
 
-    // why: modalReducer's isRendered transitions are core-tested against hand-built states;
-    // this proves React's OWN useReducer+useEffect timing reproduces that same keep-alive
-    // frame from a real visible->hidden state change — the node must still be present and
-    // eventable for one render after the app sets visible=false, matching RN's
-    // componentDidUpdate-driven exit animation.
+    // The node stays eventable for one render after `visible` flips, like RN's exit animation
     it('keeps the modal node mounted for the exit-animation frame after visible flips to false', () => {
       function KeepAliveCase(): ReactElement {
         const [visible, setVisible] = useState(true);
@@ -128,8 +118,7 @@ describe('React Modal on the engine', () => {
       expect(() => modalNode()).not.toThrow();
     });
 
-    // why: Modal.js (iOS) drops the keep-alive ONLY in its onDismiss handler — the node stays
-    // mounted through the whole native exit animation, then unmounts, then the app hears it.
+    // On iOS only the native dismiss drops the keep-alive, then the app hears it
     it('holds the modal on iOS until the native dismiss, then unmounts and calls onDismiss', async () => {
       let dismissed = 0;
       function HoldCase(): ReactElement {
@@ -162,9 +151,7 @@ describe('React Modal on the engine', () => {
   });
 
   describe('Positive — native DirectEvents round-trip to the right JS callback', () => {
-    // why: onRequestClose/onShow/onDismiss ride raw through `...passthrough` as real Fabric
-    // DirectEvents, not through any core-tested logic — this is the only place their wiring is
-    // proven at all.
+    // The events ride raw through `passthrough` as DirectEvents, this is their only wiring test
     it('routes topRequestClose to onRequestClose', () => {
       let closed = false;
       mount(
@@ -182,11 +169,7 @@ describe('React Modal on the engine', () => {
       expect(closed).toBe(true);
     });
 
-    // why: onOrientationChange is the only one of the four DirectEvents carrying a payload, so it
-    // is the only one whose declared signature can disagree with what the engine delivers —
-    // setEventListener registers every `onX` as `(event: ISymbioteEvent) => handler(event)`, so
-    // the handler gets the wrapper and the orientation rides `nativeEvent`. A signature promising
-    // a bare `{ orientation }` would make every caller read `undefined`.
+    // The handler gets the event wrapper, a bare `{ orientation }` signature would read `undefined`
     it('routes topOrientationChange to onOrientationChange with the orientation on nativeEvent', () => {
       let received: ISymbioteEvent | undefined;
       mount(
@@ -224,10 +207,7 @@ describe('React Modal on the engine', () => {
       expect(shown).toBe(true);
     });
 
-    // why: onDismiss must fire on the native exit-animation completion (topDismiss) and MUST
-    // NOT fire merely because the app requested the close (topRequestClose / the visible->hidden
-    // transition) — conflating the two would fire an app's "modal closed" side effect one frame
-    // too early, before the native view has actually finished dismissing.
+    // A requested close must not fire `onDismiss`, the native dismiss does
     it('fires onDismiss only on the native topDismiss event, not on the hide transition', () => {
       let dismissCount = 0;
       function DismissCase(): ReactElement {
@@ -247,28 +227,20 @@ describe('React Modal on the engine', () => {
       mount(ROOT_TAG, <DismissCase />);
       expect(dismissCount).toBe(0);
 
-      // Drive the native close: topRequestClose -> parent sets visible=false. The keep-alive
-      // holds the node mounted, but NO onDismiss fires from JS on this transition.
       fabric.fireEvent(modalNode().instanceHandle, 'topRequestClose', {});
       expect(dismissCount).toBe(0);
 
-      // The native exit animation completes -> Fabric emits topDismiss on the still-mounted
-      // host node -> onDismiss fires exactly once.
       fabric.fireEvent(modalNode().instanceHandle, 'topDismiss', {});
       expect(dismissCount).toBe(1);
     });
   });
 
   describe('Positive — style-precedence branches still reach the real committed node', () => {
-    // why: renderModal's transparent->backdrop/presentationStyle precedence is exhaustively
-    // value-tested in core against the pure function; this spot-checks that a REAL user style
-    // prop (`style={{ backgroundColor: 'red' }}`) still loses to the computed override once it
-    // goes through the engine's actual style flattening on a real node, not just the function's
-    // return value.
+    // A user style still loses to the transparent override after the engine flattens it
     it('lets the transparent override win over a user style on the real committed container', () => {
       mount(
         ROOT_TAG,
-        <Modal visible transparent style={{ backgroundColor: 'red' }}>
+        <Modal visible transparent style={USER_STYLE}>
           <view />
         </Modal>,
       );
@@ -278,10 +250,7 @@ describe('React Modal on the engine', () => {
   });
 
   describe("Positive — React-side prop bridge not exercised by core's direct renderModal calls", () => {
-    // why: core's renderModal test passes a hand-built `passthrough` object directly; this
-    // proves the REAL path — JSX props -> resolveAccessibilityProps -> ...passthrough -> the
-    // host node — carries ViewProps/a11y through a real mount without resolveAccessibilityProps
-    // dropping or renaming anything.
+    // The real path from JSX props to the host node drops and renames nothing
     it('passes ViewProps / a11y through to the host node', () => {
       mount(
         ROOT_TAG,
@@ -300,11 +269,7 @@ describe('React Modal on the engine', () => {
       expect(props.accessibilityLabel).toBe('a dialog');
     });
 
-    // why: supportedOrientations/hardwareAccelerated/statusBarTranslucent/
-    // navigationBarTranslucent/allowSwipeDismissal are each destructured and re-forwarded by
-    // NAME in Modal's own index.ts (not covered by core's renderModal test, which never
-    // exercises this specific field set) — this is the only place a typo/dropped field in that
-    // destructuring list would be caught.
+    // Each is forwarded by name in `Modal`, a dropped field shows only here
     it('forwards platform props as NAMED host props', () => {
       mount(
         ROOT_TAG,
@@ -326,6 +291,68 @@ describe('React Modal on the engine', () => {
       expect(props.statusBarTranslucent).toBe(true);
       expect(props.navigationBarTranslucent).toBe(true);
       expect(props.allowSwipeDismissal).toBe(true);
+    });
+  });
+
+  describe('dev warnings', () => {
+    afterEach(() => {
+      Reflect.deleteProperty(globalThis, '__DEV__');
+      vi.restoreAllMocks();
+    });
+
+    it('warns in a dev build about a prop combination RN cannot honour', () => {
+      Reflect.set(globalThis, '__DEV__', true);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mount(
+        ROOT_TAG,
+        <Modal visible transparent presentationStyle="pageSheet">
+          <view />
+        </Modal>,
+      );
+
+      expect(warn).toHaveBeenCalledWith(
+        "Modal with 'pageSheet' presentation style and 'transparent' value is not supported.",
+      );
+    });
+
+    it('stays quiet in a release build', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mount(
+        ROOT_TAG,
+        <Modal visible transparent presentationStyle="pageSheet">
+          <view />
+        </Modal>,
+      );
+
+      expect(warn).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('responder boundary', () => {
+    // RN's host claims `onStartShouldSetResponder`, so no touch inside the modal reaches an
+    // ancestor's responder handlers
+    it('keeps a touch inside the modal from granting the responder to a view above it', () => {
+      const granted: string[] = [];
+      mount(
+        ROOT_TAG,
+        <view
+          testID="above"
+          onStartShouldSetResponder={() => true}
+          onResponderGrant={() => granted.push('above')}
+        >
+          <Modal visible>
+            <view testID="inside" />
+          </Modal>
+        </view>,
+      );
+      const inside = fabric.find(node => node.props.testID === 'inside');
+      if (inside === undefined) throw new Error('no node inside the modal');
+
+      fabric.fireEvent(inside.instanceHandle ?? {}, 'topTouchStart', {});
+
+      expect(granted).toEqual([]);
     });
   });
 });

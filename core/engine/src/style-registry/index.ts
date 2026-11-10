@@ -23,6 +23,7 @@ import type {
   ISettledCondition,
 } from './media-evaluate';
 import { clearRootVariables, publishRootVariables } from './root-variables';
+import { hasVariants, mergeStyle } from './variants';
 
 export { registerRootVariables, rootVariableTable } from './root-variables';
 export type { IRootVariable } from './root-variables';
@@ -90,20 +91,12 @@ const resolvedCache = new Map<string, IResolvedStyle>();
 // total miss on every lookup.
 const RESOLVED_CACHE_LIMIT = 512;
 
-// The pressed variant, keyed by the same string and kept apart so the two never collide
-// Identity matters: `isAlreadyPublished` compares slot 0 by `Object.is`, so rows share one object
-const activeCache = new Map<string, IResolvedStyle>();
+// Whether a registered rule holds a value with states, which the host paints as its base
+let isAnyRuleWithStates = false;
 
-// The token the css-parser emits for `:active` (its `STATE_TOKEN`). Duplicated as a literal rather
-// than imported: the engine does not depend on the parser, and a CSS identifier cannot carry an
-// unescaped `:`, so this can never collide with a real class name.
-const STATE_TOKEN = ':active';
-
-// Whether ANY registered rule carries the state token. Not derivable from `ruleIndex`, which hooks
-// a rule on `tokens[0]` — for `.btn:active` that is `btn`, so `ruleIndex.has(':active')` is always
-// false and a gate built on it silently disables the whole feature. Found by a test, not by
-// reading: the wrong gate makes pressing a no-op with everything green.
-let hasActiveRules = false;
+export function hasRulesWithStates(): boolean {
+  return isAnyRuleWithStates;
+}
 
 // Every registration is a cascade change, so nothing resolved before it can be trusted. Clearing
 // wholesale beats versioning each entry — registration happens at import time, resolution happens
@@ -111,8 +104,6 @@ let hasActiveRules = false;
 function invalidateResolved(): void {
   resolvedCache.clear();
   resolvedKeys.length = 0;
-  activeCache.clear();
-  activeKeys.length = 0;
   variantsCache.clear();
   variantsKeys.length = 0;
   forgetDependents();
@@ -121,7 +112,6 @@ function invalidateResolved(): void {
 // The victim pool of each cache below: a plain array of its keys, so a random eviction is an index
 // rather than a scan, and nothing about recency or order is tracked
 const resolvedKeys: string[] = [];
-const activeKeys: string[] = [];
 const variantsKeys: string[] = [];
 
 /**
@@ -161,7 +151,7 @@ export function registerRules(
       rule.cond === undefined ? undefined : conditionIds[rule.cond];
     // A condition the table lacks is an unknown one, so the rule never applies
     if (rule.cond !== undefined && condId === undefined) continue;
-    if (rule.tokens.includes(STATE_TOKEN)) hasActiveRules = true;
+    if (hasVariants(rule.style)) isAnyRuleWithStates = true;
     const hook = rule.tokens[0];
     // The empty set is a subset of every element's tokens, so a token-less rule would paint
     // everything. It names no class and can only come from a broken compile.
@@ -179,7 +169,7 @@ export function registerRules(
 // Used between tests to reset registry state.
 export function clearGlobalStyles(): void {
   ruleIndex.clear();
-  hasActiveRules = false;
+  isAnyRuleWithStates = false;
   ruleEpoch = 0;
   clearRootVariables();
   resetConditions();
@@ -188,7 +178,7 @@ export function clearGlobalStyles(): void {
 
 // A string no cache holds needs no tracking, so the tables follow the bound of the caches
 function forgetIfUncached(key: string): void {
-  if (!resolvedCache.has(key) && !activeCache.has(key)) untrackDependents(key);
+  if (!resolvedCache.has(key)) untrackDependents(key);
 }
 
 function dropCached(
@@ -209,7 +199,6 @@ export function setMediaEnvironment(env: IMediaEnvironment): readonly number[] {
   const flipped = updateEnvironment(env);
   for (const key of dependentKeys(flipped)) {
     dropCached(resolvedCache, resolvedKeys, key);
-    dropCached(activeCache, activeKeys, key);
   }
   if (flipped.length > 0) {
     variantsCache.clear();
@@ -363,32 +352,6 @@ export function styleOfProps(props: object): readonly [unknown, unknown] {
   return [classStyle, Reflect.get(props, 'style')];
 }
 
-// The element's style with `:active` added to its tokens, so `.btn:active` cascades by specificity
-// It replaces the unpressed style in slot 0; a non-string class has no cache key and stays plain
-export function resolveActiveClassName(
-  className: IClassNameValue,
-): IResolvedStyle {
-  if (typeof className !== 'string') return resolveClassName(className);
-  // With no `:active` rule return the very same object as the unpressed path, since
-  // `isAlreadyPublished` compares by `Object.is` and an equal copy would republish for nothing
-  if (!hasActiveRules) return resolveClassName(className);
-
-  const cached = activeCache.get(className);
-  if (cached !== undefined) return cached;
-
-  const parts = className.trim().split(/\s+/).filter(Boolean);
-  const deps = new Set<number>();
-  const resolved =
-    parts.length === 0
-      ? {}
-      : (matchRules([...parts, STATE_TOKEN], deps) ?? {});
-
-  memoise(activeCache, activeKeys, className, resolved);
-  trackDependents(className, deps);
-
-  return resolved;
-}
-
 function resolveClassString(className: string): IResolvedStyle {
   const parts = className.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return EMPTY_STYLE;
@@ -459,7 +422,7 @@ function matchRules(
 
   matched.sort(byCascadeOrder);
   return matched.reduce<IResolvedStyle>(
-    (acc, match) => ({ ...acc, ...match.indexed.rule.style }),
+    (acc, match) => mergeStyle(acc, match.indexed.rule.style),
     {},
   );
 }

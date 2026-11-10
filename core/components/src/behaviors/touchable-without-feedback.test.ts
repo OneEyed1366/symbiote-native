@@ -30,7 +30,7 @@ import { registerTouchableWithoutFeedbackBehavior } from './touchable-without-fe
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
-let nextRootTag = 7800;
+let nextRootTag = 7_800;
 
 const ROOT_TEST_ID = 'root';
 // On the OWNER, which is where an app puts it — `testID` is one of the props TWF clones. It is no
@@ -178,6 +178,39 @@ describe('touchable-without-feedback host behavior', () => {
 
     listenerOf(child, 'press')(touchAt(4, 5));
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  // :172 reads `disabled !== null ? disabled : (aria-disabled ?? accessibilityState.disabled)`: the
+  // aria spelling counts only for a `disabled` that is null, and a missing one is not null
+  it.each([
+    ['is null', { disabled: null, 'aria-disabled': true }, 0],
+    [
+      'is null and the state says disabled',
+      {
+        disabled: null,
+        accessibilityState: { disabled: true },
+      },
+      0,
+    ],
+    ['is missing, so aria-disabled is ignored', { 'aria-disabled': true }, 1],
+    [
+      'is false against aria-disabled',
+      { disabled: false, 'aria-disabled': true },
+      1,
+    ],
+  ])('presses when `disabled` %s: %#', (_label, disabledProps, calls) => {
+    const onPress = vi.fn();
+    const { root, owner, child, surface } = mountIdentified({
+      onPress,
+      ...disabledProps,
+    });
+    engineAppend(root, owner);
+    engineAppend(owner, child);
+    surface.commit();
+
+    pressIn(child, touchAt(2, 2));
+    listenerFor(child, 'press')?.(touchAt(2, 2));
+    expect(onPress).toHaveBeenCalledTimes(calls);
   });
 
   // :190 hands Pressability `minPressDuration: 0`. Without it the press machine's 130 ms floor

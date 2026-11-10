@@ -13,30 +13,33 @@ import type {
 import type {
   IAccessibilityProps,
   IAriaProps,
+  ITextNativeOnlyProps,
 } from '@symbiote-native/components';
 import type { VNodeRef } from '@vue/runtime-core';
 
-export interface ITextProps extends IAccessibilityProps, IAriaProps {
-  style?: IStyleProp<ITextStyle>;
-  // See IViewProps.class — same registry, same merge precedence.
-  class?: IClassNameValue;
-  onPress?: (event: ISymbioteEvent) => void;
-  onLongPress?: (event: ISymbioteEvent) => void;
-  onPressIn?: (event: ISymbioteEvent) => void;
-  onPressOut?: (event: ISymbioteEvent) => void;
-  onLayout?: (event: ISymbioteEvent) => void;
-  onTextLayout?: (event: ISymbioteEvent) => void;
-  numberOfLines?: number;
-  ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
-  selectable?: boolean;
-  // RN's Text carries it (Text.js) and Button hands it to the label so a screen reader announces
-  // the text as disabled along with the button holding it (Button.js:388).
-  disabled?: boolean;
-  adjustsFontSizeToFit?: boolean;
-  minimumFontScale?: number;
-  allowFontScaling?: boolean;
-  maxFontSizeMultiplier?: number | null;
-  selectionColor?: string;
-  ref?: VNodeRef;
-  key?: string | number | symbol;
-}
+export type ITextProps = IAccessibilityProps &
+  IAriaProps &
+  ITextNativeOnlyProps & {
+    style?: IStyleProp<ITextStyle>;
+    // See IViewProps.class — same registry, same merge precedence.
+    class?: IClassNameValue;
+    onPress?: (event: ISymbioteEvent) => void;
+    onLongPress?: (event: ISymbioteEvent) => void;
+    onPressIn?: (event: ISymbioteEvent) => void;
+    onPressOut?: (event: ISymbioteEvent) => void;
+    onLayout?: (event: ISymbioteEvent) => void;
+    onTextLayout?: (event: ISymbioteEvent) => void;
+    numberOfLines?: number;
+    ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
+    selectable?: boolean;
+    // RN's Text carries it (Text.js) and Button hands it to the label so a screen reader announces
+    // the text as disabled along with the button holding it (Button.js:388).
+    disabled?: boolean;
+    adjustsFontSizeToFit?: boolean;
+    minimumFontScale?: number;
+    allowFontScaling?: boolean;
+    maxFontSizeMultiplier?: number | null;
+    selectionColor?: string;
+    ref?: VNodeRef;
+    key?: string | number | symbol;
+  };

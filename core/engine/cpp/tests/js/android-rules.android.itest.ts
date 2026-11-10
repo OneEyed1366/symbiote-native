@@ -38,7 +38,6 @@ import {
 
 import {
   appendChild,
-  childrenOf,
   committedPayloadOf,
   createElement,
   createSurface,
@@ -58,7 +57,7 @@ registerTextInputBehavior();
 registerScrollViewBehavior();
 registerImageBehavior();
 
-// What Android commits for BOTH text-input tags (`component-names/index.android.ts`).
+// What Android commits for both text-input tags (`component-names/index.android.ts`)
 const ANDROID_TEXT_INPUT = 'AndroidTextInput';
 
 function commitOne(
@@ -79,15 +78,14 @@ function commitOne(
   return payload;
 }
 
-// One field out of a committed nested object, narrowed rather than cast.
+// One field out of a committed nested object, narrowed rather than cast
 function fieldOf(value: unknown, name: string): unknown {
   if (typeof value !== 'object' || value === null) return undefined;
   return Object.hasOwn(value, name) ? Reflect.get(value, name) : undefined;
 }
 
 describe('the rules that only an Android build compiles', () => {
-  // why: THE GATE. Every case below asserts a key the default host never writes, so a run against
-  // the wrong binary would report ten identical failures with no hint as to why. This one says it.
+  // Каждый кейс ниже проверяет ключ, которого нет на хосте по умолчанию, этот падает первым
   it('is running against a build that compiled the Android branches', () => {
     const payload = commitOne('RCTView', 'pressable', {
       android_ripple: { color: '#ff0000' },
@@ -98,23 +96,20 @@ describe('the rules that only an Android build compiles', () => {
     );
   });
 
-  // why: `Pressable.js`'s ripple, resolved into the native slot RN's own `processDecoratedProps`
-  // writes. The dict is built by the rule rather than passed through — colour, borderless and the
-  // optional radius — so every field is a chance for the port to have dropped one.
+  // Словарь ripple собирает правило: цвет, borderless и необязательный radius
   it('builds the ripple dict from android_ripple', () => {
     const background = commitOne('RCTView', 'pressable', {
       android_ripple: { color: '#ff0000', borderless: true, radius: 12 },
     }).nativeBackgroundAndroid;
 
     expect(fieldOf(background, 'type')).toBe('RippleAndroid');
-    // why: an INT, as RN's processColor leaves it — Java reads the ripple colour with getInt.
+    // Int, как после `processColor` в RN, Java читает цвет через `getInt`
     expect(fieldOf(background, 'color')).toBe(0xff_ff_00_00 | 0);
     expect(fieldOf(background, 'borderless')).toBe(true);
     expect(fieldOf(background, 'rippleRadius')).toBe(12);
   });
 
-  // why: `foreground: true` picks the OTHER slot. Two native props, and sending the wrong one paints
-  // under the content instead of over it — invisible to any test that only checks the dict.
+  // `foreground: true` выбирает другой нативный слот, и ripple рисуется поверх контента
   it('picks the foreground slot when the ripple asks for it', () => {
     const payload = commitOne('RCTView', 'pressable', {
       android_ripple: { color: '#ff0000', foreground: true },
@@ -126,8 +121,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.nativeBackgroundAndroid).toBe(undefined);
   });
 
-  // why: a `null` colour is Android's documented "no tint", and it has to survive as a real null
-  // rather than becoming an absent key — the rule writes it explicitly for that reason.
+  // `null` цвет это "без оттенка" в Android, он должен дойти null, а не пропасть ключом
   it('keeps a missing ripple colour as an explicit null', () => {
     const background = commitOne('RCTView', 'pressable', {
       android_ripple: { borderless: false },
@@ -136,7 +130,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(fieldOf(background, 'color')).toBe(null);
   });
 
-  // why: useAndroidRippleForView.js:66 sends `alpha: alpha ?? null` in the dict.
+  // `useAndroidRippleForView.js:66` шлёт `alpha: alpha ?? null`
   it('carries the ripple alpha, null when unset', () => {
     const withAlpha = commitOne('RCTView', 'pressable', {
       android_ripple: { color: '#ff0000', alpha: 0.5 },
@@ -149,8 +143,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(fieldOf(without, 'alpha')).toBe(null);
   });
 
-  // why: useAndroidRippleForView.js:57 builds a ripple only when color, borderless or radius is
-  // set; `{foreground: true}` alone installs no background.
+  // `useAndroidRippleForView.js:57` строит ripple только при color, borderless или radius
   it('installs no ripple for a config without color, borderless or radius', () => {
     const payload = commitOne('RCTView', 'pressable', {
       android_ripple: { foreground: true },
@@ -160,7 +153,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.nativeBackgroundAndroid).toBe(undefined);
   });
 
-  // why: RN runs the ripple colour through processColor, which passes a PlatformColor through.
+  // RN гонит цвет ripple через `processColor`, `PlatformColor` он пропускает как есть
   it('passes a PlatformColor ripple colour through', () => {
     const platformColor = { resource_paths: ['?attr/colorAccent'] };
     const background = commitOne('RCTView', 'pressable', {
@@ -170,8 +163,20 @@ describe('the rules that only an Android build compiles', () => {
     expect(fieldOf(background, 'color')).toEqual(platformColor);
   });
 
-  // why: `Button.js:394-437`'s Material look, which is `{}` on iOS and the whole style here. Asserted
-  // through the committed payload's hoisted keys, which is where a style lands.
+  // RN 0.86: PlatformColor рядом с alpha, нерезолвящийся тоже, commit не падает
+  for (const resourcePath of ['?attr/colorAccent', '?attr/doesNotExist']) {
+    it(`keeps a PlatformColor ${resourcePath} next to the ripple alpha`, () => {
+      const platformColor = { resource_paths: [resourcePath] };
+      const background = commitOne('RCTView', 'pressable', {
+        android_ripple: { color: platformColor, alpha: 0.3 },
+      }).nativeBackgroundAndroid;
+
+      expect(fieldOf(background, 'color')).toEqual(platformColor);
+      expect(fieldOf(background, 'alpha')).toBe(0.3);
+    });
+  }
+
+  // Material-вид из `Button.js:394-437`, на iOS это `{}`, читается по поднятым ключам payload
   it('paints the Material button style', () => {
     const payload = commitOne('RCTView', 'button', { title: 'Save' });
 
@@ -180,8 +185,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.borderRadius).toBe(2);
   });
 
-  // why: `color` overrides the blue, and it is the app's own prop — the one thing in that style a
-  // developer can change. The raw `color` must not survive either: no ViewConfig declares it.
+  // Авторский `color` перекрывает синий, сам `color` дальше не идёт, ViewConfig его не знает
   it('lets an authored color win over the Material blue', () => {
     const payload = commitOne('RCTView', 'button', {
       title: 'Save',
@@ -192,8 +196,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.color).toBe(undefined);
   });
 
-  // why: RN pushes `{backgroundColor: color}` for ANY ColorValue (Button.js:321-325); a
-  // PlatformColor must reach native as the opaque object, not fall back to the Material blue.
+  // RN кладёт `{backgroundColor: color}` для любого ColorValue (`Button.js:321-325`)
   it('lets a PlatformColor color win over the Material blue', () => {
     const platformColor = { resource_paths: ['?android:attr/colorAccent'] };
     const payload = commitOne('RCTView', 'button', {
@@ -204,8 +207,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.backgroundColor).toEqual(platformColor);
   });
 
-  // why: disabled greys the button AND flattens it. Both, because a port that kept only the colour
-  // leaves a raised grey button, which reads as enabled at a glance.
+  // Disabled красит в серый и сплющивает, иначе серая приподнятая кнопка выглядит активной
   it('greys and flattens a disabled button', () => {
     const payload = commitOne('RCTView', 'button', {
       title: 'Save',
@@ -216,15 +218,8 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.backgroundColor).toBe(0xff_df_df_df | 0);
   });
 
-  // why: the style is REDERIVED on a late write, not frozen at mount. `color` and `disabled` are the
-  // button's OWN props, so the write dirties the node it is written on and needs no slot machinery —
-  // which is exactly why this pair is cheap to keep and worth keeping: a rule that read its input
-  // once would pass every case above.
-  // `color` and not `disabled`, and the reason is the arm's own limit rather than a preference: the
-  // JS half still reads the HOST for `Platform.OS`, so the button composes the iOS touchable and a
-  // late `disabled` write starts its opacity settle, which wants a `requestAnimationFrame` the test
-  // host does not have. The greying is asserted on a fresh mount above; what needs a LATE write is
-  // the re-derivation, and one prop proves that.
+  // Стиль пересчитывается при поздней записи, а не фиксируется при монтировании
+  // Берём `color`, т.к. JS-половина читает `Platform.OS` хоста и у `disabled` стартует анимация
   it('re-tints on a write after mount', () => {
     const surface = createSurface(ROOT_TAG);
     const button: ISymbioteNode = createElement('RCTView', false, 'button');
@@ -240,9 +235,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(committedPayloadOf(button)?.backgroundColor).toBe(0xff_ff_00_00 | 0);
   });
 
-  // why: the button's own view gets TNF's default background, because TNF renders no view and clones
-  // onto it (`:339`). The FOREGROUND slot must stay empty — `useForeground` is not a Button prop, so
-  // picking it would be the rule inventing a choice the app never made.
+  // TNF не рисует вью и клонируется на него (`:339`), foreground остаётся пустым
   it('gives the button the selectable background and no foreground', () => {
     const payload = commitOne('RCTView', 'button', { title: 'Save' });
 
@@ -252,12 +245,9 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.nativeForegroundAndroid).toBe(undefined);
   });
 
-  // (Button's Android uppercase is JS now — `slotValueFor` in `behaviors/button.ts`, because only
-  // JavaScript's `toUpperCase` is full Unicode — and is asserted in `button-android.test.ts`.)
+  // Заглавные буквы кнопки на Android считает JS, см. `slotValueFor` в `behaviors/button.ts`
 
-  // why: TouchableNativeFeedback's default background, which is what an app gets when it passes no
-  // `background` at all (`:343-348`). A ThemeAttr dict, not a ripple — the two shapes are different
-  // and only one of them is right here.
+  // Фон TNF по умолчанию без `background` (`:343-348`), это ThemeAttr, а не ripple
   it('gives a cloned child the selectable background', () => {
     const surface = createSurface(ROOT_TAG);
     const owner: ISymbioteNode = createElement(
@@ -276,8 +266,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(fieldOf(background, 'attribute')).toBe('selectableItemBackground');
   });
 
-  // why: an authored `background` is the APP's dict and the rule only picks the slot — so a
-  // `TouchableNativeFeedback.Ripple(...)` must arrive intact rather than be rebuilt.
+  // Авторский `background` это словарь приложения, правило лишь выбирает слот
   it('honours an authored background dict on the clone', () => {
     const surface = createSurface(ROOT_TAG);
     const owner: ISymbioteNode = createElement(
@@ -298,22 +287,18 @@ describe('the rules that only an Android build compiles', () => {
     mounted();
 
     const payload = committedPayloadOf(child);
-    // `useForeground` picks the other slot; `canUseNativeForeground()` is true on any Android.
-    // why: TouchableNativeFeedback.Ripple leaves the colour a string; the rule converts it.
+    // `useForeground` берёт другой слот, `canUseNativeForeground()` на Android всегда true
+    // `TouchableNativeFeedback.Ripple` оставляет цвет строкой, правило её переводит
     expect(fieldOf(payload?.nativeForegroundAndroid, 'color')).toBe(
       0xff_ff_00_00 | 0,
     );
     expect(payload?.nativeBackgroundAndroid).toBe(undefined);
-    // Neither name may reach Fabric raw: no ViewConfig declares them, so a leak is silent.
+    // Ни одно из имён не должно дойти до Fabric сырым, ViewConfig их не знает
     expect(payload?.background).toBe(undefined);
     expect(payload?.useForeground).toBe(undefined);
   });
 
-  // why: `underlineColorAndroid` defaults to `'transparent'` HERE and is emitted nowhere else
-  // (F-76): iOS's `RCTSinglelineTextInputView` ViewConfig does not declare it, so RN's own payload
-  // builder filters it out and we must not spend a wire slot on it. The iOS twin asserts its
-  // ABSENCE (`text-input-payload.itest.ts`, "sends no alias and no android-only key"); this is the
-  // half that had no home until the arm existed.
+  // `transparent` по умолчанию только здесь, iOS ViewConfig это поле не объявляет
   it('defaults a text input underline to transparent', () => {
     const payload = commitOne(ANDROID_TEXT_INPUT, 'text-input', {
       text: 'input 0',
@@ -322,9 +307,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.underlineColorAndroid).toBe(0x00_00_00_00);
   });
 
-  // why: the default must not be hardcoded PAST an explicit choice — a designer who wants the
-  // underline back must be able to ask for it. The `??` is the whole rule and a port that wrote
-  // unconditionally would pass the case above and fail only on a device.
+  // Значение по умолчанию не должно перекрывать явный выбор приложения
   it('lets an authored underline colour win', () => {
     const payload = commitOne(ANDROID_TEXT_INPUT, 'text-input', {
       underlineColorAndroid: '#00ff00',
@@ -333,10 +316,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.underlineColorAndroid).toBe(0xff_00_ff_00 | 0);
   });
 
-  // why: `search` is the ONE `inputMode` token RN resolves per platform (TextInput.js:815-825) —
-  // iOS has a dedicated search keyboard whose return key is a magnifier and Android has none, so it
-  // falls back to the default. Every other token is platform-invariant and asserted on the iOS arm;
-  // this is the only row where the two builds must disagree, which is what makes it worth an arm.
+  // `search` единственный `inputMode`, который RN решает по платформе (`TextInput.js:815-825`)
   it('falls the search keyboard back to the default', () => {
     const payload = commitOne('AndroidTextInput', 'text-input', {
       inputMode: 'search',
@@ -345,8 +325,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.keyboardType).toBe('default');
   });
 
-  // why: Android commits BOTH text-input tags as `AndroidTextInput`; RN runs the same TextInput.js
-  // on it — the controlled `value` rides as `text`, and submitBehavior follows the TAG.
+  // Оба тега TextInput на Android это `AndroidTextInput`, `value` идёт как `text`
   it('runs the text input rules on the Android component name', () => {
     const single = commitOne('AndroidTextInput', 'text-input', { value: 'x' });
     expect(single.text).toBe('x');
@@ -357,18 +336,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(multi.submitBehavior).toBe('newline');
   });
 
-  // why: `snapToAlignment` stops the content node's children collapsing on ANDROID ONLY — RN's gate
-  // is `maintainVisibleContentPosition != null || (Platform.OS === 'android' && snapToAlignment !=
-  // null)` (`ScrollView.js:1731-1733`). This is the arm that pins the half a compile-time
-  // branch made unreachable from the other one.
-  // The iOS NEGATIVE is `scroll-content-payload.itest.ts`, "lets a snapping iOS scroller collapse
-  // its children" — the two are twins and neither means much alone.
-  // why: `pagingEnabled` INVERTS between the platforms, which is the rarest shape in this file — iOS
-  // needs it OFF for snapToInterval/snapToOffsets to work and Android needs it ON
-  // (`ScrollView.js:1810-1821`, and the comment there says so in both directions). So the two arms
-  // assert opposite answers to the same bag, and neither is meaningful without the other: the iOS
-  // twin is `scroll-view-payload.itest.ts`, "drops paging on iOS when the app also asks for
-  // snapping". An app that sets only `snapToInterval` gets no snapping at all on Android without it.
+  // `pagingEnabled` инвертируется между платформами (`ScrollView.js:1810-1821`)
   it('turns paging ON for a snapping scroller', () => {
     expect(
       commitOne('RCTScrollView', 'scroll-view', { snapToInterval: 100 })
@@ -378,7 +346,7 @@ describe('the rules that only an Android build compiles', () => {
       commitOne('RCTScrollView', 'scroll-view', { snapToOffsets: [0, 100] })
         .pagingEnabled,
     ).toBe(true);
-    // The app's own request still stands on its own, and a scroller asking for neither says so.
+    // Собственный запрос приложения остаётся в силе, без обоих флагов будет false
     expect(
       commitOne('RCTScrollView', 'scroll-view', { pagingEnabled: true })
         .pagingEnabled,
@@ -388,6 +356,7 @@ describe('the rules that only an Android build compiles', () => {
     );
   });
 
+  // `snapToAlignment` не даёт схлопнуть детей контента только на Android (`ScrollView.js:1731`)
   it('stops a snapping scroller collapsing its content children', () => {
     const surface = createSurface(ROOT_TAG);
     const owner: ISymbioteNode = createElement(
@@ -406,9 +375,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(committedPayloadOf(content)?.collapsableChildren).toBe(false);
   });
 
-  // why: TextInput.js:728-735,938-954 — Android defaults `autoCapitalize` to 'sentences' and
-  // `placeholder` to '', maps the W3C autoComplete token for its own native prop, and derives no
-  // `textContentType` (an authored one still passes).
+  // Android по умолчанию: sentences и пустой `placeholder`, `autoComplete` по таблице
   it('applies the Android text input defaults and autoComplete mapping', () => {
     const payload = commitOne('AndroidTextInput', 'text-input', {
       autoComplete: 'email',
@@ -428,8 +395,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(authored.autoComplete).toBe('postal-address-region');
   });
 
-  // why: Text.js:145-150 — on Android an unset `accessible` follows the press handlers
-  // (`onPress != null || onLongPress != null`); an authored value wins.
+  // `Text.js:145-150`: неуказанный `accessible` следует за обработчиками нажатия
   it('makes text accessible on Android only when it is pressable', () => {
     const textPayload = (props: Record<string, unknown>) => {
       const surface = createSurface(ROOT_TAG);
@@ -448,8 +414,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(textPayload({ accessible: true })?.accessible).toBe(true);
   });
 
-  // why: ScrollView.js:1740-1745 — clipping breaks sticky headers on Android, so the content view
-  // is forced to false while any header sticks; without one it carries the scroller's value.
+  // `ScrollView.js:1740-1745`: клиппинг ломает sticky-заголовки, поэтому у контента он false
   it('turns content clipping off under sticky headers', () => {
     const contentPayload = (props: Record<string, unknown>) => {
       const surface = createSurface(ROOT_TAG);
@@ -480,9 +445,7 @@ describe('the rules that only an Android build compiles', () => {
     ).toBe(true);
   });
 
-  // why: RN's `processColor` hands Android a SIGNED int32 (`| 0x0`). An unsigned opaque colour
-  // reaches Java ViewManagers as a Double that Kotlin's `toInt()` saturates to 0x7fffffff, so every
-  // View background painted translucent white while text colours (read in C++) stayed right.
+  // RN отдаёт Android знаковый int32, беззнаковый Kotlin `toInt()` насыщает до 0x7fffffff
   it('commits an opaque colour as a signed int32, as RN does on Android', () => {
     const payload = commitOne('RCTView', 'view', {
       style: { backgroundColor: '#0b1220' },
@@ -491,8 +454,7 @@ describe('the rules that only an Android build compiles', () => {
     expect(payload.backgroundColor).toBe(0xff0b1220 | 0);
   });
 
-  // why: `Image.android.js` sends `defaultSource_.uri`, and `ReactImageManager.setDefaultSource`
-  // takes a `String?`. A map there is a red-box "Error while updating property 'defaultSource'".
+  // `ReactImageManager.setDefaultSource` берёт `String?`, словарь даёт красный экран
   it('commits an image defaultSource as its bare uri string', () => {
     const surface = createSurface(ROOT_TAG);
     const image: ISymbioteNode = createElement('RCTImageView', false, 'image');
@@ -507,10 +469,7 @@ describe('the rules that only an Android build compiles', () => {
     );
   });
 
-  // why: `ReactImageView.setSource` reads only `uri`/`cache`/sizes from a source map; headers reach
-  // the request ONLY through the top-level `headers` prop, which `Image.android.js` fills from
-  // `source_[0].headers` when the source is an ARRAY (a single object's are dropped at write time,
-  // in JS — see image-source-write.test.ts). Left inside the source, the request goes without them.
+  // Заголовки доходят до запроса через верхний `headers` из `source_[0]` (`Image.android.js`)
   it('lifts the first source headers to the top-level headers prop', () => {
     const surface = createSurface(ROOT_TAG);
     const image: ISymbioteNode = createElement('RCTImageView', false, 'image');
@@ -524,6 +483,46 @@ describe('the rules that only an Android build compiles', () => {
     expect(fieldOf(committedPayloadOf(image)?.headers, 'Authorization')).toBe(
       'Bearer t',
     );
+  });
+});
+
+describe('srcSet on an Android image', () => {
+  // Заголовки берутся из `source_[0]`, у `srcSet` их даёт `crossOrigin`
+  it('lifts the credentials header to the headers prop', () => {
+    const surface = createSurface(ROOT_TAG);
+    const image: ISymbioteNode = createElement('RCTImageView', false, 'image');
+    setProp(image, 'srcSet', 'https://a/2.png 2x extra');
+    setProp(image, 'crossOrigin', 'use-credentials');
+    surface.appendChild(image);
+    surface.commit();
+    mounted();
+
+    expect(
+      fieldOf(
+        committedPayloadOf(image)?.headers,
+        'Access-Control-Allow-Credentials',
+      ),
+    ).toBe('true');
+  });
+});
+
+// RN #57890: `tabbar` is in the public role union but Android's role enum has no entry for it, so
+// stock 0.86.0 throws on mount. RN fixed it natively after the pin, here the role is just dropped
+describe('accessibilityRole on Android', () => {
+  it('drops the iOS-only tabbar role instead of crashing the mount', () => {
+    const payload = commitOne('RCTView', 'view', {
+      accessibilityRole: 'tabbar',
+    });
+
+    expect(payload.accessibilityRole).toBe(undefined);
+  });
+
+  it('keeps a role Android knows', () => {
+    const payload = commitOne('RCTView', 'view', {
+      accessibilityRole: 'tablist',
+    });
+
+    expect(payload.accessibilityRole).toBe('tablist');
   });
 });
 

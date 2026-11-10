@@ -16,19 +16,6 @@ Both of upstream's API surfaces are ported, matching its own layout: the modern 
 `/legacy` subpath). The classes and functions are shared by every adapter; the one view,
 `ContactAccessButton`, is exported by every adapter in its own idiom.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -320,10 +307,12 @@ you write to accepts edits. Request the permission with `requestPermissionsAsync
 **Should I build my own contact picker?** Usually not. `Contact.presentPicker()` and the iOS 18
 `ContactAccessButton` give users a system picker and need less permission.
 
-Sources: [Expo docs: Contacts](https://docs.expo.dev/versions/latest/sdk/contacts/),
-[expo/expo#386 getContactsAsync returns an empty array on Android 7](https://github.com/expo/expo/issues/386),
-[expo/expo#200 Android Contacts API does not return phone numbers](https://github.com/expo/expo/issues/200),
-[expo/expo#29224 getContactsAsync crash on iOS](https://github.com/expo/expo/issues/29224).
+Sources:
+
+- [Expo docs: Contacts](https://docs.expo.dev/versions/latest/sdk/contacts/)
+- [expo/expo#386 getContactsAsync returns an empty array on Android 7](https://github.com/expo/expo/issues/386)
+- [expo/expo#200 Android Contacts API does not return phone numbers](https://github.com/expo/expo/issues/200)
+- [expo/expo#29224 getContactsAsync crash on iOS](https://github.com/expo/expo/issues/29224)
 
 ## How the wrapper works
 

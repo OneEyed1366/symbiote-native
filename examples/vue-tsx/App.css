@@ -53,18 +53,18 @@
    top/bottom rhythm + 12px gap as .section, but no left/right — the horizontal inset already
    comes from .scroll-content) instead of plain .section, which would double it to 48px. */
 .section {
-  gap: 12px;
-  padding: 24px;
+  gap: 0.75rem;
+  padding: 1.5rem;
 }
 .section-tight {
-  gap: 8px;
+  gap: 0.5rem;
 }
 /* CanaryScreen's own extracted demo components (AnimatedDemo, NativeModulesDemo, …) — see the
    .section comment above for why this exists instead of reusing .section unmodified. */
 .section-nested {
-  gap: 12px;
-  padding-top: 24px;
-  padding-bottom: 24px;
+  gap: 0.75rem;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
 }
 /* `flex-wrap` because RN, like CSS, defaults to nowrap: a row of three intrinsically-sized
    ActionButtons whose titles are long enough ("Start scope · Bump source · Stop scope" in
@@ -75,12 +75,12 @@
 .row {
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 0.75rem;
 }
 .row-tight {
   flex-direction: row;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.5rem;
 }
 /* no hyphen: kebabToCamel only rewrites "-[a-z]", so ".flex-1" would parse to "flex-1"
    literally, not "flex1" — the same digit trap as .box-list160 below. */
@@ -89,23 +89,23 @@
 }
 .section-label {
   color: #41506a;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .info-text {
   color: #cbd5e1;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .note-text {
   color: #cbd5e1;
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .switch-label {
   color: #cbd5e1;
-  font-size: 16px;
+  font-size: 1rem;
 }
 .list-row-text {
   color: #cbd5e1;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 /* ActionButton — every demo screen's tappable action, replacing RN's stock unstyled <Button>.
@@ -116,14 +116,14 @@
   justify-content: center;
   border-radius: 12px;
   border-width: 1.5px;
-  padding-top: 12px;
-  padding-bottom: 12px;
-  padding-left: 16px;
-  padding-right: 16px;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
   background-color: var(--paper);
 }
 .action-button-text {
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: bold;
 }
 
@@ -132,48 +132,48 @@
 .hero-card {
   flex-direction: row;
   align-items: center;
-  gap: 14px;
-  padding: 16px;
+  gap: 0.875rem;
+  padding: 1rem;
   border-radius: 16px;
   background-color: var(--paper);
 }
 .hero-badge {
-  width: 44px;
-  height: 44px;
+  width: 2.75rem;
+  height: 2.75rem;
   border-radius: 12px;
   align-items: center;
   justify-content: center;
 }
 .hero-badge-text {
   color: var(--ink);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: bold;
 }
 .hero-copy {
   flex: 1;
-  gap: 4px;
+  gap: 0.25rem;
 }
 .hero-title {
   color: var(--chalk-bright);
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: bold;
 }
 .hero-body {
   color: var(--chalk);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* AnimatedDemo */
 .pulse-frame {
-  height: 64px;
+  height: 4rem;
   align-items: center;
   justify-content: center;
 }
 /* width/height/borderRadius/backgroundColor static; opacity/transform (interpolations)
    stay dynamic on the same element's style prop. */
 .pulse-dot {
-  width: 48px;
-  height: 48px;
+  width: 3rem;
+  height: 3rem;
   border-radius: 24px;
   background-color: #42b883;
 }
@@ -182,19 +182,19 @@
    different sizes (28px here vs 48px there) — a uniform .section gap alone isn't enough when
    the frames it separates carry different built-in padding. */
 .slide-track {
-  height: 44px;
+  height: 2.75rem;
   justify-content: center;
 }
 /* transform (translateX interpolation) stays dynamic */
 .js-slide-dot {
-  width: 28px;
-  height: 28px;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 8px;
   background-color: #f6ad55;
 }
 .native-slide-dot {
-  width: 28px;
-  height: 28px;
+  width: 1.75rem;
+  height: 1.75rem;
   border-radius: 8px;
   background-color: #68d391;
 }
@@ -202,51 +202,51 @@
 /* AnimatedParityDemo */
 .drag-hint {
   color: #718096;
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 /* width/height hardcoded: XY_SPAN(96) + 36 = 132 — a true compile-time constant */
 .xy-frame {
-  width: 132px;
-  height: 132px;
+  width: 8.25rem;
+  height: 8.25rem;
   border-radius: 12px;
   background-color: #eef2f9;
-  padding: 6px;
+  padding: 0.375rem;
 }
 /* transform (xy.getTranslateTransform()) stays dynamic */
 .xy-box {
-  width: 36px;
-  height: 36px;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 8px;
   background-color: #9f7aea;
 }
 .track-row {
-  height: 30px;
+  height: 1.875rem;
   justify-content: center;
 }
 /* transform (translateX(lead)) stays dynamic */
 .lead-dot {
-  width: 22px;
-  height: 22px;
+  width: 1.375rem;
+  height: 1.375rem;
   border-radius: 11px;
   background-color: #42b883;
 }
 /* transform (translateX(follow)) stays dynamic */
 .follow-dot {
-  width: 22px;
-  height: 22px;
+  width: 1.375rem;
+  height: 1.375rem;
   border-radius: 11px;
   background-color: #f6ad55;
 }
 /* height hardcoded: HEADER_COLLAPSE(60) + 24 = 84 — a true compile-time constant */
 .collapse-frame {
-  height: 84px;
+  height: 5.25rem;
   overflow: hidden;
   justify-content: flex-start;
 }
 /* height hardcoded: HEADER_COLLAPSE = 60 — a true compile-time constant; transform
    (translateY) stays dynamic */
 .collapse-header {
-  height: 60px;
+  height: 3.75rem;
   border-radius: 8px;
   background-color: #38b2ac;
   align-items: center;
@@ -254,30 +254,30 @@
 }
 .collapse-header-text {
   color: white;
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 
 /* NativeModulesDemo */
 .row-align-center {
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 .info-text-flex {
   color: #cbd5e1;
-  font-size: 14px;
+  font-size: 0.875rem;
   flex: 1;
 }
 .logo-thumb {
-  width: 48px;
-  height: 48px;
+  width: 3rem;
+  height: 3rem;
   border-radius: 8px;
   background-color: #0f1e30;
 }
 
 /* RefApiDemo */
 .ref-box {
-  height: 56px;
+  height: 3.5rem;
   border-radius: 12px;
   background-color: #42b883;
   align-items: center;
@@ -285,7 +285,7 @@
 }
 .ref-box-text {
   color: #0b1622;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: bold;
 }
 
@@ -293,7 +293,7 @@
 /* backgroundColor stays dynamic (PlatformColor is a runtime-resolved opaque color object) */
 .color-tile {
   flex: 1;
-  height: 56px;
+  height: 3.5rem;
   border-radius: 12px;
   align-items: center;
   justify-content: center;
@@ -301,7 +301,7 @@
 /* backgroundColor (DynamicColorIOS) + borderColor (PlatformColor) stay dynamic */
 .color-tile-bordered {
   flex: 1;
-  height: 56px;
+  height: 3.5rem;
   border-radius: 12px;
   border-width: 1px;
   align-items: center;
@@ -309,29 +309,29 @@
 }
 .tile-label {
   color: #ffffff;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: bold;
 }
 /* color (PlatformColor) stays dynamic */
 .bold-label {
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: bold;
 }
 
 /* ResponderDemo */
 /* color (transfer-active ternary) stays dynamic */
 .transfer-text {
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .strip-box {
-  padding: 12px;
+  padding: 0.75rem;
   border-radius: 12px;
   background-color: #13243a;
 }
 /* borderColor (active-chip ternary) + transform (drag offset) stay dynamic */
 .chip {
-  width: 56px;
-  height: 48px;
+  width: 3.5rem;
+  height: 3rem;
   border-radius: 8px;
   background-color: #42b883;
   border-width: 2px;
@@ -340,13 +340,13 @@
 }
 .chip-text {
   color: #ffffff;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: bold;
 }
 
 /* AccessibilityDemo */
 .a11y-card {
-  padding: 12px;
+  padding: 0.75rem;
   border-radius: 10px;
   background-color: #13243a;
 }
@@ -354,8 +354,8 @@
 /* ParityDemo */
 .long-press-row {
   color: #cbd5e1;
-  font-size: 15px;
-  padding: 12px;
+  font-size: 0.9375rem;
+  padding: 0.75rem;
   border-radius: 10px;
   background-color: #13243a;
 }
@@ -363,34 +363,34 @@
    FlatList's getItemLayout), which a CSS selector has no way to read */
 .parity-row {
   justify-content: center;
-  padding-left: 12px;
-  padding-right: 12px;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
 }
 .section-header {
   color: #0b1622;
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: bold;
-  padding-top: 6px;
-  padding-bottom: 6px;
-  padding-left: 12px;
-  padding-right: 12px;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
   background-color: #42b883;
 }
 .focus-input {
   color: #e2e8f0;
-  padding: 12px;
+  padding: 0.75rem;
   border-radius: 10px;
   background-color: #0f1e30;
   border-width: 1px;
   border-color: #42b883;
 }
 .parity-list {
-  height: 120px;
+  height: 7.5rem;
   border-radius: 10px;
   background-color: #0f1e30;
 }
 .section-list {
-  height: 200px;
+  height: 12.5rem;
   border-radius: 10px;
   background-color: #0f1e30;
 }
@@ -404,35 +404,35 @@
   background-color: var(--ink);
 }
 .text-input {
-  height: 44px;
+  height: 2.75rem;
   border-radius: 10px;
   border-width: 1px;
   border-color: var(--line-primitives);
-  padding-left: 14px;
-  padding-right: 14px;
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
   color: var(--chalk-bright);
-  font-size: 18px;
+  font-size: 1.125rem;
   background-color: var(--paper);
 }
 .scroll-content {
-  padding-top: 24px;
-  padding-bottom: 40px;
-  padding-left: 24px;
-  padding-right: 24px;
+  padding-top: 1.5rem;
+  padding-bottom: 2.5rem;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
   align-items: stretch;
-  gap: 20px;
+  gap: 1.25rem;
 }
 .slider {
-  height: 40px;
+  height: 2.5rem;
   align-self: stretch;
 }
 .chip-list {
-  height: 84px;
+  height: 5.25rem;
 }
 /* no hyphen before the digit: kebabToCamel only rewrites "-[a-z]", so ".box-list-160"
    would parse to "box-list-160" literally, not "boxList160" */
 .box-list160 {
-  height: 160px;
+  height: 10rem;
   border-radius: 12px;
   background-color: var(--paper);
 }
@@ -441,102 +441,102 @@
   align-self: center;
 }
 .logo-image {
-  width: 64px;
-  height: 64px;
+  width: 4rem;
+  height: 4rem;
   border-radius: 12px;
   align-self: center;
 }
 .header-note {
   color: var(--mist);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: center;
 }
 /* borderTopWidth stays dynamic (StyleSheet.hairlineWidth is a runtime constant) */
 .hairline-note {
   color: var(--mist);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: center;
-  padding-top: 8px;
+  padding-top: 0.5rem;
   border-top-color: var(--mist);
 }
 .refresh-row {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 0.5rem;
 }
 .accent-note {
   color: var(--line-primitives);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .muted-center {
   color: var(--mist);
-  font-size: 13px;
+  font-size: 0.8125rem;
   text-align: center;
 }
 .counter-card {
-  padding-top: 18px;
-  padding-bottom: 18px;
+  padding-top: 1.125rem;
+  padding-bottom: 1.125rem;
   border-radius: 16px;
   background-color: var(--line-primitives);
   align-items: center;
 }
 .counter-text {
   color: var(--ink);
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: bold;
 }
 .greeting {
   color: var(--chalk-bright);
-  font-size: 20px;
+  font-size: 1.25rem;
   text-align: center;
 }
 .switch-row {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding-left: 4px;
-  padding-right: 4px;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
 }
 .pressable-card {
-  padding-top: 16px;
-  padding-bottom: 16px;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
   border-radius: 14px;
   align-items: center;
   border-width: 1px;
 }
 /* color (pressed ternary) stays dynamic */
 .pressable-label {
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 /* width/marginRight stay dynamic — they reference the CHIP_WIDTH/CHIP_GAP script
    consts (also used by FlatList's getItemLayout), which a CSS selector has no way to
    read; backgroundColor stays dynamic (item.color, per-chip — a deliberate rainbow, the
    FlatList windowing demo's whole point is telling 24 distinct chips apart at a glance) */
 .chip-card {
-  height: 72px;
+  height: 4.5rem;
   border-radius: 12px;
   align-items: center;
   justify-content: center;
 }
 .chip-number {
   color: var(--ink);
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: bold;
 }
 .mvcp-divider {
-  height: 8px;
-  margin-left: 14px;
+  height: 0.5rem;
+  margin-left: 0.875rem;
   background-color: #26304f;
 }
 .mvcp-row {
-  padding-top: 10px;
-  padding-bottom: 10px;
-  padding-left: 14px;
-  padding-right: 14px;
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
 }
 .retention-card {
-  height: 64px;
+  height: 4rem;
   border-radius: 14px;
   align-items: center;
   justify-content: center;
@@ -545,30 +545,30 @@
 .parity-header {
   background-color: var(--line-primitives);
   border-radius: 12px;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
   align-items: center;
 }
 .parity-header-text {
   color: var(--ink);
-  font-size: 15px;
+  font-size: 0.9375rem;
   font-weight: bold;
 }
 .scroll-demo-row {
-  height: 80px;
+  height: 5rem;
   justify-content: center;
-  padding-left: 14px;
-  padding-right: 14px;
+  padding-left: 0.875rem;
+  padding-right: 0.875rem;
 }
 .tiny-center {
   color: var(--mist);
-  font-size: 12px;
+  font-size: 0.75rem;
   text-align: center;
 }
 /* boxShadow stays dynamic (outside @symbiote-native/css-parser's supported property table) —
    the glow's own blue IS the demo (a black shadow is invisible on this bg), left untouched */
 .shadow-card {
-  height: 64px;
+  height: 4rem;
   border-radius: 12px;
   background-color: var(--paper);
   align-items: center;
@@ -576,7 +576,7 @@
 }
 .filter-tile {
   flex: 1;
-  height: 64px;
+  height: 4rem;
   border-radius: 12px;
   background-color: var(--line-primitives);
   align-items: center;
@@ -584,12 +584,12 @@
 }
 .tile-text {
   color: var(--ink);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: bold;
 }
 /* transformOrigin/transform stay dynamic — same css-parser gap as boxShadow above */
 .rotated-card {
-  height: 64px;
+  height: 4rem;
   border-radius: 12px;
   background-color: var(--line-primitives);
   align-items: center;
@@ -600,14 +600,14 @@
    proving background-image itself works, so it isn't the place to find out. Vue's own official
    gradient pairing (Ocean Green -> Pickled Bluewood) instead of the React canary's blue -> cyan. */
 .gradient-card {
-  height: 64px;
+  height: 4rem;
   border-radius: 12px;
   background-image: linear-gradient(to right, #42b883, #35495e);
   align-items: center;
   justify-content: center;
 }
 .bottom-card {
-  height: 200px;
+  height: 12.5rem;
   border-radius: 16px;
   background-color: var(--paper);
   align-items: center;
@@ -615,7 +615,7 @@
 }
 .bottom-text {
   color: var(--line-primitives);
-  font-size: 16px;
+  font-size: 1rem;
 }
 .modal-overlay {
   flex: 1;
@@ -624,21 +624,21 @@
   background-color: rgba(0, 0, 0, 0.6);
 }
 .modal-card {
-  width: 280px;
-  padding: 24px;
+  width: 17.5rem;
+  padding: 1.5rem;
   border-radius: 20px;
   background-color: var(--paper);
   align-items: center;
-  gap: 16px;
+  gap: 1rem;
 }
 .modal-title {
   color: var(--chalk-bright);
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: bold;
 }
 .modal-body {
   color: var(--chalk);
-  font-size: 14px;
+  font-size: 0.875rem;
   text-align: center;
 }
 /* the Teleport/createTunnel overlay target (CanaryScreen.tsx's overlay-host) — must cover the
@@ -648,41 +648,41 @@
    instead of mid-screen. */
 .overlay-host {
   position: absolute;
-  top: 0px;
-  left: 0px;
-  right: 0px;
-  bottom: 0px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   align-items: center;
   justify-content: center;
 }
 
 /* MenuScreen hero */
 .menu-hero {
-  gap: 6px;
-  padding-bottom: 8px;
+  gap: 0.375rem;
+  padding-bottom: 0.5rem;
 }
 .menu-eyebrow {
   color: var(--mist);
-  font-size: 12px;
-  letter-spacing: 2px;
+  font-size: 0.75rem;
+  letter-spacing: 0.125rem;
 }
 .menu-hero-title {
   color: var(--chalk-bright);
-  font-size: 26px;
+  font-size: 1.625rem;
   font-weight: bold;
 }
 .menu-hero-subtitle {
   color: var(--chalk);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 /* line tag — the "you are here" pill each demo screen carries, matching its MenuScreen row */
 .line-tag {
   align-self: flex-start;
-  padding-top: 4px;
-  padding-bottom: 4px;
-  padding-left: 10px;
-  padding-right: 10px;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  padding-left: 0.625rem;
+  padding-right: 0.625rem;
   border-radius: 999px;
 }
 .line-tag-primitives {
@@ -711,9 +711,9 @@
 }
 .line-tag-text {
   color: var(--ink);
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: bold;
-  letter-spacing: 1px;
+  letter-spacing: 0.0625rem;
 }
 
 /* DrawerDemoScreen's drawerContent panel — its own floating side-panel background comes
@@ -721,15 +721,15 @@
    needs the edge padding .section-tight itself deliberately doesn't carry (it's also reused
    inside CanaryScreen's already-padded scroll-content, where a second padding would double up). */
 .drawer-panel {
-  padding: 16px;
+  padding: 1rem;
 }
 
 /* MenuScreen rows + DrawerDemoScreen's drawerContent (shared row look) */
 .menu-row {
   flex-direction: row;
   align-items: center;
-  gap: 14px;
-  padding: 14px;
+  gap: 0.875rem;
+  padding: 0.875rem;
   border-radius: 12px;
   background-color: var(--paper);
 }
@@ -766,8 +766,8 @@
   border-left-color: var(--line-styling);
 }
 .menu-badge {
-  width: 34px;
-  height: 34px;
+  width: 2.125rem;
+  height: 2.125rem;
   border-radius: 10px;
   align-items: center;
   justify-content: center;
@@ -798,22 +798,22 @@
 }
 .menu-badge-text {
   color: var(--ink);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: bold;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.03125rem;
 }
 
 .menu-row-copy {
   flex: 1;
-  gap: 4px;
+  gap: 0.25rem;
 }
 .menu-row-label {
   color: var(--chalk-bright);
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: bold;
 }
 .menu-row-hint {
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .menu-row-hint-primitives {
   color: var(--line-primitives);
@@ -847,7 +847,7 @@
    has no standalone rule. The Vue-SFC and Svelte canaries express the same three rules inside a
    per-component scoped style block instead — same law, different scoping. */
 .badge {
-  padding: 8px;
+  padding: 0.5rem;
   border-radius: 999px;
   border-width: 1px;
   border-color: #41506a;
@@ -862,7 +862,7 @@
   background-color: #1d6b4a;
 }
 .badge-text {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--chalk);
 }
 
@@ -871,53 +871,53 @@
    .hero-card/.section-nested/.info-text/.list-row-text/.action-button vocabulary above wherever
    it already fits; only genuinely new shapes get a class here. */
 .log-card {
-  padding: 12px;
+  padding: 0.75rem;
   border-radius: 12px;
-  gap: 4px;
+  gap: 0.25rem;
   background-color: var(--paper);
 }
 .stepper-row {
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 /* BenchmarkScreen (screens/BenchmarkScreen) + its frame-rate meter
    (components/JsFrameRateMeter). Colors that vary per call site — the meter's accent and every
    ActionButton tint — stay inline, exactly like the other demo screens; the chrome lives here. */
 .bench-meter {
-  gap: 12px;
-  padding: 16px;
+  gap: 0.75rem;
+  padding: 1rem;
   border-radius: 16px;
   background-color: var(--paper);
 }
 .bench-meter-row {
   flex-direction: row;
-  gap: 12px;
+  gap: 0.75rem;
 }
 .bench-metric {
   flex: 1;
   align-items: center;
-  gap: 2px;
-  padding-top: 10px;
-  padding-bottom: 10px;
+  gap: 0.125rem;
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
   border-radius: 12px;
   background-color: var(--ink);
 }
 .bench-metric-value {
-  font-size: 26px;
+  font-size: 1.625rem;
   font-weight: bold;
 }
 .bench-metric-label {
   color: var(--mist);
-  font-size: 11px;
-  letter-spacing: 1px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.0625rem;
 }
 
 /* The two suite buttons, side by side under the meter: one per mount mode, so the mode is picked
    by the press instead of by a separate toggle that could disagree with the numbers on screen. */
 .bench-run-row {
   flex-direction: row;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 /* Shown only while a suite runs. A step can hold the JS thread for hundreds of milliseconds, so
@@ -925,19 +925,19 @@
 .bench-progress {
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: 0.75rem;
+  padding: 0.75rem;
   border-radius: 12px;
   background-color: #0f1e30;
 }
 .bench-progress-text {
   flex: 1;
   color: var(--chalk);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .bench-progress-count {
   color: var(--mist);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* Both modes' results side by side — the label stretches, the two number columns stay at a fixed
@@ -945,32 +945,32 @@
 .bench-compare-row {
   flex-direction: row;
   align-items: center;
-  padding-top: 4px;
-  padding-bottom: 4px;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
 }
 .bench-compare-label {
   flex: 1;
   color: var(--mist);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .bench-compare-cell {
-  width: 96px;
+  width: 6rem;
   text-align: right;
   color: var(--chalk);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .bench-compare-head-cell {
-  width: 96px;
+  width: 6rem;
   text-align: right;
   color: var(--mist);
-  font-size: 11px;
-  letter-spacing: 1px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.0625rem;
 }
 
 /* The sticky-header stress block. Bounded height so the frame counters stay on screen while the
    inner list is being dragged — the whole point of putting the two next to each other. */
 .bench-sticky {
-  height: 320px;
+  height: 20rem;
   border-radius: 12px;
   background-color: #0f1e30;
 }
@@ -979,7 +979,7 @@
    viewport of its own to window against, and without one it would mount every row - which is
    precisely the mode it exists to contrast with. */
 .bench-rows-viewport {
-  height: 420px;
+  height: 26.25rem;
   border-radius: 12px;
   background-color: #0f1e30;
 }
@@ -989,11 +989,11 @@
 .bench-op-row {
   flex-direction: row;
   align-items: center;
-  gap: 12px;
+  gap: 0.75rem;
 }
 .stepper-button {
-  width: 36px;
-  height: 36px;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 10px;
   align-items: center;
   justify-content: center;
@@ -1001,25 +1001,25 @@
 }
 .stepper-button-text {
   color: var(--ink);
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: bold;
 }
 .stepper-value {
   color: var(--chalk-bright);
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: bold;
-  min-width: 32px;
+  min-width: 2rem;
   text-align: center;
 }
 .frame-box {
-  padding: 14px;
+  padding: 0.875rem;
   border-radius: 12px;
   border-width: 1px;
   border-color: var(--line-framework);
-  gap: 6px;
+  gap: 0.375rem;
 }
 .flash-box {
-  height: 48px;
+  height: 3rem;
   border-radius: 10px;
   align-items: center;
   justify-content: center;
@@ -1027,12 +1027,12 @@
 }
 .flash-box-text {
   color: var(--chalk-bright);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .tab-card {
-  padding: 16px;
+  padding: 1rem;
   border-radius: 14px;
-  gap: 10px;
+  gap: 0.625rem;
   background-color: var(--paper);
 }
 /* Neither cell flexes and both hold generated text, so a long key next to a long value
@@ -1042,26 +1042,26 @@
   flex-direction: row;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
+  gap: 0.5rem;
 }
 .inspector-key {
   color: var(--chalk);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 .inspector-value {
   color: var(--line-framework);
-  font-size: 13px;
+  font-size: 0.8125rem;
   font-weight: bold;
 }
 .bench-op-result {
-  width: 88px;
+  width: 5.5rem;
   text-align: right;
   color: var(--chalk);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .bench-history-row {
   color: var(--mist);
-  font-size: 13px;
+  font-size: 0.8125rem;
 }
 
 /* A benchmark list row — kept deliberately plain (id, label, remove) so what is measured is the
@@ -1069,14 +1069,14 @@
 .bench-row {
   /* Fixed so FlatList's getItemLayout is exact in virtualized mode, and so a row occupies the
      same box in both mount modes - otherwise the two modes would not be comparable. */
-  height: 44px;
+  height: 2.75rem;
   flex-direction: row;
   align-items: center;
-  gap: 12px;
-  padding-top: 6px;
-  padding-bottom: 6px;
-  padding-left: 10px;
-  padding-right: 10px;
+  gap: 0.75rem;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  padding-left: 0.625rem;
+  padding-right: 0.625rem;
   border-radius: 8px;
   background-color: var(--paper);
 }
@@ -1088,35 +1088,35 @@
   border-left-color: var(--line-performance);
 }
 .bench-row-id {
-  width: 56px;
+  width: 3.5rem;
   color: var(--mist);
-  font-size: 12px;
+  font-size: 0.75rem;
 }
 .bench-row-label {
   color: var(--chalk);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 .bench-row-remove {
-  width: 28px;
-  height: 28px;
+  width: 1.75rem;
+  height: 1.75rem;
   align-items: center;
   justify-content: center;
 }
 .bench-row-remove-text {
   color: var(--mist);
-  font-size: 18px;
+  font-size: 1.125rem;
   font-weight: bold;
 }
 /* The `with-input` arm's one extra native view. WIDTH IS FIXED, and that is not styling: the row
    is height-locked at 44px so getItemLayout stays exact in virtualized mode, and an input that
    grows with its content would push the row past it. Height fixed for the same reason. */
 .bench-row-input {
-  width: 96px;
-  height: 28px;
-  padding-left: 6px;
-  padding-right: 6px;
+  width: 6rem;
+  height: 1.75rem;
+  padding-left: 0.375rem;
+  padding-right: 0.375rem;
   border-radius: 4px;
   background-color: #0f1621;
   color: #e8ecf1;
-  font-size: 12px;
+  font-size: 0.75rem;
 }

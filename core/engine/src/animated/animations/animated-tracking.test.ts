@@ -13,7 +13,7 @@ import {
   AnimatedTracking,
   timing,
 } from '@symbiote-native/engine';
-import type { IAnimation, IEndCallback } from '@symbiote-native/engine';
+import type { IAnimation } from '@symbiote-native/engine';
 
 // Part A starts a real TimingAnimation (to prove the public wiring), which needs a host rAF. We
 // never advance a frame, so a no-op rAF that never fires is enough.
@@ -28,11 +28,7 @@ beforeAll(() => {
 // without advancing real frames.
 function instantTo(target: number): IAnimation {
   return {
-    start(
-      _fromValue: number,
-      onUpdate: (value: number) => void,
-      onEnd: IEndCallback,
-    ): void {
+    start({ onUpdate, onEnd }): void {
       onUpdate(target);
       onEnd({ finished: true });
     },

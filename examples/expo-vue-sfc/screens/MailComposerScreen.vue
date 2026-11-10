@@ -6,6 +6,7 @@ import ActionButton from '../components/ActionButton.vue';
 import Card from '../components/Card.vue';
 import Explorer from '../components/Explorer.vue';
 import Field from '../components/Field.vue';
+import InfoNote from '../components/InfoNote.vue';
 import ResultRow from '../components/ResultRow.vue';
 import Scenario from '../components/Scenario.vue';
 import ScreenShell from '../components/ScreenShell.vue';
@@ -77,7 +78,7 @@ function handleCompose(): void {
   >
     <Card testID="mail-composer-capability-card" title="Capabilities">
       <ResultRow testID="mail-composer-available" label="Available" :value="availability" />
-      <text class="info-text">NO is expected on the iOS simulator (no Mail account configured).</text>
+      <InfoNote class="info-text">NO is expected on the iOS simulator (no Mail account configured).</InfoNote>
       <ActionButton
         testID="mail-composer-clients-button"
         title="List mail clients"

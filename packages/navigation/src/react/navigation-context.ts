@@ -1,26 +1,26 @@
-// The lifecycle half of the framework-agnostic emitter (../core/navigation-events): a plain
-// React Context so a screen's subtree can read its own route, navigator handle, and per-route
-// emitter without prop-drilling - the same role @react-navigation's NavigationContext /
-// NavigationRouteContext play, collapsed into one context since a symbiote screen only ever needs
-// its OWN route (no per-navigator param-list generics in v1 scope - see screen.ts). Provided
-// per-screen by each of stack.ts/tabs.ts/drawer.ts's render loop, consumed by the hooks in
-// ./hooks. `parent` threads the ambient context a navigator read on ITS OWN mount (undefined at
-// the root) into the value it provides to its own screens, forming a linked list - this is what
-// lets a screen nested inside e.g. a Stack-screen-renders-a-Tab composition reach the enclosing
-// Stack via useNavigation().getParent().
+// Context a navigator provides per screen: the screen's own route, navigator handle and emitter
+// `parent` links the enclosing screen's context, so `getParent()` reaches a navigator above
 
 import { createContext, useContext } from 'react';
-import type { INavigationEmitter, IRoute, IAnyNavigatorHandle } from '../core';
+import type {
+  IEdgeInsetState,
+  INavigationEmitter,
+  IRoute,
+  IAnyNavigatorHandle,
+  ITransitionProgress,
+} from '../core';
 export type { IAnyNavigatorHandle } from '../core';
 
-// A nested navigator (e.g. a Tab rendered as a Stack screen's content) means a screen's OWN
-// navigation prop and its PARENT's handle can be different navigator kinds, so the Context
-// value's `navigation` field must stay a union rather than Stack-specific. Consumers narrow it
-// themselves (e.g. `'push' in handle` picks out a Stack handle) - no `as` casts.
+// `navigation` stays a union, as a screen's own navigator and its parent's can differ in kind
+// Consumers narrow it themselves, for example `'push' in handle` picks out a Stack handle
 export type INavigationContextValue = {
   route: IRoute<unknown>;
   navigation: IAnyNavigatorHandle;
   emitter: INavigationEmitter;
+  // Only a Stack route has one, as native sends transition events for stack screens alone
+  transitionProgress?: ITransitionProgress;
+  // The insets this screen's header took, a nested header reads them up the `parent` chain
+  edgeInsets?: IEdgeInsetState;
   parent?: INavigationContextValue;
 };
 

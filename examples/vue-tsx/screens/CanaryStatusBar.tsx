@@ -1,6 +1,6 @@
 import { defineComponent, ref } from 'vue';
 import { Platform, StatusBar } from '@symbiote-native/vue';
-import { ACCENT } from './canary-shared';
+import { FlexButton } from './canary-parts';
 
 const BAR_RED = '#ff0000';
 const BAR_DEFAULT = '#22323f';
@@ -21,16 +21,8 @@ const AndroidWindowFlags = defineComponent({
     };
     return () => (
       <view class="row">
-        <view class="flex1">
-          <button title={isRed.value ? 'BG default' : 'BG red'} onPress={toggleRed} color={ACCENT} />
-        </view>
-        <view class="flex1">
-          <button
-            title={isTranslucent.value ? 'Opaque' : 'Translucent'}
-            onPress={toggleTranslucent}
-            color={ACCENT}
-          />
-        </view>
+        <FlexButton title={isRed.value ? 'BG default' : 'BG red'} onPress={toggleRed} />
+        <FlexButton title={isTranslucent.value ? 'Opaque' : 'Translucent'} onPress={toggleTranslucent} />
       </view>
     );
   },
@@ -46,20 +38,14 @@ export const CanaryStatusBar = defineComponent({
       <>
         <StatusBar barStyle={isDark.value ? 'dark-content' : 'light-content'} hidden={isHidden.value} animated={true} />
         <view class="row">
-          <view class="flex1">
-            <button
-              title={isHidden.value ? 'Show status bar' : 'Hide status bar'}
-              onPress={() => (isHidden.value = !isHidden.value)}
-              color={ACCENT}
-            />
-          </view>
-          <view class="flex1">
-            <button
-              title={isDark.value ? 'Light text' : 'Dark text'}
-              onPress={() => (isDark.value = !isDark.value)}
-              color={ACCENT}
-            />
-          </view>
+          <FlexButton
+            title={isHidden.value ? 'Show status bar' : 'Hide status bar'}
+            onPress={() => (isHidden.value = !isHidden.value)}
+          />
+          <FlexButton
+            title={isDark.value ? 'Light text' : 'Dark text'}
+            onPress={() => (isDark.value = !isDark.value)}
+          />
         </view>
         {Platform.OS === 'android' && <AndroidWindowFlags />}
       </>

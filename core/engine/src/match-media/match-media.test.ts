@@ -2,8 +2,8 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Dimensions } from '../dimensions';
 import { resetMediaEnvironment } from '../media-environment';
+import { Dimensions } from '../react-native-host';
 import { clearGlobalStyles } from '../style-registry';
 import { resetMediaSubscriptions } from '../style-registry/media-subscriptions';
 import { matchMedia, MediaQueryListEvent } from './index';

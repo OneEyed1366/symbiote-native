@@ -1,53 +1,16 @@
 <script lang="ts">
-  // Drawer demo · Home: this screen is mounted under a Drawer, so useDrawerNavigation() hands back
-  // the Drawer-specific handle (openDrawer/closeDrawer/toggleDrawer/jumpTo) directly — no
-  // narrowing. Svelte twin of examples/vue-sfc/screens/DrawerHomeScreen.vue.
-  import { useDrawerNavigation } from '@symbiote-native/navigation/svelte';
+  import ScreenHero from '../components/ScreenHero.svelte';
   import { ROUTE_NAME } from '../routes';
-  import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-  import ActionButton from '../components/ActionButton.svelte';
-
-  const navigation = useDrawerNavigation();
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DrawerDemo];
+  import DrawerRecipes from './drawer/DrawerRecipes.svelte';
 </script>
 
-<safe-area-view class="screen">
-  <view class="section">
-    <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
-    </view>
-    <view class="hero-card">
-      <view
-        class="hero-badge"
-        style={{ backgroundColor: LINE_COLOR.structure }}
-      >
-        <text class="hero-badge-text">DR</text>
-      </view>
-      <view class="hero-copy">
-        <text class="hero-title">Drawer</text>
-        <text class="hero-body">
-          A swipeable drawer sliding in from the right, driven by the
-          navigator's own gesture handler.
-        </text>
-      </view>
-    </view>
-    <text class="info-text">
-      drawerPosition: right · drawerType: slide — swipe from the RIGHT edge, or
-      use a button
-    </text>
-    <ActionButton
-      testID="drawer-open"
-      title="Open drawer"
-      onPress={() => navigation.current.openDrawer()}
-      color={LINE_COLOR.structure}
+<scroll-view class="screen" contentInsetAdjustmentBehavior="automatic">
+  <view class="scroll-content">
+    <ScreenHero
+      route={ROUTE_NAME.DrawerDemo}
+      title="Drawer"
+      body="A swipeable drawer driven by the navigator's own gesture handler. Change its props below and swipe from the chosen edge."
     />
-    <ActionButton
-      testID="drawer-toggle"
-      title="Toggle drawer"
-      onPress={() => navigation.current.toggleDrawer()}
-      color={LINE_COLOR.structure}
-    />
+    <DrawerRecipes />
   </view>
-</safe-area-view>
+</scroll-view>

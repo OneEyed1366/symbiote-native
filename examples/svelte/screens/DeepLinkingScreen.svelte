@@ -1,76 +1,31 @@
-<script lang="ts">
-  // Deep-linking demo: APP_LINKING_CONFIG (navigation-linking.ts) is the SAME config wired at the
-  // root via useLinkingIntegration (App.svelte) for real OS deep links — here resolveRouteFromUrl is
-  // called directly against a typed-in URL so the resolution itself is provable inside the running
-  // app without needing an actual OS-level deep link. Svelte twin of
-  // examples/vue-sfc/screens/DeepLinkingScreen.vue.
-  import { resolveRouteFromUrl } from '@symbiote-native/navigation';
-  import type { ITextInputChangeEvent } from '@symbiote-native/svelte';
-  import ActionButton from '../components/ActionButton.svelte';
-  import {
-    APP_LINKING_CONFIG,
-    SAMPLE_DEEP_LINK_URL,
-  } from '../navigation-linking';
-  import { ROUTE_NAME } from '../routes';
-  import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
+<script lang="ts" module>
+  import type { ISvelteScreenOptions } from '@symbiote-native/navigation/svelte';
+  import { LINE_COLOR } from '../navigation-lines';
 
-  const PLACEHOLDER_COLOR = '#8a8a8a';
-  const JSON_INDENT = 2;
-
-  let url = $state(SAMPLE_DEEP_LINK_URL);
-  let resolved = $state<string | undefined>(undefined);
-
-  function onResolve(): void {
-    const route = resolveRouteFromUrl(APP_LINKING_CONFIG, url);
-    resolved = JSON.stringify(route, null, JSON_INDENT);
-  }
-
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.DeepLinking];
+  export const deepLinkingScreenOptions: ISvelteScreenOptions = {
+    title: 'Deep Linking',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.routing,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: { backgroundColor: '#0b1622' },
+    headerUserInterfaceStyle: 'dark',
+  };
 </script>
 
-<safe-area-view class="screen">
-  <view class="section">
-    <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
-    </view>
-    <view class="hero-card">
-      <view class="hero-badge" style={{ backgroundColor: LINE_COLOR.routing }}>
-        <text class="hero-badge-text">DL</text>
-      </view>
-      <view class="hero-copy">
-        <text class="hero-title">Deep linking</text>
-        <text class="hero-body">
-          A typed URL resolved to a route through resolveRouteFromUrl, the same
-          path a real deep link or push notification would take.
-        </text>
-      </view>
-    </view>
-    <text class="info-text">
-      prefixes: symbiotecanarysvelte:// · https://canary.symbiote-native.dev
-    </text>
-    <text class="note-text">
-      Details → details/:id · HeaderOptions → header-options · TabsDemo → tabs
-    </text>
-    <text-input
-      testID="deep-link-input"
-      value={url}
-      onValueChange={(event: ITextInputChangeEvent) => (url = event.text)}
-      placeholder="symbiotecanarysvelte://details/42"
-      placeholderTextColor={PLACEHOLDER_COLOR}
-      class="text-input"
-    ></text-input>
-    <ActionButton
-      testID="deep-link-resolve"
-      title="Resolve"
-      onPress={onResolve}
-      color={LINE_COLOR.routing}
+<script lang="ts">
+  import ScreenHero from '../components/ScreenHero.svelte';
+  import { ROUTE_NAME } from '../routes';
+  import LinkingRecipes from './linking/LinkingRecipes.svelte';
+</script>
+
+<scroll-view class="screen" contentInsetAdjustmentBehavior="automatic">
+  <view class="scroll-content">
+    <ScreenHero
+      route={ROUTE_NAME.DeepLinking}
+      title="Deep linking"
+      body="A link typed here goes through the same matching a real deep link or a push notification takes."
     />
-    <view class="parity-list">
-      <text testID="deep-link-result" class="list-row-text">
-        {resolved ?? 'tap Resolve to see the parsed route'}
-      </text>
-    </view>
+    <LinkingRecipes />
   </view>
-</safe-area-view>
+</scroll-view>

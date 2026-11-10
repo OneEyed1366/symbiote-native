@@ -1,128 +1,125 @@
-import type { Combinator, SelectorComponent } from 'lightningcss';
+// One lightningcss selector component at a time, folded into the builder
+
+import type { SelectorComponent } from 'lightningcss';
 import {
   drop,
   pushToken,
   setCombinator,
+  takeState,
   type IBuilder,
 } from './selector-builder.ts';
-import { isSelectorComponent } from './selector-guards.ts';
 import { consumePayload } from './selector-payload.ts';
+import { stateKeyOf } from './selector-states.ts';
 import { COMBINATOR, type ISelectorCombinator } from './selector-types.ts';
-import { applyStateToken, STATE_PSEUDO_CLASS } from './state-token.ts';
 
 type IPseudoClass = Extract<SelectorComponent, { type: 'pseudo-class' }>;
 type IPseudoElement = Extract<SelectorComponent, { type: 'pseudo-element' }>;
+type IDeepPseudoElement = 'v-deep' | 'ng-deep';
 
-const COMPONENT = {
-  class: 'class',
-  combinator: 'combinator',
-  id: 'id',
-  type: 'type',
-  universal: 'universal',
-  attribute: 'attribute',
-  pseudoClass: 'pseudo-class',
-  pseudoElement: 'pseudo-element',
-} as const;
+// The two wrappers, spelled the way lightningcss reports their name
+const WRAPPER = { global: 'global', deep: 'deep' } as const;
 
-const KIND = {
-  custom: 'custom',
-  customFunction: 'custom-function',
-  global: 'global',
-  root: 'root',
-} as const;
+const CLASS_COMPONENT = 'class';
 
-// Vue and Angular spell the deep combinator as a pseudo-element
-const DEEP_PSEUDO_ELEMENT_NAMES = ['v-deep', 'ng-deep'] as const;
-type IDeepPseudoElementName = (typeof DEEP_PSEUDO_ELEMENT_NAMES)[number];
-const DEEP_PSEUDO_ELEMENTS: ReadonlySet<string> =
-  new Set<IDeepPseudoElementName>(DEEP_PSEUDO_ELEMENT_NAMES);
+// Every component type, so a shape lightningcss does not produce is told apart from one it does
+const SELECTOR_COMPONENT_TYPES = [
+  'combinator',
+  'universal',
+  'namespace',
+  'type',
+  'id',
+  CLASS_COMPONENT,
+  'attribute',
+  'pseudo-class',
+  'pseudo-element',
+  'nesting',
+] as const satisfies readonly SelectorComponent['type'][];
 
-// Both wrappers are read by hand, since lightningcss implements neither
-const WRAPPER_NAME = { global: 'global', deep: 'deep' } as const;
+// `>>>` and `/deep/` differ only in spelling, the rest of the combinators drop the rule
+const COMBINATORS = new Map<string, ISelectorCombinator>([
+  ['descendant', COMBINATOR.descendant],
+  ['child', COMBINATOR.child],
+  ['next-sibling', COMBINATOR.nextSibling],
+  ['later-sibling', COMBINATOR.laterSibling],
+  ['deep-descendant', COMBINATOR.deep],
+  [WRAPPER.deep, COMBINATOR.deep],
+]);
 
-// The combinators this pipeline can act on, the rest drop the rule
-function combinatorFor(value: Combinator): ISelectorCombinator | null {
-  switch (value) {
-    case 'descendant':
-    case 'child':
-    case 'next-sibling':
-    case 'later-sibling':
-      return value;
-    // `>>>` and `/deep/` differ only in spelling
-    case 'deep-descendant':
-    case 'deep':
-      return COMBINATOR.deep;
-    default:
-      return null;
-  }
+// They arrive as a custom pseudo-element between two descendant combinators
+const DEEP_PSEUDO_ELEMENTS = [
+  'v-deep',
+  'ng-deep',
+] as const satisfies readonly IDeepPseudoElement[];
+
+function isSelectorComponent(value: unknown): value is SelectorComponent {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    SELECTOR_COMPONENT_TYPES.some(type => type === value.type)
+  );
 }
 
 function pseudoName(component: IPseudoClass | IPseudoElement): string {
-  return component.kind === KIND.custom ||
-    component.kind === KIND.customFunction
+  return component.kind === 'custom' || component.kind === 'custom-function'
     ? component.name
     : component.kind;
 }
 
-// Neither wrapper adds specificity, the payload's classes carry it
-// `:deep(X)` reaches through a scope boundary, so the gap into X is `deep`
+// `:global(X)` says only that the name lives outside the scope, `:deep(X)` that the match may
+// cross a scope boundary, so the gap into X is `deep`
 function consumeWrapper(
   builder: IBuilder,
   name: string,
   args: readonly unknown[],
 ): boolean {
-  if (name === WRAPPER_NAME.global) {
-    consumePayload(builder, args, `:${name}()`);
+  if (name === WRAPPER.global) {
+    consumePayload(builder, args, ':global()');
     return true;
   }
-  if (name === WRAPPER_NAME.deep) {
+  if (name === WRAPPER.deep) {
     setCombinator(builder, COMBINATOR.deep);
-    consumePayload(builder, args, `:${name}()`);
+    consumePayload(builder, args, ':deep()');
     return true;
   }
   return false;
 }
 
-function consumeCombinator(builder: IBuilder, value: Combinator): void {
-  const combinator = combinatorFor(value);
-  if (combinator === null) drop(builder, 'unsupported', value);
-  else setCombinator(builder, combinator);
-}
-
-// `:root` declares custom properties, which `collectRootVariables` already read
-// It gets its own reason so the caller stays silent unless the rule also paints
 function consumePseudoClass(builder: IBuilder, component: IPseudoClass): void {
-  // With `cssModules` on, `:global(X)` arrives parsed as an ordinary component array
-  if (component.kind === KIND.global) {
+  // The parsed `:global(X)` of `cssModules` mode: its payload is an ordinary component array
+  if (component.kind === WRAPPER.global) {
     consumeSelector(builder, component.selector);
     return;
   }
-  if (component.kind === KIND.root) {
-    drop(builder, 'root', KIND.root);
+  // `:root` is where custom properties are declared, so it is reported apart from a real drop
+  if (component.kind === 'root') {
+    drop(builder, 'root', 'root');
     return;
   }
-  const isWrapper =
-    component.kind === KIND.customFunction &&
-    consumeWrapper(builder, component.name, component.arguments);
-  if (isWrapper) return;
-
-  // `:not()` and `:is()` take their argument's specificity, but they drop here regardless
+  if (
+    component.kind === 'custom-function' &&
+    consumeWrapper(builder, component.name, component.arguments)
+  ) {
+    return;
+  }
+  const name = pseudoName(component);
+  const stateKey = stateKeyOf(name);
+  if (stateKey !== null) {
+    takeState(builder, name, stateKey);
+    return;
+  }
   builder.specificity[1]++;
-  if (component.kind === STATE_PSEUDO_CLASS) {
-    applyStateToken(builder);
-    return;
-  }
-  drop(builder, 'pseudo-class', pseudoName(component));
+  drop(builder, 'pseudo-class', name);
 }
 
 function consumePseudoElement(
   builder: IBuilder,
   component: IPseudoElement,
 ): void {
-  if (
-    component.kind === KIND.custom &&
-    DEEP_PSEUDO_ELEMENTS.has(component.name)
-  ) {
+  const isDeep =
+    component.kind === 'custom' &&
+    DEEP_PSEUDO_ELEMENTS.some(name => name === component.name);
+  if (isDeep) {
     setCombinator(builder, COMBINATOR.deep);
     return;
   }
@@ -130,42 +127,52 @@ function consumePseudoElement(
   drop(builder, 'pseudo-element', pseudoName(component));
 }
 
+function consumeCombinator(builder: IBuilder, value: string): void {
+  const combinator = COMBINATORS.get(value);
+  if (combinator === undefined) {
+    drop(builder, 'unsupported', value);
+    return;
+  }
+  setCombinator(builder, combinator);
+}
+
 function consumeComponent(
   builder: IBuilder,
   component: SelectorComponent,
 ): void {
   switch (component.type) {
-    case COMPONENT.class:
+    case CLASS_COMPONENT:
       builder.specificity[1]++;
       pushToken(builder, component.name);
-      return;
-    case COMPONENT.combinator:
+      break;
+    case 'combinator':
       consumeCombinator(builder, component.value);
-      return;
-    case COMPONENT.id:
+      break;
+    case 'id':
       builder.specificity[0]++;
       drop(builder, 'id', `#${component.name}`);
-      return;
-    case COMPONENT.type:
+      break;
+    case 'type':
       builder.specificity[2]++;
       drop(builder, 'element', component.name);
-      return;
-    case COMPONENT.universal:
+      break;
+    case 'universal':
       drop(builder, 'universal', '*');
-      return;
-    case COMPONENT.attribute:
+      break;
+    case 'attribute':
       builder.specificity[1]++;
       drop(builder, 'attribute', `[${component.name}]`);
-      return;
-    case COMPONENT.pseudoClass:
+      break;
+    case 'pseudo-class':
       consumePseudoClass(builder, component);
-      return;
-    case COMPONENT.pseudoElement:
+      break;
+    case 'pseudo-element':
       consumePseudoElement(builder, component);
-      return;
-    // `namespace` (`ns|div`) and `nesting` (`&`) need context this compiler lacks
+      break;
+    // `namespace` (`ns|div`) and `nesting` (`&`) need context this compiler does not have
     default:
       drop(builder, 'unsupported', component.type);
+      break;
   }
 }
 
@@ -174,10 +181,10 @@ export function consumeSelector(
   selector: readonly unknown[],
 ): void {
   for (const component of selector) {
-    if (!isSelectorComponent(component)) {
+    if (isSelectorComponent(component)) {
+      consumeComponent(builder, component);
+    } else {
       drop(builder, 'unsupported', String(component));
-      continue;
     }
-    consumeComponent(builder, component);
   }
 }

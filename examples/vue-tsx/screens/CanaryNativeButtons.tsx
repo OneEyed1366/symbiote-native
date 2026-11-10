@@ -1,5 +1,7 @@
 import { defineComponent } from 'vue';
 import { ActionSheetIOS, Alert, Linking, Platform, Share, Vibration } from '@symbiote-native/vue';
+import { ActionButton } from '../components/ActionButton';
+import { FlexButton } from './canary-parts';
 import { ACCENT, SHEET_CANCEL_INDEX, SHEET_OPTIONS, SITE } from './canary-shared';
 
 // A rejected promise (no native module, user cancel) is expected here, so it is dropped
@@ -35,25 +37,15 @@ export const CanaryNativeButtons = defineComponent({
     return () => (
       <>
         <view class="row">
-          <view class="flex1">
-            <button title="Alert" onPress={showAlert} color={ACCENT} />
-          </view>
+          <FlexButton title="Alert" onPress={showAlert} />
           {/* ActionSheetIOS has no Android native module, so it is iOS-only by design */}
-          {Platform.OS !== 'android' && (
-            <view class="flex1">
-              <button title="Action sheet" onPress={showActionSheet} color={ACCENT} />
-            </view>
-          )}
+          {Platform.OS !== 'android' && <FlexButton title="Action sheet" onPress={showActionSheet} />}
         </view>
         <view class="row">
-          <view class="flex1">
-            <button title="Share" onPress={share} color={ACCENT} />
-          </view>
-          <view class="flex1">
-            <button title="Vibrate" onPress={() => Vibration.vibrate()} color={ACCENT} />
-          </view>
+          <FlexButton title="Share" onPress={share} />
+          <FlexButton title="Vibrate" onPress={() => Vibration.vibrate()} />
         </view>
-        <button title="Open vuejs.org" onPress={openSite} color={ACCENT} />
+        <ActionButton title="Open vuejs.org" onPress={openSite} color={ACCENT} />
       </>
     );
   },

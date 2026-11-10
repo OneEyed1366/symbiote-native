@@ -5,8 +5,8 @@ A wrapper package for [SymbioteNative](../../README.md) that makes
 prompting the platform's native in-app review flow - usable from **every** adapter, React,
 Vue, Svelte, Solid, and Angular, not just React. Like [`@symbiote-native/device`](../device) and
 [`@symbiote-native/local-auth`](../local-auth), every export here is a one-shot async call with
-no per-instance state, so there is no hook/composable/service to wrap - the React, Vue, Svelte,
-and Solid entry points are plain re-exports of the same `core`.
+no per-instance state. So there is no hook/composable/service to wrap.
+The React, Vue, Svelte, and Solid entry points are plain re-exports of the same `core`.
 
 ## Install
 
@@ -33,15 +33,15 @@ npm install @symbiote-native/store-review
 ```
 
 `expo-store-review` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions - never install either yourself, and never add the `expo` meta-package to your project
+versions. Never install either yourself, and never add the `expo` meta-package to your project
 (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
 
 ### Required one-time step: native autolinking wiring
 
 Unlike a plain RN native module, `expo-store-review`'s native code is discovered by
-`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism - this needs wiring
-into the native host app **once**, covering this package and every other `expo-modules-core`
-package with zero further changes:
+`expo-modules-autolinking`, not RN's own `react-native.config.cjs` mechanism.
+This needs wiring into the native host app **once**, covering this package and every other
+`expo-modules-core` package with zero further changes:
 
 | Platform | Touches                                                                                                                                             |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -204,17 +204,18 @@ import { requestReview } from '@symbiote-native/store-review/angular';
 
 - **Deliberate deviation from upstream - no `expo-constants` dependency.** Upstream's
   `storeUrl()` reads `Constants.expoConfig.ios.appStoreUrl`/`.android.playStoreUrl` off
-  `expo-constants`, which requires an Expo-CLI-generated manifest (`app.config`/EAS/updates)
-  this bare, Metro-only project never produces (see the `symbiote-expo-package-catalog` skill,
-  row 9 - `expo-constants` was skipped for exactly this reason). So this port trims that surface:
-  every function that would have read the manifest instead takes an optional
-  `IStoreReviewUrlOptions` argument (`iosAppStoreUrl` / `androidPlayStoreUrl`), and the caller
-  supplies the store URL explicitly instead of it being resolved from `app.json`/`app.config.js`.
+  `expo-constants`.
+  That needs an Expo-CLI-generated manifest (`app.config`/EAS/updates), which this bare,
+  Metro-only project never produces. So `expo-constants` was skipped.
+  Every function that would have read the manifest instead takes an optional
+  `IStoreReviewUrlOptions` argument (`iosAppStoreUrl` / `androidPlayStoreUrl`).
+  The caller supplies the store URL explicitly, not from `app.json`/`app.config.js`.
   There is no standalone `storeUrl()` export - its logic lives inline as a private helper,
   since it now takes the same options argument every public function does.
 - **`requestReview()` prefers the native in-app review flow** (iOS `SKStoreReviewController`,
-  Android's Play Core in-app review API) and only falls back to opening the supplied store URL
-  via `Linking` when the native flow is unavailable - matching upstream's own fallback order.
+  Android's Play Core in-app review API).
+  It falls back to opening the supplied store URL via `Linking` only when the native flow is
+  unavailable, matching upstream's own fallback order.
 - **A missing URL on the fallback path logs a warning, never throws** - matching upstream's own
   `console.warn`-and-continue behavior, just with different wording (pointing at the
   `IStoreReviewUrlOptions` argument instead of `app.json`).
@@ -243,7 +244,8 @@ ViewConfig. Native rendering itself is verified on-device (see the parent
 Native autolinking wiring for `expo-modules-core` packages is already done in all six Expo
 canary apps (`examples/expo-react`, `examples/expo-vue-sfc`, `examples/expo-vue-tsx`,
 `examples/expo-svelte`, `examples/expo-solid`, `examples/expo-angular`) via
-`@symbiote-native/local-auth`/`@symbiote-native/sensors` - this package reuses that same wiring
-with zero further app-side changes, since `expo-modules-autolinking` discovers any
+`@symbiote-native/local-auth`/`@symbiote-native/sensors`.
+This package reuses that same wiring with zero further app-side changes, since
+`expo-modules-autolinking` discovers any
 `expo-modules-core` package already present in `node_modules`. Each canary carries its own
 `StoreReviewScreen` demo.

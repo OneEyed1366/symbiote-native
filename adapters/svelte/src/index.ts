@@ -4,8 +4,8 @@
 // All Fabric clone-on-write lives in the engine, shared cross-adapter. App code names only
 // @symbiote-native/svelte.
 //
-// Full component parity with React/Vue/Angular (svelte-adapter-dom-shim skill §15)
-// Each component is hand-written markup mirroring its `render-*.ts`, so no bridge is needed
+// Full component parity with React/Vue/Angular, see the `svelte-adapter-dom-shim` skill
+// Components are hand-authored markup mirroring `render-*.ts`, so there is no `descriptorToSvelte`
 
 // Bare side-effect import, deliberately NOT a re-export and deliberately not beside one of the
 // same specifier: it registers the press behavior with the engine's host-behavior registry. Any
@@ -13,10 +13,15 @@
 import './register';
 
 export { mount, unmount } from './render';
-export { AppRegistry, setHostRegistrar } from './modules/app-registry';
+export {
+  AppRegistry,
+  HeadlessJsTaskError,
+  setHostRegistrar,
+} from './modules/app-registry';
 export type {
   IComponentProvider,
   IWrapperComponentProvider,
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,
@@ -40,6 +45,8 @@ export {
   VirtualizedSectionList,
   SectionList,
 } from './components';
+export { getVirtualizedListScope } from './components/virtualized-list/nested-scope';
+export type { IListScope } from '@symbiote-native/components';
 export type {
   IViewProps,
   ITextProps,
@@ -56,6 +63,8 @@ export type {
   ITextInputChangeEvent,
   IModalProps,
   ISafeAreaViewProps,
+  ILayoutConformanceProps,
+  ILayoutConformanceMode,
   IRefreshControlProps,
   IPressableProps,
   ITouchableOpacityProps,
@@ -66,6 +75,7 @@ export type {
   ICheckboxProps,
   IScrollViewProps,
   IScrollViewHandle,
+  ICellRendererProps,
   IVirtualizedListProps,
   IVirtualizedListHandle,
   IFlatListProps,
@@ -131,7 +141,6 @@ export {
   processColor,
   setNativeViewConfigSource,
   setColorProcessor,
-  setDeviceEventSource,
   PixelRatio,
   PanResponder,
   dlog,
@@ -194,6 +203,7 @@ export {
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
+  TextInputState,
   BackHandler,
   PermissionsAndroid,
   PERMISSIONS,
@@ -266,8 +276,8 @@ export type {
 // a ShimElement wrapper, so it needs its own typed unwrap).
 export { findNodeHandle, hostInstance } from './host-instance';
 export type { IHostInstance } from './host-instance';
-// `ShimElement` is the `bind:this` value type of a raw `symbiote-*` host tag, see host-instance.ts
-// Public so app code can type its own `$state.raw<ShimElement | null>` ref
+// `ShimElement` is the `bind:this` type of a raw `symbiote-*` tag, so an app can type its own ref
+// `$state.raw<ShimElement | null>`, see host-instance.ts
 export type { ShimElement } from './dom-shim';
 
 // Type-only, and the re-export is the POINT rather than the `ISymbioteIntrinsicTag` name: it is
@@ -278,11 +288,12 @@ export type {
   ISymbioteHostAttributes,
 } from './intrinsic-elements';
 
-// The Descriptor to shim-tree bridge is deliberately absent from this barrel (skill §19)
-// Import `@symbiote-native/svelte/native-view-bridge`, as this barrel loads every `.svelte` file
+// The Descriptor -> shim-tree bridge is NOT re-exported here, this barrel loads `.svelte` sources
+// and one unrelated import would load the whole graph, fatal under the plain vitest transform
+// Use `@symbiote-native/svelte/native-view-bridge`, see its header
 
-// `createTunnel` passes the tunnel as a prop of `TunnelIn` and `TunnelOut`, unlike React and Vue
-// See create-tunnel/tunnel.ts for the reason
+// Svelte twin of Vue's tunnel, taking an explicit `tunnel` prop rather than `tunnel.In`/`.Out`
+// See create-tunnel/tunnel.ts for why the shape differs
 export {
   createTunnel,
   TunnelIn,
@@ -305,6 +316,11 @@ export { Portal, type IPortalProps, type IPortalTarget } from './create-portal';
 // bucket is named `runes/`, not `hooks/`/`composables/`.
 export { useWindowDimensions } from './runes/use-window-dimensions.svelte';
 export { useColorScheme } from './runes/use-color-scheme.svelte';
+export {
+  useAnimatedColor,
+  useAnimatedValue,
+  useAnimatedValueXY,
+} from './runes/use-animated-value';
 
 // The React Native twins of `svelte/reactivity/window`, which is browser-only and would read
 // `undefined` forever here. Same names, same `.current` shape, engine Dimensions/PixelRatio
@@ -340,3 +356,44 @@ export {
 // `createAnimatedComponent` — the engine resolves an AnimatedNode in any prop of any host node, so
 // nothing needs wrapping (modules/animated/index.ts).
 export { Animated } from './modules/animated';
+
+// The device event bus and the easing curves, shared verbatim from the engine
+export {
+  DeviceEventEmitter,
+  Easing,
+  EventEmitter,
+  NativeAppEventEmitter,
+  NativeEventEmitter,
+} from '@symbiote-native/engine';
+export type {
+  IEasing,
+  IEasingFunction,
+  IEmitterSubscription,
+  IEventEmitter,
+  IEventEmitterModule,
+  IEventSubscription,
+  INativeEventListener,
+} from '@symbiote-native/engine';
+
+// RN's dev and native-module utilities, shared verbatim from the engine. The ones RN owns forward
+// to its own module, which `registerApp` hands over
+export {
+  codegenNativeCommands,
+  codegenNativeComponent,
+  DevMenu,
+  DevSettings,
+  LogBox,
+  NativeComponentRegistry,
+  NativeModules,
+  Networking,
+  PushNotificationIOS,
+  ReactNativeVersion,
+  registerCallableModule,
+  requireNativeComponent,
+  Systrace,
+  Touchable,
+  TurboModuleRegistry,
+  UIManager,
+  UTFSequence,
+} from '@symbiote-native/engine';
+export type { IDevSettings } from '@symbiote-native/engine';

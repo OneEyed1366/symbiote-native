@@ -1,3 +1,5 @@
+// TODO(rn-port): RN's `Modal.js` is a React component, only its native host view is shared
+
 // Modal: the render half (framework-agnostic). RCTModalHostView is an ordinary Fabric host
 // node: it lives in the SAME childSet and commits through the SAME completeRoot as the rest of
 // the tree. The native iOS/Android view presents its own window internally; there is no second
@@ -9,6 +11,7 @@
 import {
   dlog,
   I18nManager,
+  type IColorValue,
   type IStyleProp,
   type IViewStyle,
 } from '@symbiote-native/engine';
@@ -26,14 +29,11 @@ export type IModalOrientation =
   | 'landscape-left'
   | 'landscape-right';
 
-// What Fabric puts on `nativeEvent` for topOrientationChange — NOT what an onOrientationChange
-// handler receives. The engine registers every `onX` prop as `(event: ISymbioteEvent) => handler(event)`
-// (core/engine/src/node.ts setEventListener), so a handler always gets the wrapper and reads the
-// orientation at `event.nativeEvent.orientation`, narrowed at runtime like every other nativeEvent
-// field (readLayoutField, valueFromChange).
-export interface IModalOrientationChangeEvent {
+// What Fabric puts on `nativeEvent` for `topOrientationChange`, not what a handler receives.
+// The engine wraps every `onX` handler, so it reads `nativeEvent.orientation` narrowed at runtime
+export type IModalOrientationChangeEvent = {
   orientation: 'portrait' | 'landscape';
-}
+};
 
 // The full-screen box RN anchors the modal content in (Modal.js styles.container: [side]:0,
 // top:0, flex:1, backgroundColor:'white'). It is NOT position:absolute, it is a flex child that
@@ -56,6 +56,9 @@ const MODAL_HOST_STYLE: Readonly<IViewStyle> = {
   position: 'absolute',
 };
 
+// Modal.js `_shouldSetResponder`: no responder event bubbles out of the modal to a view above it
+const claimResponder = (): boolean => true;
+
 const TRANSPARENT_BACKDROP = 'transparent';
 const OPAQUE_BACKDROP = 'white';
 const DEFAULT_ANIMATION_TYPE: IModalAnimationType = 'none';
@@ -65,15 +68,12 @@ const DEFAULT_ANIMATION_TYPE: IModalAnimationType = 'none';
 const PRESENTATION_FULL_SCREEN: IModalPresentationStyle = 'fullScreen';
 const PRESENTATION_OVER_FULL_SCREEN: IModalPresentationStyle = 'overFullScreen';
 
-// The pre-resolved inputs renderModal paints from. The adapter narrows the typed fields (the
-// visible gate / backdrop / platform props) and folds everything else: the events
-// (onShow/onDismiss/onRequestClose/onOrientationChange, all real ViewConfig DirectEvents), the
-// already-folded accessibility* props, and testID into `passthrough`, which lands on the
-// modal host node untouched.
+// The pre-resolved inputs `renderModal` paints from, the adapter narrows the typed fields
+// Events, folded accessibility props and `testID` go into `passthrough`, untouched on the host node
 export type IModalViewProps = {
   visible?: boolean;
   transparent?: boolean;
-  backdropColor?: string;
+  backdropColor?: IColorValue;
   animationType?: IModalAnimationType;
   presentationStyle?: IModalPresentationStyle;
   supportedOrientations?: ReadonlyArray<IModalOrientation>;
@@ -85,23 +85,16 @@ export type IModalViewProps = {
   passthrough: Record<string, unknown>;
 };
 
-// `isRTL` is injectable purely for testability, the same shape `computeInset`'s `os` option
-// takes: `I18nManager`'s constants are resolved once at module load with no setter, so a test
-// exercising the RTL branch cannot toggle the real module and must pass the value in.
-export function renderModal(
-  view: IModalViewProps,
-  isRTL: boolean = I18nManager.isRTL,
-): IDescriptor {
-  // Only override backgroundColor when transparent or backdropColor are explicitly set, so these
-  // Modal-specific props take precedence over the generic style prop (Modal.js: containerStyles
-  // composed LAST in [styles.container, props.style, containerStyles]).
-  const backdropOverride: IViewStyle =
-    view.transparent === true
-      ? { backgroundColor: TRANSPARENT_BACKDROP }
-      : view.backdropColor !== undefined
-        ? { backgroundColor: view.backdropColor }
-        : {};
+function backdropOverrideOf(view: IModalViewProps): IViewStyle {
+  if (view.transparent === true) {
+    return { backgroundColor: TRANSPARENT_BACKDROP };
+  }
+  if (view.backdropColor === undefined) return {};
+  return { backgroundColor: view.backdropColor };
+}
 
+// The backdrop override goes last, so `transparent` and `backdropColor` win over `style`
+function containerOf(view: IModalViewProps, isRTL: boolean): IDescriptor {
   const containerStyle: IStyleProp<IViewStyle> = [
     {
       ...CONTAINER_STYLE_BASE,
@@ -109,8 +102,21 @@ export function renderModal(
       backgroundColor: OPAQUE_BACKDROP,
     },
     view.style,
-    backdropOverride,
+    backdropOverrideOf(view),
   ];
+  return el('view', { style: containerStyle, collapsable: false }, []);
+}
+
+// `isRTL` is injectable for tests, like the `os` option of `computeInset`
+// `I18nManager` resolves its constants once at load with no setter, so a test must pass it in
+export function renderModal(
+  view: IModalViewProps,
+  isRTL: boolean = I18nManager.isRTL,
+): IDescriptor {
+  dlog('Modal visible -> committing ModalHostView(container View)');
+
+  // RN ignores the deprecated `animated`, `animationType` replaces it
+  const { animated: _deprecated, ...passthrough } = view.passthrough;
 
   const resolvedPresentationStyle =
     view.presentationStyle ??
@@ -118,21 +124,10 @@ export function renderModal(
       ? PRESENTATION_OVER_FULL_SCREEN
       : PRESENTATION_FULL_SCREEN);
 
-  dlog('Modal visible -> committing ModalHostView(container View)');
-
-  // collapsable:false keeps the container as a real shadow node (RN sets this so the wrapper is
-  // never flattened away under the host). Empty structural children: the adapter injects the
-  // user children UNDER this container, never as a direct sibling of the host.
-  const container = el(
-    'view',
-    { style: containerStyle, collapsable: false },
-    [],
-  );
-
   return el(
     'modal',
     {
-      ...view.passthrough,
+      ...passthrough,
       style: MODAL_HOST_STYLE,
       transparent: view.transparent,
       animationType: view.animationType ?? DEFAULT_ANIMATION_TYPE,
@@ -147,7 +142,10 @@ export function renderModal(
       navigationBarTranslucent: view.navigationBarTranslucent,
       allowSwipeDismissal: view.allowSwipeDismissal,
       visible: view.visible ?? true,
+      onStartShouldSetResponder: claimResponder,
     },
-    [container],
+    // `collapsable: false` keeps the container a real shadow node, the adapter injects the user
+    // children under it, never as a direct sibling of the host
+    [containerOf(view, isRTL)],
   );
 }

@@ -1,26 +1,6 @@
-// Co-located Vue-driven pipeline test for the KeyboardAvoidingView lifecycle half
-// (adapters/vue/src/components/keyboard-avoiding-view.ts): which keyboard notifications it
-// subscribes to, what it feeds computeInset on each of them, and that it tears the
-// subscriptions down.
-//
-// The inset math itself (computeInset / resolveKeyboardAvoidingLayout / the cross-fade early
-// return) is unit-tested in core/components/src/view/render-keyboard-avoiding-view.test.ts, and
-// the Keyboard module's own subscribe/cache/unsubscribe contract in
-// core/engine/src/keyboard/keyboard.test.ts — neither is re-derived here. What IS Vue's own is
-// the wiring: the event pair comes from the host, the previous inset is read live off the
-// reactive cell at event time, and the cross-fade flag is a plain non-reactive variable resolved
-// once in onMounted.
-//
-// Platform.OS resolves to 'ios' headless (core/engine/src/platform/index.ts re-exports index.ios),
-// so the expected pair is the will* one; the android did* branch is covered at the core level.
-//
-// The fake __turboModuleProxy answers with a KeyboardObserver (whose observe-counters record the
-// subscribed event NAMES) and an AccessibilityManager whose cross-fade getter is switchable per
-// test; the fake RN$registerCallableModule captures the device hub so the test can play "native".
-//
-// A RECORDING host, read through the LIVE tree — every question here is "what does the wrapper
-// currently hold" (paddingBottom / height / flex, folded off style), so it reads the payload off
-// the CURRENT committed child, not the creation log.
+// Vue lifecycle of `KeyboardAvoidingView`: the keyboard events it subscribes to, what it feeds
+// `computeInset` on each, the live previous inset read off the reactive cell and teardown
+// Headless `Platform` is iOS so the will* pair is expected; the inset math is tested in core
 
 import { defineComponent, h, ref, type VNode } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -28,6 +8,7 @@ import { KeyboardAvoidingView, mount, unmount } from '@symbiote-native/vue';
 import { Keyboard, KEYBOARD_EVENT } from '@symbiote-native/engine';
 import {
   createLiveTree,
+  emitRnDeviceEvent,
   installRecordingFabric,
   type ILiveNode,
 } from '@symbiote-native/test-utils';
@@ -65,12 +46,6 @@ const registeredModules: Record<string, unknown> = {
   AccessibilityManager: fakeAccessibilityManager,
 };
 
-interface IDeviceHub {
-  emit: (eventType: string, ...args: unknown[]) => void;
-}
-
-let deviceHub: IDeviceHub | undefined;
-
 function isType<T>(value: unknown): value is T {
   return value !== null && value !== undefined;
 }
@@ -82,24 +57,12 @@ Object.assign(globalThis, {
     if (!isType<T>(module)) return null;
     return module;
   },
-  RN$registerCallableModule: (
-    name: string,
-    factory: () => IDeviceHub,
-  ): void => {
-    if (name === 'RCTDeviceEventEmitter') deviceHub = factory();
-  },
 });
 
 // The Keyboard module self-subscribes to didShow/didHide ONCE, when its emitter is first created,
 // to feed the isVisible()/metrics() cache. Force that here so those two never land inside a test's
 // own recording (beforeEach clears it).
 Keyboard.addListener(KEYBOARD_EVENT.didShow, () => {}).remove();
-
-function hub(): IDeviceHub {
-  if (deviceHub === undefined)
-    throw new Error('the device hub was never registered');
-  return deviceHub;
-}
 
 // ---- inset geometry -----------------------------------------------------
 
@@ -156,21 +119,20 @@ function showKeyboard(
   screenY = KEYBOARD_SCREEN_Y,
   height = KEYBOARD_HEIGHT,
 ): void {
-  hub().emit(KEYBOARD_EVENT.willShow, { endCoordinates: { height, screenY } });
+  emitRnDeviceEvent(KEYBOARD_EVENT.willShow, {
+    endCoordinates: { height, screenY },
+  });
 }
 function hideKeyboard(): void {
-  hub().emit(KEYBOARD_EVENT.willHide, {
+  emitRnDeviceEvent(KEYBOARD_EVENT.willHide, {
     endCoordinates: { height: 0, screenY: SCREEN_HEIGHT },
   });
 }
 
 describe('Vue KeyboardAvoidingView on the engine', () => {
   describe('Positive — the subscription is the host pair, and only the pair', () => {
-    // why: RN subscribes to exactly TWO notifications, chosen per host, and its own comment says
-    // changeFrame must not be one of them — with an undocked/split/floating iOS keyboard it is
-    // emitted BEFORE the hide notification, so a change-frame listener applies a frame captured
-    // mid-dismissal. iOS additionally takes the will* pair so the view rides up WITH the keyboard
-    // animation instead of snapping into place after it.
+    // RN subscribes to two notifications per host and never to change-frame, which an undocked
+    // iOS keyboard emits BEFORE the hide; iOS takes the will* pair to ride up WITH the keyboard
     it('subscribes to this host two keyboard events and never to changeFrame', async () => {
       mountKav({ behavior: 'padding' });
       await tick();
@@ -212,10 +174,8 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
       expect(currentWrapper().payload.paddingBottom).toBe(0);
     });
 
-    // why: Vue does NOT camelCase $attrs, so a template's `:keyboard-vertical-offset` arrives
-    // kebab-keyed. The render path already normalized; the keyboard handler read rawAttrs
-    // directly, silently dropping the offset for every SFC that writes the prop idiomatically —
-    // the offset is what keeps a view under a header clear of the keyboard.
+    // Vue does not `camelCase` `$attrs`, so `:keyboard-vertical-offset` arrives kebab-keyed
+    // The handler must normalize it too, or the offset that clears a header is silently dropped
     it('resolves a kebab-case keyboardVerticalOffset inside the handler', async () => {
       const OFFSET = 40;
       mountKav({ behavior: 'padding', 'keyboard-vertical-offset': OFFSET });
@@ -231,12 +191,8 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
   });
 
   describe('Positive — what the handler reads at event time (previousInset, behavior)', () => {
-    // why: THE regression this change exists for. In 'height' mode the wrapper is SHRUNK by the
-    // inset, so its next onLayout reports a frame shorter by exactly that much. Feeding
-    // computeInset the currently-applied inset cancels the shrink; without it the second keyboard
-    // event computes 0 and the view walks straight back down under the keyboard. The previous
-    // inset must be read at EVENT time off the reactive cell, not captured when the handler was
-    // created.
+    // 'height' mode shrinks the wrapper by the inset, so the next `onLayout` reports less height
+    // Feeding `computeInset` the applied inset cancels the shrink, read at EVENT time off the cell
     it('behavior="height": holds the inset when the shrunk wrapper re-reports a shorter frame', async () => {
       mountKav({ behavior: 'height' });
       await tick();
@@ -257,11 +213,8 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
       ).toBe(SHRUNK_HEIGHT);
     });
 
-    // why: `behavior` carries the same staleness risk as the previous inset — it is a prop read
-    // from inside a subscription that outlives every render, so a handler that captured it in
-    // setup would keep applying the OLD behavior's math forever. The tell is the same fixpoint:
-    // once switched to 'height', the second event must hold the inset; a handler still on
-    // 'padding' skips the correction and drops the wrapper back to full height.
+    // `behavior` is read inside a subscription that outlives every render, same staleness risk as
+    // the previous inset; after switching to 'height' the second event must hold the inset
     it('applies a behavior changed after mount, without re-subscribing', async () => {
       const behavior = ref('padding');
       mount(
@@ -305,10 +258,8 @@ describe('Vue KeyboardAvoidingView on the engine', () => {
   });
 
   describe('Positive — the iOS Prefer-Cross-Fade setting', () => {
-    // why: with that accessibility setting on, iOS reports the keyboard screenY as 0 rather than
-    // its real top edge, and the ordinary math turns that into "lift the view by its whole
-    // y + height" — the content goes clean off screen. Core answers 0, but only if the adapter
-    // passes the flag it read in onMounted.
+    // With that setting on, iOS reports `screenY` 0, which the plain math turns into a lift by
+    // the whole y + height; core answers 0 only if the adapter passes the flag read in `onMounted`
     it('lifts nothing when screenY is 0 and the setting is on', async () => {
       prefersCrossFade = true;
       mountKav({ behavior: 'padding' });

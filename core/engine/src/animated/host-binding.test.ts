@@ -16,7 +16,7 @@
 // (bare-tag) twin of the adapter-level animated-native-driver/-event itests Rounds 5-6 already
 // built.
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { installRecordingFabric, payloadOf } from '@symbiote-native/test-utils';
 import {
   AnimatedValue,
@@ -27,10 +27,11 @@ import {
   event,
   removeChild,
   routeProp,
+  timing,
 } from '../index';
 
 const fabric = installRecordingFabric();
-let nextRootTag = 9700;
+let nextRootTag = 9_700;
 
 afterEach(() => {
   fabric.reset();
@@ -181,6 +182,35 @@ describe('an animated value in a prop of a bare tag', () => {
     opacity.setValue(0.9);
     await tick();
     expect(payloadOf(view).opacity).toBe(0.5);
+  });
+
+  // RN's `Animated-test` "stops animation when detached": the last node leaving ends it
+  it('stops a running animation when its node leaves the tree', () => {
+    const opacity = new AnimatedValue(0);
+    const { surface } = mount();
+    const root = createElement('RCTView');
+    const view = createElement('RCTView');
+    appendChild(root, view);
+    routeProp(view, 'style', { opacity });
+    surface.appendChild(root);
+    surface.commit();
+
+    // Frames never fire: the animation stays running until the detach ends it
+    vi.stubGlobal('requestAnimationFrame', () => 1);
+    vi.stubGlobal('cancelAnimationFrame', () => undefined);
+    const results: unknown[] = [];
+    timing(opacity, {
+      toValue: 10,
+      duration: 1_000,
+      useNativeDriver: false,
+    }).start(result => results.push(result));
+    expect(results).toEqual([]);
+
+    removeChild(root, view);
+    surface.commit();
+    vi.unstubAllGlobals();
+
+    expect(results).toEqual([{ finished: false }]);
   });
 
   it('re-arms a subtree the sweep tore down and the framework put back', async () => {

@@ -14,7 +14,8 @@
 // cell to the next is always CELL + GAP. Nothing here is an approximation to argue about.
 
 import { describe, expect, it } from 'vitest';
-import { buildOffsets, computeWindow } from './virtualized-list';
+import { computeWindowedRenderLimits } from './virtualize-utils';
+import { buildOffsets } from './virtualized-list';
 
 const COUNT = 200;
 const CELL = 100;
@@ -38,23 +39,28 @@ function step(
   measuredOffsets: Map<number, number>,
   scrollOffset: number,
 ): { first: number; leadingExtent: number } {
-  const { offsets, lengths } = buildOffsets(
-    COUNT,
+  const { offsets, lengths } = buildOffsets({
+    count: COUNT,
     measured,
     measuredOffsets,
-    undefined,
-    CELL,
-    CELL + GAP,
-  );
-  const { first, last } = computeWindow(
-    COUNT,
-    offsets,
-    lengths,
-    scrollOffset,
-    VIEWPORT,
-    WINDOW_SIZE,
-    INITIAL,
-  );
+    fixedLayout: undefined,
+    averageLength: CELL,
+    averageStride: CELL + GAP,
+  });
+  const { first, last } = computeWindowedRenderLimits({
+    metrics: {
+      itemCount: COUNT,
+      getCellMetricsApprox: index => ({
+        offset: offsets[index],
+        length: lengths[index],
+      }),
+    },
+    // Every batch lands at once, this test is about the table, not the fill pacing
+    maxToRenderPerBatch: COUNT,
+    windowSize: WINDOW_SIZE,
+    prev: { first: 0, last: INITIAL - 1 },
+    scroll: { offset: scrollOffset, velocity: 0, visibleLength: VIEWPORT },
+  });
 
   const leadingExtent =
     first > 0 ? offsets[first - 1] + lengths[first - 1] - offsets[0] : 0;

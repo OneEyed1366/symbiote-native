@@ -35,10 +35,10 @@ const DEEP_OFFSET = 900 * ITEM_HEIGHT;
 const MID_OFFSET = 400 * ITEM_HEIGHT;
 const BOTTOM_OFFSET = CONTENT_HEIGHT - VIEWPORT_HEIGHT;
 
-interface IRow {
+type IRow = {
   id: number;
   label: string;
-}
+};
 
 const DATA: IRow[] = Array.from({ length: ITEM_COUNT }, (_unused, index) => ({
   id: index,
@@ -143,9 +143,7 @@ function mountWithViewport(): IAuthoredNode {
 // has no guard clause here that rejects an input.
 describe('React FlatList virtualization on the engine (Positive)', () => {
   it('windows to a bounded prefix anchored at the top', () => {
-    // why: over 1000 items, only a viewport's worth may ever be committed — an unbounded
-    // window defeats the entire point of virtualization (1000 live native views instead of a
-    // few dozen), and the window must start at row-0, not mid-list.
+    // Over 1000 items only a viewport's worth may be committed, anchored at row-0
     mountWithViewport();
 
     const labels = collectRowLabels();
@@ -164,9 +162,7 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
   });
 
   it('shifts the window when scrolled deep', () => {
-    // why: the window must SHIFT, not just grow — a list that only ever appends rows as you
-    // scroll leaks native views and eventually degrades to the unbounded case this whole
-    // feature exists to avoid.
+    // The window must SHIFT, not just grow, or native views leak as you scroll
     const scrollView = mountWithViewport();
     scrollTo(scrollView.instanceHandle, DEEP_OFFSET);
 
@@ -174,21 +170,17 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
     expect(labels.size, 'window stays bounded after scroll').toBeLessThan(
       WINDOW_CEILING,
     );
-    // The deep row is now resident...
     expect(labels.has(DEEP_ROW)).toBe(true);
-    // ...and the early rows have fallen out of the window (real shift, not append).
-    expect(labels.has('row-0')).toBe(false);
+    // RN keeps the initial region for scroll-to-top, rows past it fall out
+    expect(labels.has('row-20')).toBe(false);
   });
 
   it('gates onEndReached on the last cell being rendered', () => {
-    // why: onEndReached must gate on the last cell actually being resident in the window, not
-    // on a distance-from-end estimate — the old count-based gating could misfire mid-list. It
-    // must also fire exactly once per arrival at the bottom, not once per scroll event, or an
-    // infinite-scroll consumer double-fetches its next page.
+    // `onEndReached` gates on the last cell being resident, and fires once per arrival at the
+    // bottom, or an infinite-scroll consumer double-fetches its next page
     const scrollView = mountWithViewport();
 
-    // Mid-list: the trailing buffer does NOT yet reach the last row, so onEndReached must
-    // NOT fire, exactly the misfire the old count-based gating allowed.
+    // Mid-list the trailing buffer does not reach the last row, so it must not fire
     scrollTo(scrollView.instanceHandle, MID_OFFSET);
     expect(
       collectRowLabels().has('row-999'),
@@ -210,10 +202,8 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
   });
 
   it('exposes the RN imperative handle methods', () => {
-    // why: FlatList's ref is documented to be RN-API-compatible (scrollTo*, flashScrollIndicators,
-    // getNativeScrollRef, ...) — a caller migrating existing RN code expects the same imperative
-    // surface, and getNativeScrollRef must hand back the real inner ScrollView handle, not a
-    // stand-in, or its own imperative methods (e.g. flashScrollIndicators) are unreachable.
+    // A caller migrating RN code expects the same imperative surface
+    // and `getNativeScrollRef` must hand back the real inner ScrollView handle
     mountWithViewport();
 
     const handle = listRef.current;
@@ -235,9 +225,7 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
   });
 
   it('fires onStartReached when scrolling back to the top', () => {
-    // why: onStartReached is onEndReached's mirror for backward-infinite lists (e.g. a chat
-    // history loading older messages) — it must re-arm after moving away from the top and fire
-    // exactly once per arrival, not once per scroll event at the top.
+    // `onStartReached` mirrors `onEndReached`, it re-arms after leaving the top and fires once
     const scrollView = mountWithViewport();
 
     // Park at the bottom so onStartReached is re-armed, then return to the very top.
@@ -261,13 +249,8 @@ describe('React FlatList virtualization on the engine (Positive)', () => {
   });
 });
 
-// The multi-column (numColumns > 1) path packs items into rows and virtualizes ROWS, not
-// items — chunkIntoRows/rowKeyExtractor/expandRowViewability/firstItemOfRow/lastItemOfRow
-// (core/components/src/state/flat-list.ts) are the pure transform behind it, shared by every
-// adapter, but have NO dedicated core/components test yet — a gap in core coverage, not
-// something this suite should paper over by skipping the composition. The row-element creation
-// itself (the flex-row wrapper + per-cell flex:1 View) is genuinely React-adapter-only code
-// (index.ts's renderRow), never delegated to a shared render fn.
+// При `numColumns` больше 1 список виртуализирует строки, а не элементы
+// Элемент строки (flex-row обёртка, ячейка с `flex: 1`) только у React, преобразования общие
 describe('React FlatList multi-column composition (Positive)', () => {
   const COLUMN_COUNT = 2;
   const MULTI_COLUMN_ROOT_TAG = 24;
@@ -319,15 +302,16 @@ describe('React FlatList multi-column composition (Positive)', () => {
   function findRowWrappers(): ILiveNode[] {
     const rows: ILiveNode[] = [];
     live.walkLive(live.appRoot(), node => {
-      if (node.viewName === 'view' || node.viewName === 'RCTView') {
-        if (node.payload.flexDirection === 'row') rows.push(node);
-      }
+      const isView = node.viewName === 'view' || node.viewName === 'RCTView';
+      if (isView && node.payload.flexDirection === 'row') rows.push(node);
     });
     return rows;
   }
 
-  function mountMultiColumnWithViewport(): IAuthoredNode {
-    mount(MULTI_COLUMN_ROOT_TAG, <MultiColumnApp />);
+  function mountMultiColumnWithViewport(
+    app: ReactElement = <MultiColumnApp />,
+  ): IAuthoredNode {
+    mount(MULTI_COLUMN_ROOT_TAG, app);
     const scrollView = fabric.find(n => n.viewName === 'RCTScrollView');
     expect(scrollView, 'an RCTScrollView was created').toBeDefined();
     fabric.fireEvent(scrollView!.instanceHandle, 'topLayout', {
@@ -371,6 +355,27 @@ describe('React FlatList multi-column composition (Positive)', () => {
       leadingLabel: 'row-1',
       trailingLabel: 'row-2',
     });
+  });
+
+  // RN 0.83: `ItemSeparatorComponent` may be a ready element, it is rendered as it is
+  it('renders a separator given as a ready element between rows', () => {
+    mountMultiColumnWithViewport(
+      createElement(FlatList<IRow>, {
+        data: multiColumnData,
+        numColumns: COLUMN_COUNT,
+        keyExtractor: (item: IRow) => `mc-${item.id}`,
+        ItemSeparatorComponent: createElement('text', {}, 'ELEMENT-DIVIDER'),
+        getItemLayout: (_data: unknown, index: number) => ({
+          length: ITEM_HEIGHT,
+          offset: ITEM_HEIGHT * index,
+          index,
+        }),
+        renderItem: ({ item }: { item: IRow }) =>
+          createElement('text', { key: item.id }, item.label),
+      }),
+    );
+
+    expect(hasText('ELEMENT-DIVIDER')).toBe(true);
   });
 
   it('expands row-level viewability to one token per real item, not one per row', () => {

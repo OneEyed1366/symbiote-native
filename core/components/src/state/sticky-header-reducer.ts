@@ -17,7 +17,7 @@ const NO_TRANSLATE = null;
 // One sticky header's folded state. `inputRange`/`outputRange` feed the adapter's
 // scrollAnimatedValue.interpolate(); `translateY` is the debounced value pushed to the committed
 // transform (null until the debounce first fires).
-export interface IStickyHeaderState {
+export type IStickyHeaderState = {
   measured: boolean;
   layoutY: number;
   layoutHeight: number;
@@ -32,20 +32,27 @@ export interface IStickyHeaderState {
   // derived ranges against the identity ranges an unmeasured header ALSO derives — without this
   // flag the very first `inputs-changed` reads as a no-op and the header never commits at all.
   rangesEmitted: boolean;
-}
+  // The `hiddenOnScroll` flag the last rebuild was derived with, so a flip rebuilds
+  hiddenOnScroll: boolean;
+};
 
 // Per-call config, passed in rather than stored: the host OS (debounce window), interpolation
 // inputs, and — only when the reducer owns cross-talk recording — this header's own `index`.
 // React/Vue record through their own onLayout closure and leave `index` unset.
-export interface IStickyReducerInputs {
+export type IStickyReducerInputs = {
   os: string;
   inverted: boolean | undefined;
   scrollViewHeight: number | undefined;
   // The y of the NEXT sticky header. Changes via cross-talk as a later header measures — exactly
   // the `inputs-changed` recompute trigger.
   nextHeaderLayoutY: number | undefined;
+  // RN `stickyHeaderHiddenOnScroll`: the pin also slides off on a downward scroll
+  hiddenOnScroll?: boolean;
   index?: number;
-}
+};
+
+// The header geometry RN's `diffClamp` offset is built from (clamped to `-layoutHeight..0`)
+export type IStickyHideOffset = { layoutY: number; layoutHeight: number };
 
 // The events the adapter turns native callbacks into. `layout` is the header's own onLayout;
 // `inputs-changed` is the collision/viewport recompute signal; `animated-tick` is the interpolation
@@ -64,18 +71,20 @@ export type IStickyEffect =
       kind: 'rebuild-interpolation';
       inputRange: number[];
       outputRange: number[];
+      // Present only under `hiddenOnScroll`: the runner adds the clamped offset to the pin
+      hideOffset?: IStickyHideOffset;
     }
   | { kind: 'schedule-debounce'; delay: number; value: number }
   | { kind: 'apply-passthrough'; translateY: number }
   | { kind: 'record-header-y'; index: number; y: number };
 
-export interface IStickyReduceResult {
+export type IStickyReduceResult = {
   state: IStickyHeaderState;
   effects: IStickyEffect[];
   // Whether render-relevant state (the ranges or the committed translateY) changed, so the adapter
   // knows to re-render. A swallowed / scheduled animated tick returns false (nothing painted yet).
   changed: boolean;
-}
+};
 
 export function createInitialStickyState(): IStickyHeaderState {
   return {
@@ -87,6 +96,7 @@ export function createInitialStickyState(): IStickyHeaderState {
     inputRange: [...IDENTITY_INPUT_RANGE],
     outputRange: [...IDENTITY_OUTPUT_RANGE],
     rangesEmitted: false,
+    hiddenOnScroll: false,
   };
 }
 
@@ -106,7 +116,11 @@ function arraysEqual(a: readonly number[], b: readonly number[]): boolean {
 function deriveRanges(
   state: IStickyHeaderState,
   inputs: IStickyReducerInputs,
-): { inputRange: number[]; outputRange: number[] } {
+): {
+  inputRange: number[];
+  outputRange: number[];
+  hideOffset: IStickyHideOffset | undefined;
+} {
   const { inputRange, outputRange } = computeStickyInterpolation({
     measured: state.measured,
     inverted: inputs.inverted,
@@ -117,7 +131,11 @@ function deriveRanges(
   });
   state.inputRange = inputRange;
   state.outputRange = outputRange;
-  return { inputRange, outputRange };
+  state.hiddenOnScroll = inputs.hiddenOnScroll === true;
+  const hideOffset = state.hiddenOnScroll
+    ? { layoutY: state.layoutY, layoutHeight: state.layoutHeight }
+    : undefined;
+  return { inputRange, outputRange, hideOffset };
 }
 
 // Diagnostic-only, gated: identifies which header instance a log line belongs to — layoutY
@@ -137,7 +155,8 @@ function handleLayout(
   const alreadyAtThisGeometry =
     state.measured &&
     state.layoutY === action.y &&
-    state.layoutHeight === action.height;
+    state.layoutHeight === action.height &&
+    state.hiddenOnScroll === (inputs.hiddenOnScroll === true);
   state.layoutY = action.y;
   state.layoutHeight = action.height;
   state.measured = true;
@@ -151,13 +170,18 @@ function handleLayout(
     );
     return { state, effects, changed: effects.length > 0 };
   }
-  const { inputRange, outputRange } = deriveRanges(state, inputs);
+  const { inputRange, outputRange, hideOffset } = deriveRanges(state, inputs);
   state.rangesEmitted = true;
   dlog(
     `STICKY[reducer ${headerTag(state)}] layout: measured=true inputRange=${JSON.stringify(inputRange)} ` +
       `outputRange=${JSON.stringify(outputRange)}`,
   );
-  effects.push({ kind: 'rebuild-interpolation', inputRange, outputRange });
+  effects.push({
+    kind: 'rebuild-interpolation',
+    inputRange,
+    outputRange,
+    hideOffset,
+  });
   return { state, effects, changed: true };
 }
 
@@ -171,13 +195,14 @@ function handleInputsChanged(
   const previousInputRange = state.inputRange;
   const previousOutputRange = state.outputRange;
   const hadEmitted = state.rangesEmitted;
-  const { inputRange, outputRange } = deriveRanges(state, inputs);
+  const wasHidden = state.hiddenOnScroll;
+  const { inputRange, outputRange, hideOffset } = deriveRanges(state, inputs);
   state.rangesEmitted = true;
-  if (
-    hadEmitted &&
+  const isUnchanged =
+    wasHidden === state.hiddenOnScroll &&
     arraysEqual(previousInputRange, inputRange) &&
-    arraysEqual(previousOutputRange, outputRange)
-  ) {
+    arraysEqual(previousOutputRange, outputRange);
+  if (hadEmitted && isUnchanged) {
     dlog(
       `STICKY[reducer ${headerTag(state)}] inputs-changed: ranges unchanged, skipped rebuild`,
     );
@@ -190,7 +215,9 @@ function handleInputsChanged(
   );
   return {
     state,
-    effects: [{ kind: 'rebuild-interpolation', inputRange, outputRange }],
+    effects: [
+      { kind: 'rebuild-interpolation', inputRange, outputRange, hideOffset },
+    ],
     changed: true,
   };
 }

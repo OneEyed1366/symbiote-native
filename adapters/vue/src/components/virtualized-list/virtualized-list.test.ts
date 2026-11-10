@@ -336,14 +336,14 @@ describe('Vue VirtualizedList virtualization on the engine', () => {
       WINDOW_CEILING,
     );
     expect(labels.has(DEEP_ROW), 'the deep row is now resident').toBe(true);
-    expect(labels.has('row-0'), 'early rows fell out of the window').toBe(
+    expect(labels.has('row-0'), 'the initial region stays mounted').toBe(true);
+    expect(labels.has('row-50'), 'rows past it fell out of the window').toBe(
       false,
     );
-    // A leading spacer now reserves the off-window content scrolled past above — it was absent at
-    // the top.
+    // A spacer now reserves the content between the retained initial region and the window
     expect(
-      hasLeadingSpacer(),
-      'a leading spacer grew after scrolling deep',
+      contentChildren().slice(1, -1).some(isSpacer),
+      'a spacer grew between the initial region and the window',
     ).toBe(true);
   });
 
@@ -604,32 +604,29 @@ describe('Vue VirtualizedList maintainVisibleContentPosition and scrollToIndex f
     ).toBe(10);
   });
 
-  // why: native MVCP only compensates for content it can see; content prepended INTO the leading
-  // spacer (still off-window) is invisible to it, so the adapter's JS-side reactive watcher must
-  // dispatch a compensating instant scrollTo itself, or the visually-anchored row jumps on prepend.
-  it('shifts the scroll offset to keep the anchored row put when rows are prepended above the window', async () => {
+  // The window follows the anchor key and native MVCP moves the scroll, as in RN
+  it('keeps the windowed rows and sends no scroll when rows are prepended above the window', async () => {
     const scrollView = await mountWithComponent(makeMvcpList());
     scrollTo(scrollView.instanceHandle, MVCP_SCROLL_OFFSET);
     await tick();
+    const before = live.texts(live.appRoot());
 
-    // Prepend rows with fresh ids ABOVE the viewport: the anchored row k-0 moves down by the
-    // prepended count, into the leading spacer the native MVCP cannot see, so the JS shift fires.
     mvcpData.value = [
       ...makeRows(ITEM_COUNT, MVCP_PREPEND_COUNT),
       ...mvcpData.value,
     ];
     await tick();
 
-    const scrolls = fabric.commands.filter(c => c.commandName === 'scrollTo');
-    expect(scrolls.length, 'MVCP dispatches one compensating scrollTo').toBe(1);
-    expect(scrolls[0].args[0], 'x stays 0 for a vertical list').toBe(0);
-    // The leading spacer grew by MVCP_PREPEND_COUNT * ITEM_HEIGHT, so the offset shifts by exactly
-    // that to keep the anchored row visually pinned.
-    expect(scrolls[0].args[1], 'offset shifted by the prepended extent').toBe(
-      MVCP_SCROLL_OFFSET + MVCP_PREPEND_COUNT * ITEM_HEIGHT,
+    const after = live.texts(live.appRoot());
+    expect(after.filter(text => before.includes(text))).toEqual(
+      before.filter(text => after.includes(text)),
     );
-    // The JS correction is instant, never animated (RN getDerivedStateFromProps).
-    expect(scrolls[0].args[2], 'the MVCP correction is instant').toBe(false);
+    expect(after.length, 'the same number of rows stays mounted').toBe(
+      before.length,
+    );
+    expect(fabric.commands.filter(c => c.commandName === 'scrollTo')).toEqual(
+      [],
+    );
   });
 
   // why: RN's documented contract for an unresolvable scrollToIndex is the onScrollToIndexFailed

@@ -312,7 +312,7 @@ describe('reduceList commit — onStartReached', () => {
 });
 
 describe('reduceList commit — viewability', () => {
-  it('emits fire-viewable for the newly visible cells, then dedups after viewable-fired', () => {
+  it('emits fire-viewable for the newly visible cells, then dedups the same indices', () => {
     const inputs = baseInputs({ viewabilityPairs: [noopViewablePair] });
     const state = settled(inputs);
 
@@ -321,16 +321,13 @@ describe('reduceList commit — viewability', () => {
     expect(fired).toBeDefined();
     if (fired?.kind !== 'fire-viewable')
       throw new Error('expected fire-viewable');
-    expect(fired.delay).toBe(0);
+    expect(
+      first.effects.some(effect => effect.kind === 'schedule-viewable'),
+      'no minimumViewTime reports at once',
+    ).toBe(false);
     expect(fired.info.viewableItems.map(token => token.index)).toEqual([0, 1]);
 
-    // Fold the fired set back, exactly as the adapter does once the (zero) debounce completes.
-    const settledState = reduceList(
-      first.state,
-      { kind: 'viewable-fired', map: fired.map },
-      inputs,
-    ).state;
-    const second = reduceList(settledState, { kind: 'commit' }, inputs);
+    const second = reduceList(first.state, { kind: 'commit' }, inputs);
     expect(second.effects.some(effect => effect.kind === 'fire-viewable')).toBe(
       false,
     );
@@ -381,6 +378,42 @@ describe('reduceList commit — initialScrollIndex', () => {
     expect(second.effects.some(effect => effect.kind === 'scroll-to')).toBe(
       false,
     );
+  });
+
+  it('does not scroll for index 0', () => {
+    const inputs = baseInputs({ initialScrollIndex: 0 });
+    const result = reduceList(settled(inputs), { kind: 'commit' }, inputs);
+    expect(result.effects.some(effect => effect.kind === 'scroll-to')).toBe(
+      false,
+    );
+  });
+
+  it('scrolls to the end when the index is past the last item', () => {
+    const inputs = baseInputs({ initialScrollIndex: 15 });
+    const result = reduceList(settled(inputs), { kind: 'commit' }, inputs);
+    expect(result.effects).toContainEqual({
+      kind: 'scroll-to',
+      offset: 300,
+      animated: false,
+    });
+  });
+
+  it('lands a fractional index that share of the way through its cell', () => {
+    const lengths = [1, 2, 3, 4, 5];
+    const inputs = baseInputs({
+      initialScrollIndex: 1.5,
+      getItemLayout: (_data, index) => ({
+        length: lengths[index],
+        offset: lengths.slice(0, index).reduce((sum, one) => sum + one, 0),
+        index,
+      }),
+    });
+    const result = reduceList(settled(inputs), { kind: 'commit' }, inputs);
+    expect(result.effects).toContainEqual({
+      kind: 'scroll-to',
+      offset: 2,
+      animated: false,
+    });
   });
 });
 
@@ -464,10 +497,58 @@ describe('reduceList imperative scrolls', () => {
       {
         kind: 'fire-scroll-to-index-failed',
         index: 3,
-        highestMeasuredFrameIndex: -1,
+        highestMeasuredFrameIndex: 0,
         averageItemLength: 0,
       },
     ]);
+  });
+
+  it('scroll-to-index adds the length of offsetByCellLength to the view offset', () => {
+    const inputs = baseInputs();
+    const result = reduceList(
+      settled(inputs),
+      {
+        kind: 'scroll-to-index',
+        index: 3,
+        animated: false,
+        viewPosition: 0,
+        viewOffset: 25,
+        offsetByCellLength: 2,
+      },
+      inputs,
+    );
+    expect(result.effects).toEqual([
+      { kind: 'scroll-to', offset: 175, animated: false },
+    ]);
+  });
+
+  it('reports the end edge before the start edge when a short list is within both', () => {
+    const inputs = baseInputs({
+      onEndReachedActive: true,
+      onStartReachedActive: true,
+    });
+    const result = reduceList(settled(inputs), { kind: 'commit' }, inputs);
+    expect(
+      result.effects
+        .map(effect => effect.kind)
+        .filter(kind => kind.endsWith('-reached')),
+    ).toEqual(['fire-end-reached', 'fire-start-reached']);
+  });
+
+  it('scroll-to-index 0 scrolls when nothing is measured yet, RN counts the highest as 0', () => {
+    const inputs = baseInputs({ getItemLayout: undefined });
+    const result = reduceList(
+      settled(inputs),
+      {
+        kind: 'scroll-to-index',
+        index: 0,
+        animated: true,
+        viewPosition: 0,
+        viewOffset: 0,
+      },
+      inputs,
+    );
+    expect(result.effects.map(effect => effect.kind)).toEqual(['scroll-to']);
   });
 
   // why: RN's scrollToIndex asserts the index is in range BEFORE anything else, so a stale index
@@ -601,10 +682,10 @@ describe('the offset table is reused while nothing it depends on moves', () => {
     // with itself.
     const firstIndexBefore = first.metrics.first;
 
-    const scrolled = stepTo(first, { kind: 'scroll', offset: 4000 }, inputs);
+    const scrolled = stepTo(first, { kind: 'scroll', offset: 4_000 }, inputs);
     const scrolledAgain = stepTo(
       scrolled,
-      { kind: 'scroll', offset: 8000 },
+      { kind: 'scroll', offset: 8_000 },
       inputs,
     );
 

@@ -55,8 +55,8 @@
   padding: 3px;
 }
 
-/* Pseudo-classes: the WHOLE rule is dropped, bare or trailing a class. RN has no hover state,
-   and half-applying `opacity` permanently was the worse of the two bugs here. */
+/* A state on a class writes its values under the state. A bare state names no class, so that
+   rule is dropped whole. */
 .card:hover {
   opacity: 0.5;
 }

@@ -9,22 +9,9 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 [`expo-system-ui`](https://github.com/expo/expo/tree/main/packages/expo-system-ui) — setting and
 reading the root view's background color — so every SymbioteNative adapter can reach it, not
 just React. Like [device](/docs/packages/device/) and [local auth](/docs/packages/local-auth/),
-both exports here are one-shot async calls with no per-instance state, so there is no
-hook/composable/service to wrap — the React, Vue, Angular, Svelte, and Solid entry points are
+both exports here are one-shot async calls with no per-instance state. So there is no
+hook/composable/service to wrap. The React, Vue, Angular, Svelte, and Solid entry points are
 plain re-exports of the same `core`.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 ## Installation
 
@@ -37,16 +24,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --s
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-system-ui` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-system-ui`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
   flow either, since this project never installs the `expo` meta-package. Follow
   [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -194,9 +181,8 @@ Sources: [Expo docs: SystemUI](https://docs.expo.dev/versions/latest/sdk/system-
 ## How the wrapper works
 
 `@symbiote-native/system-ui` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-system-ui`
-itself — its
-two functions are hand-ported, verbatim, into this package's own `core/`, resolving the native
-module through `expo-modules-core`'s `requireNativeModule` rather than the `expo` meta-package
+itself. Its two functions are hand-ported, verbatim, into this package's own `core/`. The native
+module resolves through `expo-modules-core`'s `requireNativeModule`, not the `expo` meta-package
 this project never installs:
 
 ```
@@ -211,9 +197,10 @@ packages/system-ui/src/
 └── solid/    # @symbiote-native/system-ui/solid   — export * from '../core'
 ```
 
-Same shape as [device](/docs/packages/device/)'s and [local auth](/docs/packages/local-auth/)'s
-adapter entries: single-file re-exports with no lifecycle code at all, since every export
-here is a stateless one-shot async call — there is nothing for a hook, composable, or service to
-subscribe to or clean up. The native code itself is never vendored or copied —
-`expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
-guide](/docs/howtos/expo-native-module-setup/)).
+The adapter entries have the same shape as [device](/docs/packages/device/)'s and
+[local auth](/docs/packages/local-auth/)'s. They are single-file re-exports with no lifecycle code
+at all, since every export here is a stateless one-shot async call. There is nothing for a hook,
+composable, or service to subscribe to or clean up.
+
+The native code itself is never vendored or copied. `expo-modules-autolinking` resolves it straight
+out of `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

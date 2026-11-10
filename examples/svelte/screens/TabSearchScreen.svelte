@@ -1,22 +1,31 @@
+<!-- Prints what `jumpTo` passed in, and writes back through `setParams` with its own key -->
 <script lang="ts">
-  // Tabs demo · Search tab: registered with a tabBarBadge (TabsDemoScreen.svelte's <TabScreen>).
-  // Svelte twin of examples/vue-sfc/screens/TabSearchScreen.vue.
-  import { useIsFocused } from '@symbiote-native/navigation/svelte';
-  import { ROUTE_NAME } from '../routes';
-  import { ROUTE_LINE_INFO } from '../navigation-lines';
+  import {
+    useIsFocused,
+    useRoute,
+    useTabNavigation,
+  } from '@symbiote-native/navigation/svelte';
+  import ActionButton from '../components/ActionButton.svelte';
+  import { LINE_COLOR } from '../navigation-lines';
 
+  const COLOR = LINE_COLOR.structure;
+  const route = useRoute();
+  const tabs = useTabNavigation();
   const isFocused = useIsFocused();
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TabsDemo];
 </script>
 
-<safe-area-view class="screen">
-  <view class="section">
-    <view class={`line-tag line-tag-${lineInfo.line}`}>
-      <text class="line-tag-text">
-        {`${lineInfo.code} · ${lineInfo.label}`}
-      </text>
-    </view>
+<scroll-view class="screen" contentInsetAdjustmentBehavior="automatic">
+  <view class="scroll-content">
     <text class="section-label">Search tab</text>
     <text class="info-text">{`focused: ${isFocused.current}`}</text>
+    <text testID="tabs-search-params" class="info-text">
+      {`params: ${JSON.stringify(route.current.params) ?? 'none'}`}
+    </text>
+    <ActionButton
+      testID="tabs-set-params"
+      title="setParams on this tab"
+      onPress={() => tabs.current.setParams({ touched: true }, route.current.key)}
+      color={COLOR}
+    />
   </view>
-</safe-area-view>
+</scroll-view>

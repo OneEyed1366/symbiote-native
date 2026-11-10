@@ -1,11 +1,8 @@
-// Sticky headers: the framework-agnostic math behind the JS layer RN implements in
-// ScrollView.js / ScrollViewStickyHeader.js. RN does stickiness PURELY IN JS: a single
-// scroll AnimatedValue drives each flagged header's translateY through an interpolation that
-// keeps it pinned to the top (or bottom, inverted) until the next header collides with it.
-// The native Fabric scroll view does NOT honor stickyHeaderIndices on its own. The load-bearing
-// piece, the top/inverted inputRange/outputRange math (computeStickyInterpolation), is ported
-// byte-for-byte from ScrollViewStickyHeader.js's effect. The adapter owns the component shell,
-// the layout state, and building the interpolation onto its Animated value.
+// TODO(rn-port): the sticky math sits in an effect of React's `ScrollViewStickyHeader.js`
+
+// Sticky headers: RN pins them purely in JS, the scroll `AnimatedValue` drives each `translateY`.
+// `computeStickyInterpolation` is the range math of `ScrollViewStickyHeader.js`
+// The adapter owns the component shell, the layout state and the interpolation
 
 import type { AnimatedValue, ISymbioteEvent } from '@symbiote-native/engine';
 import { readLayoutField } from './layout-event';
@@ -39,6 +36,8 @@ export type IStickyHeaderProps = {
   inverted: boolean | undefined;
   // Parent scroll view height, only needed (and only set) when inverted.
   scrollViewHeight: number | undefined;
+  // RN `stickyHeaderHiddenOnScroll`: the pinned header also slides off on a downward scroll
+  hiddenOnScroll?: boolean;
 };
 
 // Thin re-export kept for the existing public surface (adapters import this name from
@@ -73,53 +72,51 @@ export function computeStickyInterpolation(
   inputRange: number[];
   outputRange: number[];
 } {
-  const {
-    measured,
-    inverted,
-    scrollViewHeight,
-    layoutY,
-    layoutHeight,
-    nextHeaderLayoutY,
-  } = params;
-  const inputRange: number[] = [-1, 0];
-  const outputRange: number[] = [0, 0];
-  if (measured) {
-    if (inverted === true) {
-      // Inverted: the header sticks at the BOTTOM of the viewport. It starts sticking once
-      // its bottom edge reaches the viewport bottom (stickStartPoint), then tracks scroll up
-      // to the next header's collision point.
-      if (scrollViewHeight !== undefined) {
-        const stickStartPoint = layoutY + layoutHeight - scrollViewHeight;
-        if (stickStartPoint > 0) {
-          inputRange.push(stickStartPoint, stickStartPoint + 1);
-          outputRange.push(0, 1);
-          const collisionPoint =
-            (nextHeaderLayoutY ?? 0) - layoutHeight - scrollViewHeight;
-          if (collisionPoint > stickStartPoint) {
-            inputRange.push(collisionPoint, collisionPoint + 1);
-            outputRange.push(
-              collisionPoint - stickStartPoint,
-              collisionPoint - stickStartPoint,
-            );
-          }
-        }
-      }
-    } else {
-      // Top: no translation until the header reaches the top (layoutY), then it tracks the
-      // scroll 1:1 to stay pinned, until the next header pushes it back off.
-      inputRange.push(layoutY);
-      outputRange.push(0);
-      const collisionPoint = (nextHeaderLayoutY ?? 0) - layoutHeight;
-      if (collisionPoint >= layoutY) {
-        inputRange.push(collisionPoint, collisionPoint + 1);
-        outputRange.push(collisionPoint - layoutY, collisionPoint - layoutY);
-      } else {
-        inputRange.push(layoutY + 1);
-        outputRange.push(1);
-      }
-    }
+  const identity = { inputRange: [-1, 0], outputRange: [0, 0] };
+  if (!params.measured) return identity;
+  const tail =
+    params.inverted === true ? invertedTail(params) : topTail(params);
+  return {
+    inputRange: [...identity.inputRange, ...tail.inputRange],
+    outputRange: [...identity.outputRange, ...tail.outputRange],
+  };
+}
+
+type IRangeTail = { inputRange: number[]; outputRange: number[] };
+
+// Inverted: прилипает к низу вьюпорта, когда нижний край доходит до него (`stickStartPoint`),
+// и ведёт скролл до точки столкновения со следующим заголовком
+function invertedTail(params: IStickyInterpolationParams): IRangeTail {
+  const { scrollViewHeight, layoutY, layoutHeight, nextHeaderLayoutY } = params;
+  const tail: IRangeTail = { inputRange: [], outputRange: [] };
+  if (scrollViewHeight === undefined) return tail;
+  const stickStartPoint = layoutY + layoutHeight - scrollViewHeight;
+  if (stickStartPoint <= 0) return tail;
+  tail.inputRange.push(stickStartPoint, stickStartPoint + 1);
+  tail.outputRange.push(0, 1);
+  const collisionPoint =
+    (nextHeaderLayoutY ?? 0) - layoutHeight - scrollViewHeight;
+  if (collisionPoint > stickStartPoint) {
+    tail.inputRange.push(collisionPoint, collisionPoint + 1);
+    tail.outputRange.push(
+      collisionPoint - stickStartPoint,
+      collisionPoint - stickStartPoint,
+    );
   }
-  return { inputRange, outputRange };
+  return tail;
+}
+
+// Top: без сдвига до `layoutY`, дальше 1:1 со скроллом, пока следующий заголовок не вытолкнет
+function topTail(params: IStickyInterpolationParams): IRangeTail {
+  const { layoutY, layoutHeight, nextHeaderLayoutY } = params;
+  const collisionPoint = (nextHeaderLayoutY ?? 0) - layoutHeight;
+  if (collisionPoint >= layoutY) {
+    return {
+      inputRange: [layoutY, collisionPoint, collisionPoint + 1],
+      outputRange: [0, collisionPoint - layoutY, collisionPoint - layoutY],
+    };
+  }
+  return { inputRange: [layoutY, layoutY + 1], outputRange: [0, 1] };
 }
 
 // The cross-talk lookup (RN's _headerLayoutYs, ScrollView.js:1695 nextIndex): given this

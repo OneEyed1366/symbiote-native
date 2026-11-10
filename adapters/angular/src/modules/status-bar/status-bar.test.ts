@@ -1,13 +1,6 @@
-// Proves the Angular lifecycle half of StatusBar (index.ts): the native driving, the imperative
-// statics, and the Android bar-height accessor all live in @symbiote-native/engine's status-bar
-// module (shared verbatim with React/Vue, and covered by that module's own tests — N/A here). What
-// is Angular-specific: the declarative component (a) renders NO Fabric node — StatusBar has no
-// visual, only a native side effect — (b) re-applies its props through ngOnChanges on mount AND on
-// every subsequent input change, not just once, and (c) attaches the SAME engine functions as its
-// static methods rather than re-implementing them, so a future engine fix can't silently diverge
-// from what the component exposes. No Negative group: ngOnChanges/buildProps is a pure prop fold
-// with no throwing branch, and applyStatusBarProps itself already treats a missing native module as
-// a silent no-op (an engine-level concern, not asserted again here).
+// Angular half of StatusBar (index.ts), the props stack and native calls are the engine's and
+// covered in core/engine/src/status-bar. Here: no Fabric node, a stack entry applied on mount and
+// on every input change, released on destroy, and the statics are the engine's own functions
 import '@angular/compiler';
 import { Component, signal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -49,21 +42,30 @@ Component({
   template: `<StatusBar [hidden]="hiddenValue" [animated]="false" />`,
 })(DynamicStatusBarHost);
 
+// Stands in for the engine's stack entry, which is what the component's lifecycle drives
+function fakeEntry() {
+  const apply = vi.fn();
+  const release = vi.fn();
+  vi.spyOn(engine, 'createStatusBarEntry').mockReturnValue({ apply, release });
+  return { apply, release };
+}
+
 beforeEach(() => fabric.reset());
-afterEach(() => unmount(ROOT_TAG));
+afterEach(() => {
+  vi.restoreAllMocks();
+  unmount(ROOT_TAG);
+});
 
 describe('StatusBar', () => {
   // why: StatusBar's template is '' — it drives a native module imperatively and must never paint
   // a real view, or it would silently occupy space / intercept layout in the host tree.
   it('applies status bar props on mount and renders no Fabric node', async () => {
-    const spy = vi
-      .spyOn(engine, 'applyStatusBarProps')
-      .mockReturnValue(undefined);
+    const { apply } = fakeEntry();
 
     mount(ROOT_TAG, StatusBarHost);
     await tick();
 
-    expect(spy).toHaveBeenCalledWith(
+    expect(apply).toHaveBeenCalledWith(
       expect.objectContaining({
         barStyle: 'dark-content',
         hidden: true,
@@ -75,39 +77,43 @@ describe('StatusBar', () => {
     expect(root.children).toHaveLength(0);
   });
 
-  // why: the component's own file comment states it "re-applies the props through ngOnChanges on
-  // mount + every prop change" — a StatusBar whose `hidden`/`barStyle` prop changes on a later
-  // render (e.g. a screen toggling dark mode) must re-drive the native module again, not just once
-  // at mount, or the status bar would freeze at its first-render appearance forever.
+  // A prop that changes on a later render (a screen toggling dark mode) must reach native again
   it('re-applies props on every subsequent input change, not only at mount', async () => {
-    const spy = vi
-      .spyOn(engine, 'applyStatusBarProps')
-      .mockReturnValue(undefined);
+    const { apply } = fakeEntry();
     DynamicStatusBarHost.hidden.set(false);
 
     mount(ROOT_TAG, DynamicStatusBarHost);
     await tick();
-    expect(spy).toHaveBeenLastCalledWith(
+    expect(apply).toHaveBeenLastCalledWith(
       expect.objectContaining({ hidden: false }),
     );
-    const callsAfterMount = spy.mock.calls.length;
+    const callsAfterMount = apply.mock.calls.length;
 
     DynamicStatusBarHost.hidden.set(true);
     await tick();
 
-    // Not asserting an exact call count: Angular's zoneless scheduler may run more than one CD
-    // pass per commit, which is its own internal detail, not a product contract. The contract is
-    // that a LATER input change drives at least one more real re-application with the new value.
-    expect(spy.mock.calls.length).toBeGreaterThan(callsAfterMount);
-    expect(spy).toHaveBeenLastCalledWith(
+    // The zoneless scheduler may run more than one pass per commit, so the contract is "at least
+    // one more application carrying the new value"
+    expect(apply.mock.calls.length).toBeGreaterThan(callsAfterMount);
+    expect(apply).toHaveBeenLastCalledWith(
       expect.objectContaining({ hidden: true }),
     );
   });
 
-  // why: Object.assign(StatusBarComponent, statusBarImperative) must forward the EXACT engine
-  // functions, not wrapped/re-authored stand-ins — a `typeof StatusBar.setHidden === 'function'`
-  // check alone would stay green even if the component shipped its own diverging implementation,
-  // which is exactly the structural-parity failure <adapters_reach_full_feature_parity> forbids.
+  it('releases its stack entry when the component is destroyed', async () => {
+    const { release } = fakeEntry();
+
+    mount(ROOT_TAG, StatusBarHost);
+    await tick();
+    expect(release).not.toHaveBeenCalled();
+
+    unmount(ROOT_TAG);
+    await tick();
+
+    expect(release).toHaveBeenCalledOnce();
+  });
+
+  // The statics must be the engine's own functions, a `typeof` check would pass a diverging copy
   it('exposes the imperative statics as the same functions the engine defines', () => {
     expect(StatusBar.setHidden).toBe(engine.statusBarImperative.setHidden);
     expect(StatusBar.setBarStyle).toBe(engine.statusBarImperative.setBarStyle);
@@ -122,9 +128,7 @@ describe('StatusBar', () => {
     );
   });
 
-  // why: currentHeight is wired as a live GETTER (Object.defineProperty), not a value snapshotted
-  // once at module load — it must read through the engine's own platform accessor every access, so
-  // this proves the descriptor is the accessor itself, not merely that a `currentHeight` key exists.
+  // A live getter reads through the engine accessor on every access, a snapshot would go stale
   it('exposes currentHeight as a getter backed by the engine platform accessor', () => {
     const descriptor = Object.getOwnPropertyDescriptor(
       StatusBar,

@@ -14,19 +14,6 @@ hook/composable/service shape as [location](/docs/packages/location/)'s own perm
 so switching between the two packages needs no relearning; `getAdvertisingId`/`isAvailable` are
 plain stateless free functions, same as [device](/docs/packages/device/).
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 <Aside type="note" title="Android and web always report granted">
   There is no tracking-consent concept on either platform —
   `getTrackingPermissionsAsync`/`requestTrackingPermissionsAsync` short-circuit
@@ -45,23 +32,26 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --t
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-tracking-transparency` and `expo-modules-core` come along as regular dependencies, pinned to
-exact versions — never install either yourself, and never add the `expo` meta-package to your
-project (it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+exact versions. Never install either yourself. Never add the `expo` meta-package to your project
+either, as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-tracking-transparency`'s native code is discovered by
   `expo-modules-autolinking`, a different mechanism from the
   `react-native.config.cjs`/podspec autolinking every other SymbioteNative
-  wrapper uses — and it isn't the standard Expo setup flow either, since this
+  wrapper uses. It isn't the standard Expo setup flow either, since this
   project never installs the `expo` meta-package. Follow [How to: wire up an
   Expo native module](/docs/howtos/expo-native-module-setup/) once per app
-  first; it covers this package and every other `expo-modules-core` package with
-  zero further native changes. Additionally, iOS needs an
-  `NSUserTrackingUsageDescription` string in `Info.plist` — required for the ATT
-  prompt to show at all. `symbiote-expo-link` inserts a generic default for you
-  when that key is absent; write your own wording into `Info.plist` and it
-  stands, since the linker never rewrites a key that already exists. The Android
-  native module also pulls in
+  first. It covers this package and every other `expo-modules-core` package with
+  zero further native changes.
+
+  Additionally, iOS needs an `NSUserTrackingUsageDescription` string in
+  `Info.plist`, required for the ATT prompt to show at all.
+  `symbiote-expo-link` inserts a generic default for you when that key is
+  absent. Write your own wording into `Info.plist` and it stands, since the
+  linker never rewrites a key that already exists.
+
+  The Android native module also pulls in
   `com.google.android.gms:play-services-ads-identifier:18.0.1` transitively,
   automatically, with no extra wiring needed.
 </Aside>
@@ -256,9 +246,9 @@ Sources: [Expo docs: TrackingTransparency](https://docs.expo.dev/versions/latest
 ## How the wrapper works
 
 `@symbiote-native/tracking-transparency` ships zero React/Vue/Angular/Svelte/Solid logic in
-`expo-tracking-transparency` itself — its functions are hand-ported, verbatim, into this package's
-own `core/`, resolving the native module through `expo-modules-core`'s `requireNativeModule`
-rather than the `expo` meta-package this project never installs:
+`expo-tracking-transparency` itself. Its functions are hand-ported, verbatim, into this package's
+own `core/`. The native module resolves through `expo-modules-core`'s `requireNativeModule`,
+not the `expo` meta-package this project never installs:
 
 ```
 packages/tracking-transparency/src/
@@ -272,10 +262,12 @@ packages/tracking-transparency/src/
 `-- solid/                 @symbiote-native/tracking-transparency/solid: useTrackingPermissions
 ```
 
-Only the permission surface gets a lifecycle hook, there is per-instance state to seed and
-refresh; `getAdvertisingId`/`isAvailable` are stateless, re-exported verbatim by every adapter.
+Only the permission surface gets a lifecycle hook, as it has per-instance state to seed and
+refresh. `getAdvertisingId`/`isAvailable` are stateless, re-exported verbatim by every adapter.
+
 Upstream's `useTrackingPermissions` is ported to every adapter on the shared `createPermissionHook`
 factory (`PermissionsServiceBase` on Angular), the same shape as
-[location](/docs/packages/location/)'s permission hooks. The native code itself is never vendored or copied — `expo-modules-autolinking`
-resolves it straight out of `node_modules` (see [the native setup
-guide](/docs/howtos/expo-native-module-setup/)).
+[location](/docs/packages/location/)'s permission hooks.
+
+The native code itself is never vendored or copied. `expo-modules-autolinking` resolves it straight
+out of `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

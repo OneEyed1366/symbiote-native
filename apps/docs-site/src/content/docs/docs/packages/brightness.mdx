@@ -10,28 +10,15 @@ so every SymbioteNative adapter can read and set the screen brightness. Like [ba
 and [cellular](/docs/packages/cellular/), it's built on `expo-modules-core` — a pure async-function +
 `EventEmitter` surface, no Fabric view involved. Its permission surface (`getPermissionsAsync`/
 `requestPermissionsAsync`) shares the exact same `usePermissions()` hook/composable/service shape as
-`@symbiote-native/cellular`, so switching between the two packages needs no relearning; what's unique to
+`@symbiote-native/cellular`, so switching between the two packages needs no relearning. What's unique to
 brightness is an Android-only system-brightness-mode surface and an iOS-only change listener.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 <Aside
   type="caution"
   title="getBrightnessAsync/setBrightnessAsync never round-trip on the iOS Simulator"
 >
   `UIScreen.main.brightness` is a long-standing Apple Simulator limitation,
-  reproducible in any app including stock Expo Go: `set` is silently a no-op and
+  reproducible in any app including stock Expo Go. `set` is silently a no-op and
   `get` always returns a constant (observed `1.0`), regardless of what was
   written. This is not a bug in this wrapper — `BrightnessModule.swift`'s
   `setBrightnessAsync`/`getBrightnessAsync` are a bare, unstubbed
@@ -64,16 +51,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --b
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-brightness` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-brightness`'s native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes. On Android, setting the system-wide brightness additionally
   needs the `WRITE_SETTINGS` permission declared in your app's
@@ -416,7 +403,7 @@ caller. Angular's auto-fetch is latched to at most one run per service instance,
   for.
 - **The `WRITE_SETTINGS` grant is re-checked on every system write.** `setSystemBrightnessAsync`
   and `setSystemBrightnessModeAsync` call `Settings.System.canWrite` each time and throw a
-  permissions exception when it is `false` — a grant revoked after the fact surfaces as a rejected
+  permissions exception when it is `false`. A grant revoked after the fact surfaces as a rejected
   promise, not as a `PermissionResponse`, so keep a `catch` on those two even once
   `requestPermissionsAsync` has resolved granted.
 - **Android quantizes the system value.** `0`..`1` is mapped onto Android's integer `1`..`255`
@@ -448,10 +435,10 @@ Sources: [Expo docs: Brightness](https://docs.expo.dev/versions/latest/sdk/brigh
 
 ## How the wrapper works
 
-`@symbiote-native/brightness` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-brightness` itself** —
-that package's own JS hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
-meta-package (which this project never installs), so its functions and types are hand-ported,
-verbatim, into this package's own `core/`, changing only that one import line to pull from
+`@symbiote-native/brightness` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-brightness` itself**.
+That package's own JS hard-imports `PermissionResponse`/`PermissionStatus` from the `expo`
+meta-package, which this project never installs. So its functions and types are hand-ported,
+verbatim, into this package's own `core/`. Only that one import line changes, to pull from
 `expo-modules-core` instead:
 
 ```
@@ -468,9 +455,9 @@ packages/brightness/src/
 └── angular/services/permissions.service @symbiote-native/brightness/angular
 ```
 
-`usePermissions` is the only stateful surface — auto-fetch on mount, expose `get`/`request` as
-imperative callbacks — written once as a shared pattern and reapplied identically in
-[cellular](/docs/packages/cellular/#usepermissions); every other export is a stateless free
+`usePermissions` is the only stateful surface: auto-fetch on mount, expose `get`/`request` as
+imperative callbacks. It is written once as a shared pattern and reapplied identically in
+[cellular](/docs/packages/cellular/#usepermissions). Every other export is a stateless free
 function, re-exported verbatim by all five adapters. The native code itself is never vendored or
-copied — `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
+copied: `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native
 setup guide](/docs/howtos/expo-native-module-setup/)).

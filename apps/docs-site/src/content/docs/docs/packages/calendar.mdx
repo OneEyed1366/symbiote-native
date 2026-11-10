@@ -16,19 +16,6 @@ entry) and the legacy function-based API (the `/legacy` subpath). The classes an
 shared by every adapter. The two permission hooks, `useCalendarPermissions` and
 `useRemindersPermissions`, are ported to all five in each framework's own idiom.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -298,17 +285,19 @@ and the reminders permission functions are iOS only.
 write-only access (`requestCalendarPermissions(true)`). The linker cannot swap the Info.plist string
 for you; see the write-only note near Install.
 
-Sources: [Expo docs: Calendar](https://docs.expo.dev/versions/v56.0.0/sdk/calendar-legacy/),
-[expo/expo#36001 system calendar dialog requires permission on iOS](https://github.com/expo/expo/issues/36001),
-[expo/expo#4991 getCalendarsAsync error on Android](https://github.com/expo/expo/issues/4991),
-[expo/expo#48186 getDefaultCalendarSync and getCalendars requiring full access](https://github.com/expo/expo/pull/48186).
+Sources:
+
+- [Expo docs: Calendar](https://docs.expo.dev/versions/v56.0.0/sdk/calendar-legacy/)
+- [expo/expo#36001 system calendar dialog requires permission on iOS](https://github.com/expo/expo/issues/36001)
+- [expo/expo#4991 getCalendarsAsync error on Android](https://github.com/expo/expo/issues/4991)
+- [expo/expo#48186 getDefaultCalendarSync and getCalendars requiring full access](https://github.com/expo/expo/pull/48186)
 
 ## How the wrapper works
 
 `expo-calendar`'s JS is hand-ported into this package: `core/` for the modern class API, `legacy/`
-for the function API. Every class extends its native shared object and overrides only what upstream
-overrides (date stringification, a platform guard, upgrading a returned native instance in place,
-since Android's Kotlin throws on direct construction). `./react`, `./vue`, `./svelte` and `./solid`
+for the function API. Every class extends its native shared object. It overrides only what upstream
+overrides: date stringification, a platform guard, and upgrading a returned native instance in
+place, since Android's Kotlin throws on direct construction. `./react`, `./vue`, `./svelte` and `./solid`
 alias `core/` plus their own permission hooks. The native code is never vendored:
 `expo-modules-autolinking` resolves it from `node_modules` (see
 [the native setup guide](/docs/howtos/expo-native-module-setup/)).

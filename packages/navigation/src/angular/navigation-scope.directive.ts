@@ -1,14 +1,13 @@
-// The Angular twin of react/navigation-context.ts's `NavigationContext.Provider` usage in
-// stack.ts/tabs.ts/drawer.ts's render loops: one directive instance = one fresh scope. Applying
-// `[symbioteNavigationScope]` to an element re-`providers: [NavigationContextService]`
-// (component/directive-level DI), so every usage mints its OWN service instance - the DI twin of
-// `createElement(NavigationContext.Provider, { value }, content)`. Descendants (a screen's own
-// component tree, reached through `*ngComponentOutlet`) call `inject(NavigationContextService)`
-// and resolve to the NEAREST enclosing instance, exactly like `useContext(NavigationContext)`
-// walks to the nearest Provider.
+// One directive instance is one fresh scope, as it re-provides `NavigationContextService`
+// A descendant's `inject(NavigationContextService)` resolves to the nearest enclosing scope
 
 import { Directive, Input, inject, type OnChanges } from '@angular/core';
-import type { INavigationEmitter, IRoute } from '../core';
+import type {
+  IEdgeInsetState,
+  INavigationEmitter,
+  IRoute,
+  ITransitionProgress,
+} from '../core';
 import {
   NavigationContextService,
   type IAnyNavigatorHandle,
@@ -24,6 +23,8 @@ export class NavigationScopeDirective implements OnChanges {
   route!: IRoute<unknown>;
   @Input({ required: true }) navigation!: IAnyNavigatorHandle;
   @Input({ required: true }) emitter!: INavigationEmitter;
+  @Input() transitionProgress?: ITransitionProgress;
+  @Input() edgeInsets?: IEdgeInsetState;
 
   private readonly context = inject(NavigationContextService);
 
@@ -31,5 +32,7 @@ export class NavigationScopeDirective implements OnChanges {
     this.context.setRoute(this.route);
     this.context.navigation = this.navigation;
     this.context.emitter = this.emitter;
+    this.context.transitionProgress = this.transitionProgress;
+    this.context.edgeInsets = this.edgeInsets;
   }
 }

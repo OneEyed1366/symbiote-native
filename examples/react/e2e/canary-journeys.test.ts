@@ -4,9 +4,8 @@ import { by, device, element, expect, waitFor } from 'detox';
 // Canary user-journey e2e. Detox attaches at the stock RN host BELOW the renderer symbiote
 // replaces, so this exact spec is framework-agnostic: the identical file runs against the
 // React, Vue-TSX and Vue-SFC canaries — all three render the same surface with the same testIDs.
-// Each journey drives a real native interaction AND asserts the observable outcome of ONE
-// component, so a component that mounts but MIS-behaves — e.g. a native-driver Animated view
-// that renders frozen — fails HERE, where a bare toBeVisible would pass.
+// Each journey drives a real native interaction and asserts the outcome of ONE component
+// A component that mounts but misbehaves (a frozen `Animated` view) fails here, not `toBeVisible`
 //
 // Sync is OFF from the first launch: the canary runs a perpetual native Animated.loop heartbeat
 // (offloaded to the UI thread, so JS never reports idle) which would otherwise hang launchApp
@@ -24,9 +23,8 @@ const sleep = (ms: number): Promise<void> =>
 // Scroll the canary until the target is on screen. Demos sit at different depths below the launch
 // fold, so every journey self-scrolls instead of assuming a fixed offset. startY 0.8 (not Detox's
 // ~0.95 default) keeps the swipe start hittable above the safe area.
-// scroll(...) is a real swipe gesture, not a discrete scrollTo — ScrollView's own momentum
-// keeps drifting briefly after the gesture resolves, so a tap right after can land on a spot
-// the target view has already scrolled away from. Settle before handing control back.
+// `scroll` is a real swipe, not a discrete `scrollTo`, so momentum keeps drifting after it resolves
+// A tap right after can miss the target, so settle before handing control back
 async function bringIntoView(id: string): Promise<void> {
   await waitFor(element(by.id(id)))
     .toBeVisible()
@@ -51,32 +49,29 @@ async function waitForText(
   timeoutMs: number,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
-  let last = '';
-  while (Date.now() < deadline) {
-    last = await elementText(id);
-    if (matches(last)) return;
+  const poll = async (): Promise<void> => {
+    const text = await elementText(id);
+    if (matches(text)) return;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `${id} never matched within ${timeoutMs}ms; last text was "${text}"`,
+      );
+    }
     await sleep(250);
-  }
-  throw new Error(
-    `${id} never matched within ${timeoutMs}ms; last text was "${last}"`,
-  );
+    return poll();
+  };
+  return poll();
 }
 
-// Sync is off (file header), so Detox's own native hittability check (dtx_assertHittableAtPoint)
-// occasionally throws "not hittable" for a split second right after a text-changing recommit
-// retriggers layout, even though the view is genuinely on-screen and untouched — confirmed via a
-// screenshot taken at the exact failure point showing the card fully visible and correctly
-// updated. Retry past this known false-negative instead of chasing a native race that isn't an
-// app bug.
+// Sync is off, so `dtx_assertHittableAtPoint` can throw "not hittable" for a moment after recommit
+// The view is on screen and updated (a screenshot at the failure shows it), so retry
 async function tapWithRetry(id: string, attempts = 3): Promise<void> {
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      await element(by.id(id)).tap();
-      return;
-    } catch (error) {
-      if (attempt === attempts) throw error;
-      await sleep(300);
-    }
+  try {
+    await element(by.id(id)).tap();
+  } catch (error) {
+    if (attempts <= 1) throw error;
+    await sleep(300);
+    return tapWithRetry(id, attempts - 1);
   }
 }
 
@@ -144,12 +139,16 @@ describe('symbiote canary · user journeys', () => {
     await device.launchApp(launchOpts);
     // App.tsx boots on the navigation demo Menu screen (@symbiote-native/navigation's Stack) —
     // push into "Canary" first, the screen carrying every testID below.
+    await waitFor(element(by.id('menu-row-FrameworkHub')))
+      .toBeVisible()
+      .withTimeout(10_000);
+    await element(by.id('menu-row-FrameworkHub')).tap();
     await waitFor(element(by.id('menu-row-Canary')))
       .toBeVisible()
       .withTimeout(10_000);
     await element(by.id('menu-row-Canary')).tap();
-    // Sync is OFF, so nothing auto-waits for the first commit. Gate on the scroll container existing
-    // before any journey scrolls/queries, or the first whileElement(...).scroll() races the launch.
+    // Sync is OFF, so nothing waits for the first commit
+    // Gate on `canary-scroll` existing, or the first `scroll` of a journey races the launch
     await waitFor(element(by.id('canary-scroll')))
       .toExist()
       .withTimeout(30_000);

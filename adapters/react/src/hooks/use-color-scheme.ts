@@ -1,18 +1,8 @@
-// useColorScheme subscribes a component to the device color scheme and re-renders
-// on change. Mirrors RN's Libraries/Utilities/useColorScheme.js: a thin
-// useSyncExternalStore over Appearance's change event + current scheme read.
+// RN's own `useColorScheme`, typed here because the source ships none
+// @ts-expect-error - untyped Flow source
+import useColorSchemeUpstream from 'react-native/Libraries/Utilities/useColorScheme';
 
-import { useSyncExternalStore } from 'react';
+import type { IColorSchemeName } from '@symbiote-native/engine';
 
-import { Appearance, type IColorSchemeName } from '@symbiote-native/engine';
-
-const subscribe = (onStoreChange: () => void): (() => void) => {
-  const subscription = Appearance.addChangeListener(onStoreChange);
-  return () => subscription.remove();
-};
-
-const getSnapshot = (): IColorSchemeName | null => Appearance.getColorScheme();
-
-export function useColorScheme(): IColorSchemeName | null {
-  return useSyncExternalStore(subscribe, getSnapshot);
-}
+export const useColorScheme: () => IColorSchemeName | null | undefined =
+  useColorSchemeUpstream;

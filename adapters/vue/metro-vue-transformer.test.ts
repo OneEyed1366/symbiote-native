@@ -1,16 +1,5 @@
-// Covers the `<style>` block support in compileSfc (registerRules injection). The rest of the
-// transformer (script/template inlining, `vue` import rewrite) is exercised by the canary build
-// itself; this file only guards the CSS-parsing addition.
-//
-// N/A, deliberately not covered here: compileSfc's SFC-parse-error and missing-<script> throws
-// (`descriptor.errors`, `scriptSetup == null && script == null`) are @vue/compiler-sfc's own
-// input-validation surface, not the CSS-parsing addition this file exists to guard — and
-// `transform`/`getCacheKey` (the Metro entry points wrapping compileSfc) are integration-only,
-// exercised by the canary build, not unit-testable without a real Metro worker.
-//
-// No throwing-vs-non-throwing split by describe group: each nested describe below groups by
-// SFC feature (plain <style>, `scoped`, `module`, kebab-case classes); the one throwing case
-// (unsupported lang) sits inside its feature's describe, asserting the specific error message.
+// Covers the `<style>` block support in `compileSfc` (`registerRules` injection)
+// Script inlining, the `vue` import rewrite and `transform` are exercised by the canary build
 import { describe, expect, it } from 'vitest';
 import metroVueTransformer from './metro-vue-transformer.cjs';
 
@@ -19,15 +8,14 @@ const {
 }: { compileSfc: (src: string, filename: string) => Promise<string> } =
   metroVueTransformer;
 
-// One entry of the emitted `registerRules([...])` array: the selector's own token set, not a name
-// collapsed out of it. `combinators` is stripped at emit (compile-time-only), so the emitted shape
-// is exactly these four fields.
-interface IEmittedRule {
+// One entry of the emitted `registerRules([...])` array, with the selector's own token set
+// `combinators` is compile-time-only and stripped at emit, so these four fields are the shape
+type IEmittedRule = {
   tokens: string[];
   specificity: [number, number, number];
   order: number;
   style: Record<string, unknown>;
-}
+};
 
 function extractRegisterRulesArg(code: string): IEmittedRule[] {
   const match = code.match(/registerRules\((\[[\s\S]*?\])\);/);
@@ -96,12 +84,9 @@ $spacing: 10px;
 </style>
 `;
 
-// Indented syntax (no braces/semicolons) — distinct from SCSS at the SYNTAX level, but
-// SFC_STYLE_LANG_TO_PREPROCESSOR routes both `lang="scss"` and `lang="sass"` through the same
-// compilePreprocessor('scss', ...) entry point, disambiguated only by a synthetic `${filename}.sass`
-// path (compileStyleBlockContent). A wrong synthetic path would hand indented text to the
-// brace-expecting SCSS parser and fail outright — this proves the SFC-level wiring picks the right
-// syntax, not the preprocessor itself (that unit is core/css-parser/src/preprocessors's own job).
+// Indented syntax goes through the same `scss` entry as `lang="scss"`
+// Only the synthetic `${filename}.sass` path from `compileStyleBlockContent` picks the syntax
+// This proves the SFC wiring, the preprocessor itself is covered in core/css-parser
 const SFC_WITH_SASS_STYLE_BLOCK = `
 <script setup lang="ts">
 const label = 'hi'
@@ -207,9 +192,8 @@ const label = 'hi'
 </style>
 `;
 
-// `.big` has no standalone rule of its own, so it is only ever named inside a compound selector.
-// lightningcss renames it anyway (a class is a class), which is what keeps the template's `big`
-// token and the registered key on one spelling.
+// `.big` has no standalone rule and is only named inside a compound selector
+// `lightningcss` renames it anyway, which keeps the template's `big` token and the key aligned
 const SFC_WITH_COMPOUND_SCOPED_SELECTOR = `
 <script setup lang="ts">
 const label = 'hi'
@@ -235,9 +219,8 @@ const label = 'hi'
 </style>
 `;
 
-// `.legacy` sits inside a `:global()` that is only PART of its selector: the rule as a whole is
-// this file's own (it hangs off the file's `.card`), but the `legacy` half names markup this file
-// does not own and must survive unsuffixed.
+// `.legacy` sits in a `:global()` that covers only part of its selector
+// The rule hangs off this file's `.card`, but `legacy` names foreign markup and stays unsuffixed
 const SFC_WITH_PARTIAL_GLOBAL_IN_SCOPED_BLOCK = `
 <script setup lang="ts">
 const label = 'hi'
@@ -343,9 +326,8 @@ const label = 'hi'
 </style>
 `;
 
-// Read off a renamed name rather than a dedicated constant: the scope id exists only inside the
-// names lightningcss produced, so reading it from one of those keeps these assertions honest —
-// a test that recomputed it would be a second implementation of the same rule.
+// Read off a renamed name: the scope id exists only inside the names `lightningcss` produced
+// A test that recomputed it would be a second implementation of the same rule
 function scopeIdOf(code: string): string {
   const match = code.match(/__(data-v-[0-9a-z]+)/);
   if (!match?.[1])
@@ -353,9 +335,8 @@ function scopeIdOf(code: string): string {
   return match[1];
 }
 
-// Every preprocessor fixture below authors the same shape - `.card` with a nested `.title` - so
-// the four of them assert one constant. The nested rule is a DESCENDANT selector, which the
-// registry still matches like a compound one (trap 6): two tokens, specificity [0, 2, 0].
+// Every preprocessor fixture authors `.card` with a nested `.title`, so they share one constant
+// The nested rule is a descendant selector, matched like a compound one: two tokens, [0, 2, 0]
 const NESTED_RULES = [
   {
     tokens: ['card'],
@@ -376,8 +357,8 @@ describe('metro-vue-transformer compileSfc <style> support', () => {
     const code = await compileSfc(SFC_WITH_ONE_STYLE_BLOCK, 'Card.vue');
     expect(code).toContain('registerRules(');
     expect(code).toContain("from '@symbiote-native/engine'");
-    // `#f00`, not `red`: lightningcss normalizes a colour keyword on the way through. Same colour
-    // to Fabric.
+    // `#f00`, not `red`: `lightningcss` normalizes a colour keyword
+    // Fabric sees the same colour
     expect(extractRegisterRulesArg(code)).toEqual([
       {
         tokens: ['card'],
@@ -388,10 +369,9 @@ describe('metro-vue-transformer compileSfc <style> support', () => {
     ]);
   });
 
-  // Two blocks no longer MERGE into one entry per class - each contributes its own rule and the
-  // cascade decides at resolve time. What this guards is `order`: the second block's rule restarts
-  // at 0 inside its own compile, so appendRules has to renumber it to 1, or the tie-break between
-  // two equally specific `.card` rules is undefined.
+  // Each block contributes its own rule and the cascade decides at resolve time
+  // This guards `order`: the second block restarts at 0, so `appendRules` has to renumber it to 1
+  // Without that the tie-break between two equally specific `.card` rules is undefined
   it('concatenates multiple <style> blocks with order increasing across them', async () => {
     const code = await compileSfc(SFC_WITH_TWO_STYLE_BLOCKS, 'Card.vue');
     expect(extractRegisterRulesArg(code)).toEqual([
@@ -431,10 +411,9 @@ describe('metro-vue-transformer compileSfc <style> support', () => {
     expect(extractRegisterRulesArg(code)).toEqual(NESTED_RULES);
   });
 
-  // why: lang="sass" (the indented syntax) and lang="scss" share ONE compiler entry point
-  // (compilePreprocessor('scss', ...)); only the synthetic file path fed to it tells dart-sass
-  // which syntax to parse. A regression here would make every indented-syntax SFC style block
-  // throw a brace-expected parse error instead of compiling.
+  // `lang="sass"` and `lang="scss"` share one `compilePreprocessor` entry
+  // Only the synthetic file path tells it which syntax to parse
+  // A regression makes every indented-syntax block throw a brace-expected parse error
   it('compiles a lang="sass" (indented syntax) block via the synthetic .sass path', async () => {
     const code = await compileSfc(SFC_WITH_SASS_STYLE_BLOCK, 'Card.vue');
     expect(extractRegisterRulesArg(code)).toEqual(NESTED_RULES);
@@ -476,8 +455,7 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
     expect(code).toContain(
       "import { registerRules, renameClassTokens as __scopeClass } from '@symbiote-native/engine'",
     );
-    // The runtime half now READS the renamed name out of the same map the styles registered
-    // under, instead of rebuilding it from a name set plus a scope id.
+    // The runtime half reads the renamed name from the same map the styles registered under
     expect(code).toContain(
       `__scopeClass({ active: isActive }, __scopedClassNames)`,
     );
@@ -507,8 +485,8 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
         style: { padding: 10 },
       },
     ]);
-    // static class="card highlight" — only the scoped token gets suffixed, the global one
-    // that lives in the sibling unscoped block passes through unchanged in the same string.
+    // Static `class="card highlight"`: only the scoped token is suffixed
+    // The global one from the sibling unscoped block passes through unchanged
     expect(code).toContain(`class: "card__${scopeId} highlight"`);
   });
 
@@ -519,10 +497,8 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
     );
     const scopeId = scopeIdOf(code);
 
-    // A compound rule carries BOTH renamed tokens rather than a name collapsed out of them, so
-    // there is nothing left for the registry to reverse: it matches the element whose token list
-    // is a superset. `cardBig__<scope>` and the per-token markup used to be two spellings that had
-    // to be reconciled; now the rule names exactly the two tokens the markup carries.
+    // A compound rule carries both renamed tokens, so the registry has nothing to reverse
+    // It matches the element whose token list is a superset, and the markup carries the same tokens
     expect(extractRegisterRulesArg(code)).toEqual([
       {
         tokens: [`card__${scopeId}`],
@@ -558,9 +534,8 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
     expect(code).not.toMatch(/reset__data-v-/);
   });
 
-  // why: `:global()` around PART of a selector is the escape hatch for reaching markup this file
-  // does not own. lightningcss answers this for free: a name it did not rename is global, so
-  // `legacy` never enters the rename map and the escape hatch cannot be scope-mangled shut.
+  // `:global()` around part of a selector reaches markup this file does not own
+  // `lightningcss` leaves a name it did not rename global, so `legacy` never enters the rename map
   it('leaves a partial :global() token unsuffixed while the rest of its chain is suffixed', async () => {
     const code = await compileSfc(
       SFC_WITH_PARTIAL_GLOBAL_IN_SCOPED_BLOCK,
@@ -568,8 +543,7 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
     );
     const scopeId = scopeIdOf(code);
 
-    // Both rules survive registration: the two-token rule LAYERS over `.card` rather than
-    // replacing it, so `.card`'s own declarations must still be there to layer under.
+    // Both rules survive registration: the two-token rule layers over `.card`, not replacing it
     expect(extractRegisterRulesArg(code)).toEqual([
       {
         tokens: [`card__${scopeId}`],
@@ -577,8 +551,7 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
         order: 0,
         style: { padding: 10 },
       },
-      // Per-token renaming again: the `card` half carries the scope, the `:global()` half does
-      // not, and the rule names them exactly as they now read.
+      // The `card` half carries the scope, the `:global()` half does not
       {
         tokens: [`card__${scopeId}`, 'legacy'],
         specificity: [0, 2, 0],
@@ -590,9 +563,8 @@ describe('metro-vue-transformer compileSfc <style scoped> support', () => {
     expect(code).not.toContain(`legacy__${scopeId}`);
   });
 
-  // why: the exemption must be surgical — a fully global selector still registers under its plain
-  // name and an ordinary scoped one in the SAME block still gets its suffix. Widening the token
-  // exemption into either of those would unscope the whole file.
+  // The exemption must be surgical: a fully global selector keeps its plain name
+  // An ordinary scoped class in the same block still gets its suffix
   it('still suffixes an ordinary scoped class beside a fully global one in the same block', async () => {
     const code = await compileSfc(
       SFC_WITH_GLOBAL_AND_SCOPED_RULES_IN_ONE_BLOCK,
@@ -681,8 +653,8 @@ describe('metro-vue-transformer compileSfc <style module> support', () => {
 
   it('never auto-applies a module class to a literal class= attribute (opt-in via $style.x only)', async () => {
     const code = await compileSfc(SFC_WITH_MODULE_STYLE_BLOCK, 'Card.vue');
-    // Unlike <style scoped>, module classes must not be added to __scopedClassNames — a
-    // literal class="card" elsewhere in the same file must stay unsuffixed.
+    // Unlike `<style scoped>`, module classes stay out of `__scopedClassNames`
+    // so a literal `class="card"` elsewhere in the file stays unsuffixed
     expect(code).not.toContain('__scopedClassNames');
   });
 
@@ -691,10 +663,8 @@ describe('metro-vue-transformer compileSfc <style module> support', () => {
       SFC_WITH_SCOPED_AND_MODULE_BLOCKS_SHARING_A_CLASS_NAME,
       'Card.vue',
     );
-    // The two tails no longer share their spelling: a module tail is the bare hash, matching the
-    // standalone `.module.css` form (and SCOPE_TAIL_PATTERN's `module__[0-9a-z]+`, which the old
-    // `module__data-v-<hash>` never matched — that is why base layering and compound lookup were
-    // dead in a Vue `<style module>`). Same hash, different shape, still no collision.
+    // A module tail is the bare hash, as in a standalone `.module.css`
+    // A scoped tail is `data-v-<hash>`, so one hash in two shapes never collides
     expect(extractRegisterRulesArg(code)).toEqual([
       {
         tokens: [`card__${scopeIdOf(code)}`],
@@ -712,9 +682,8 @@ describe('metro-vue-transformer compileSfc <style module> support', () => {
   });
 });
 
-// A kebab class is registered AS AUTHORED now. Nothing in the pipeline camelCases, so
-// `.section-label` is the token `section-label` on both sides and the two spellings that used to
-// have to be reconciled (and the registry's kebab->camel fallback that reconciled them) are gone.
+// A kebab class is registered as authored: nothing in the pipeline `camelCases` it
+// So `.section-label` is the token `section-label` on both sides, with no fallback involved
 describe('metro-vue-transformer compileSfc kebab-case class= support', () => {
   it('registers a kebab-case CSS selector under its authored name (unscoped)', async () => {
     const code = await compileSfc(SFC_WITH_KEBAB_CLASS_UNSCOPED, 'Card.vue');
@@ -726,8 +695,8 @@ describe('metro-vue-transformer compileSfc kebab-case class= support', () => {
         style: { color: '#f00' },
       },
     ]);
-    // the raw kebab class="section-label" attribute passes through unrewritten (no scoped block
-    // installs the nodeTransform) and now matches the rule's token exactly - no fallback involved.
+    // The raw `class="section-label"` passes through unrewritten, as no scoped block installs
+    // the `nodeTransform`, and it matches the rule's token exactly
     expect(code).toContain('class: "section-label"');
   });
 
@@ -750,8 +719,7 @@ describe('metro-vue-transformer compileSfc kebab-case class= support', () => {
       },
     ]);
     expect(code).toContain(`class: "section-label__${scopeId}"`);
-    // ONE entry per authored class - the camelCase alias each used to carry is gone with the
-    // camelCasing itself.
+    // One entry per authored class, with no `camelCase` alias
     expect(code).toContain(
       `const __scopedClassNames = {"is-active":"is-active__${scopeId}","section-label":"section-label__${scopeId}"};`,
     );
@@ -759,9 +727,8 @@ describe('metro-vue-transformer compileSfc kebab-case class= support', () => {
 
   it('leaves a kebab-case key inside a dynamic :class toggle-map object literal alone', async () => {
     const code = await compileSfc(SFC_WITH_KEBAB_CLASS_SCOPED, 'Card.vue');
-    // The toggle-map key stays kebab in the SOURCE expression (Vue reproduces it unchanged) and
-    // renameClassTokens looks it up under that same spelling at runtime. Here we only confirm the
-    // compiled call site wraps the original expression unchanged.
+    // The toggle-map key stays kebab in the source expression, and `renameClassTokens` looks it
+    // up under that spelling at runtime, so the call site must wrap the expression unchanged
     expect(code).toContain(
       "__scopeClass({ 'is-active': isActive }, __scopedClassNames)",
     );
@@ -786,9 +753,8 @@ const rows = ['a'];
 `;
 
 describe('metro-vue-transformer bare boolean attributes', () => {
-  // why: a bare attribute is Vue's boolean shorthand, but Vue casts it to `true` only for a prop the
-  // component declares Boolean. Our tags declare nothing and our components forward attrs, so it
-  // reached native as "" and Android's ViewManager threw `String cannot be cast to Boolean`.
+  // Vue casts a bare attribute to `true` only for a declared Boolean prop, and our tags declare
+  // none, so it reached native as "" and Android threw `String cannot be cast to Boolean`
   it('passes true for a bare attribute on an intrinsic tag', async () => {
     const code = await compileSfc(SFC_WITH_BARE_ATTRIBUTES, 'Screen.vue');
     expect(code).toContain('"nested-scroll-enabled": true');
@@ -800,13 +766,13 @@ describe('metro-vue-transformer bare boolean attributes', () => {
     expect(code).toContain('"scroll-enabled": true');
   });
 
-  // why: the app's own component keeps Vue's semantics — a bare attribute on a String prop is "".
+  // The app's own component keeps Vue's semantics: a bare attribute on a String prop is `""`
   it("leaves a bare attribute on the app's own component to Vue", async () => {
     const code = await compileSfc(SFC_WITH_BARE_ATTRIBUTES, 'Screen.vue');
     expect(code).toContain('flag: ""');
   });
 
-  // why: an explicit empty value is a string, not the shorthand.
+  // An explicit empty value is a string, not the shorthand
   it('keeps an explicit empty string', async () => {
     const code = await compileSfc(SFC_WITH_BARE_ATTRIBUTES, 'Screen.vue');
     expect(code).toContain('placeholder: ""');

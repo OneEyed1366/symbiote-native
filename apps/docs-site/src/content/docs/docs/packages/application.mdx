@@ -14,19 +14,6 @@ SymbioteNative adapter can read it. Like [local auth](/docs/packages/local-auth/
 is either a plain constant resolved once at import time or a one-shot async call with no
 per-instance state.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
-
 ## Installation
 
 ```sh
@@ -38,16 +25,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --a
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-application` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-application`'s native code is discovered by `expo-modules-autolinking`,
   a different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every future `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -308,8 +295,8 @@ Sources: [Expo docs: Application](https://docs.expo.dev/versions/latest/sdk/appl
 
 ## How the wrapper works
 
-`@symbiote-native/application` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-application` itself —
-its constants and functions are hand-ported, verbatim, into this package's own `core/`, resolving
+`@symbiote-native/application` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-application` itself.
+Its constants and functions are hand-ported, verbatim, into this package's own `core/`. They resolve
 the native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
 meta-package this project never installs:
 
@@ -329,8 +316,8 @@ Solid has no `solid/` directory at all: `package.json`'s `"./solid"` export poin
 directly (`.claude/rules/barrel-passthrough.md`).
 
 Same shape as [local auth](/docs/packages/local-auth/)'s five adapter entries: single-file
-re-exports with no lifecycle code at all, since every export here is either an eagerly-resolved
-constant or a stateless one-shot call — there is nothing for a hook, composable, or service to
-subscribe to or clean up. The native code itself is never vendored or copied —
+re-exports with no lifecycle code at all. Every export here is either an eagerly-resolved
+constant or a stateless one-shot call, so there is nothing for a hook, composable, or service to
+subscribe to or clean up. The native code itself is never vendored or copied.
 `expo-modules-autolinking` resolves it straight out of `node_modules` (see [the native setup
 guide](/docs/howtos/expo-native-module-setup/)).

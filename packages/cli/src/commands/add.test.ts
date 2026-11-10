@@ -10,20 +10,21 @@ vi.mock('../detect-framework.js', () => ({
 vi.mock('../detect-added-layers.js', () => ({
   detectAddedLayers: vi.fn(),
 }));
-// explicitLayersFromFlags stays real (pure, trivial) — only the resolvers that need mocking are
-// replaced, via importOriginal rather than hand-duplicating its five-flag mapping here.
-vi.mock('../prompts.js', async importOriginal => ({
-  ...(await importOriginal<typeof import('../prompts.js')>()),
+// `explicitLayersFromFlags` stays real, being pure and trivial, so only the resolvers are replaced
+vi.mock('../add-layer-prompts.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../add-layer-prompts.js')>()),
   resolveAddLayers: vi.fn(),
   resolveAddOverwrite: vi.fn(),
+}));
+vi.mock('../prompts.js', async importOriginal => ({
+  ...(await importOriginal<typeof import('../prompts.js')>()),
   resolveGrantSelection: vi.fn(),
   resolvePackageManager: vi.fn(),
 }));
 vi.mock('../add-layers.js', () => ({
   addLayersToApp: vi.fn(),
 }));
-// discoveredBundlesFromLayers stays real (pure, trivial — same reasoning as
-// explicitLayersFromFlags below) — only applyBundle needs mocking, since it writes files.
+// `discoveredBundlesFromLayers` stays real for the same reason, and only `applyBundle` writes files
 vi.mock('../grant-bundles.js', async importOriginal => ({
   ...(await importOriginal<typeof import('../grant-bundles.js')>()),
   applyBundle: vi.fn(),
@@ -38,12 +39,10 @@ const clack = await import('@clack/prompts');
 const { detectSymbioteFrameworkFromDependencies, readCwdDependencies } =
   await import('../detect-framework.js');
 const { detectAddedLayers } = await import('../detect-added-layers.js');
-const {
-  resolveAddLayers,
-  resolveAddOverwrite,
-  resolveGrantSelection,
-  resolvePackageManager,
-} = await import('../prompts.js');
+const { resolveAddLayers, resolveAddOverwrite } =
+  await import('../add-layer-prompts.js');
+const { resolveGrantSelection, resolvePackageManager } =
+  await import('../prompts.js');
 const { addLayersToApp } = await import('../add-layers.js');
 const { applyBundle } = await import('../grant-bundles.js');
 const { NotSymbioteAppError } = await import('../errors.js');
@@ -60,15 +59,22 @@ const BASE_PARSED: IAddCommand = {
   hasTesting: false,
   hasSplashScreen: false,
   hasSlider: false,
+  hasReanimated: false,
+  expoPackages: new Set(),
   hasForce: false,
   packageManager: 'npm',
 };
 
-// resolveFrameworkForAdd is `add`'s eligibility guard — its own purpose statement (from the design
-// review this redesign came out of): `add` extends an EXISTING @symbiote-native/* app, it doesn't
-// bootstrap symbiote into a plain RN project, so it must refuse rather than fall back to an
-// interactive framework picker (the OLD behavior, dropped along with the old "install symbiote
-// into any RN app" scope).
+function outroText(): string {
+  return vi
+    .mocked(clack.outro)
+    .mock.calls.map(([message]) => message)
+    .join('\n');
+}
+
+// `resolveFrameworkForAdd` is the eligibility guard of `add`, which extends an EXISTING
+// @symbiote-native/* app and does not bootstrap one into plain RN, so it refuses instead of
+// falling back to an interactive framework picker
 describe('resolveFrameworkForAdd', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,8 +109,8 @@ describe('resolveFrameworkForAdd', () => {
     expect(resolveFrameworkForAdd('react', '/fake')).toBe('react');
   });
 
-  // An explicit flag that disagrees with what's actually installed reads as a typo or a stale
-  // command far more often than genuine intent to override reality — refuse instead of trusting it.
+  // A flag that disagrees with what is installed reads as a typo or a stale command
+  // That is far likelier than an intent to override reality, so it is refused
   it('rejects an explicit --framework that disagrees with the detected adapter', () => {
     vi.mocked(readCwdDependencies).mockReturnValue({
       '@symbiote-native/react': '1.0.0',
@@ -131,8 +137,19 @@ describe('runAdd', () => {
     vi.mocked(detectAddedLayers).mockReturnValue(new Set());
   }
 
-  // The guard runs BEFORE anything else — no point resolving layers for a project `add` refuses
-  // to touch.
+  function mockApplied(
+    layers: readonly string[],
+    hasManualBabelStep = false,
+  ): void {
+    vi.mocked(addLayersToApp).mockResolvedValue({
+      appliedLayers: layers,
+      skippedLayers: [],
+      hasManualBabelStep,
+    });
+  }
+
+  // The guard runs before anything else, as there is no point resolving layers for a project
+  // `add` refuses to touch
   it('refuses on a non-symbiote project before resolving any layers', async () => {
     vi.mocked(readCwdDependencies).mockReturnValue({});
     vi.mocked(detectSymbioteFrameworkFromDependencies).mockReturnValue(
@@ -143,25 +160,17 @@ describe('runAdd', () => {
     expect(resolveAddLayers).not.toHaveBeenCalled();
   });
 
-  // splash-screen's hide() JS wiring is spliced into the App source by addLayersToApp itself
-  // (apply-splash-screen-hide.ts) — `add` prints no manual per-framework instructions for a
-  // step it does itself.
+  // The `hide()` wiring for splash-screen is spliced into the App source by `addLayersToApp`
+  // So `add` prints no manual per-framework instructions for a step it does itself
   it('does not print manual hide() instructions when splash-screen is applied', async () => {
     mockEligibleApp('vue');
     vi.mocked(resolveAddLayers).mockResolvedValue(['splash-screen']);
-    vi.mocked(addLayersToApp).mockResolvedValue({
-      appliedLayers: ['splash-screen'],
-      skippedLayers: [],
-    });
+    mockApplied(['splash-screen']);
 
     await runAdd({ ...BASE_PARSED, hasSplashScreen: true });
 
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).not.toContain('onMounted');
-    expect(outroText).not.toContain('Call hide()');
+    expect(outroText()).not.toContain('onMounted');
+    expect(outroText()).not.toContain('Call hide()');
   });
 
   it('does nothing when every layer is already present and none was explicitly requested', async () => {
@@ -176,10 +185,7 @@ describe('runAdd', () => {
   it('applies the resolved layers against the current working directory', async () => {
     mockEligibleApp();
     vi.mocked(resolveAddLayers).mockResolvedValue(['navigation']);
-    vi.mocked(addLayersToApp).mockResolvedValue({
-      appliedLayers: ['navigation'],
-      skippedLayers: [],
-    });
+    mockApplied(['navigation']);
 
     await runAdd({ ...BASE_PARSED, hasNavigation: true });
 
@@ -192,21 +198,55 @@ describe('runAdd', () => {
     );
   });
 
-  // The overwrite policy (TTY confirm / --force / non-interactive skip) lives in resolveAddOverwrite
-  // — this proves runAdd actually wires the real --force flag into it rather than hardcoding a
-  // choice of its own.
-  //
-  // why: a developer who just added `audio` won't know it also offers an optional,
-  // policy-sensitive Android bundle unless `add` OFFERS it right there — printing a command to run
-  // later is bad DX (the previous shape this replaces), so `add` asks interactively and applies
-  // the developer's actual choice, same as `grant` itself would.
+  // Reanimated has a native half, so a developer who just added it needs the pods and a rebuild
+  it('tells the developer to run pod install after reanimated is applied', async () => {
+    mockEligibleApp();
+    vi.mocked(resolveAddLayers).mockResolvedValue(['reanimated']);
+    mockApplied(['reanimated']);
+
+    await runAdd({ ...BASE_PARSED, hasReanimated: true });
+
+    expect(outroText()).toContain('pod install');
+  });
+
+  it('stays silent about the babel plugin when reanimated wrote it itself', async () => {
+    mockEligibleApp();
+    vi.mocked(resolveAddLayers).mockResolvedValue(['reanimated']);
+    mockApplied(['reanimated'], false);
+
+    await runAdd({ ...BASE_PARSED, hasReanimated: true });
+
+    expect(outroText()).not.toContain('react-native-worklets/plugin');
+  });
+
+  // An app whose babel config has no plugins list cannot be edited, so the developer is told to
+  it('names the babel plugin step when the config could not take it', async () => {
+    mockEligibleApp();
+    vi.mocked(resolveAddLayers).mockResolvedValue(['reanimated']);
+    mockApplied(['reanimated'], true);
+
+    await runAdd({ ...BASE_PARSED, hasReanimated: true });
+
+    expect(outroText()).toContain('react-native-worklets/plugin');
+  });
+
+  it('prints no pod install note when reanimated was not part of the add', async () => {
+    mockEligibleApp();
+    vi.mocked(resolveAddLayers).mockResolvedValue(['navigation']);
+    mockApplied(['navigation']);
+
+    await runAdd({ ...BASE_PARSED, hasNavigation: true });
+
+    expect(outroText()).not.toContain('pod install');
+  });
+
+  // A developer who just added `audio` will not know it also offers an optional, policy-sensitive
+  // Android bundle unless `add` offers it there, since a command printed for later is bad DX
+  // So `add` asks interactively and applies the actual choice, as `grant` itself would
   it('offers to grant a bundle for a newly-applied package that has one, and applies what was picked', async () => {
     mockEligibleApp();
     vi.mocked(resolveAddLayers).mockResolvedValue(['audio']);
-    vi.mocked(addLayersToApp).mockResolvedValue({
-      appliedLayers: ['audio'],
-      skippedLayers: [],
-    });
+    mockApplied(['audio']);
     const bundle = {
       id: 'recording',
       label: 'Background audio recording',
@@ -224,44 +264,29 @@ describe('runAdd', () => {
       expect.stringContaining(bundle.warning),
       bundle.label,
     );
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).toContain(bundle.label);
+    expect(outroText()).toContain(bundle.label);
   });
 
-  // why: declining every offered bundle is an informed choice, not a failure — nothing should be
-  // applied, and repeating a "run grant later" hint the developer just answered would be noise.
+  // Declining every offered bundle is an informed choice, not a failure
+  // Nothing is applied, and a "run grant later" hint would repeat what they just answered
   it('applies nothing when the developer declines every offered bundle', async () => {
     mockEligibleApp();
     vi.mocked(resolveAddLayers).mockResolvedValue(['audio']);
-    vi.mocked(addLayersToApp).mockResolvedValue({
-      appliedLayers: ['audio'],
-      skippedLayers: [],
-    });
+    mockApplied(['audio']);
     vi.mocked(resolveGrantSelection).mockResolvedValue([]);
 
     await runAdd({ ...BASE_PARSED, expoPackages: new Set(['audio']) });
 
     expect(applyBundle).not.toHaveBeenCalled();
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).not.toContain('grant');
+    expect(outroText()).not.toContain('grant');
   });
 
-  // why: a piped/CI `add` can't pop an interactive multiselect — resolveGrantSelection fails fast
-  // in that case (its own documented contract), and `add` must not let that abort the whole
-  // command. It falls back to the printed hint so the developer still hears about it later.
+  // A piped or CI `add` cannot pop a multiselect, so `resolveGrantSelection` fails fast
+  // That must not abort the command, which falls back to the printed hint
   it('falls back to a printed hint when resolveGrantSelection cannot ask (non-interactive)', async () => {
     mockEligibleApp();
     vi.mocked(resolveAddLayers).mockResolvedValue(['audio']);
-    vi.mocked(addLayersToApp).mockResolvedValue({
-      appliedLayers: ['audio'],
-      skippedLayers: [],
-    });
+    mockApplied(['audio']);
     vi.mocked(resolveGrantSelection).mockRejectedValue(
       new CliUsageError('not interactive'),
     );
@@ -269,41 +294,35 @@ describe('runAdd', () => {
     await runAdd({ ...BASE_PARSED, expoPackages: new Set(['audio']) });
 
     expect(applyBundle).not.toHaveBeenCalled();
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).toContain('@symbiote-native/cli grant audio');
+    expect(outroText()).toContain('@symbiote-native/cli grant audio');
   });
 
-  // why: a package with no optional bundle (e.g. battery) has nothing to ask about — must not pop
-  // an empty prompt or print a hint that leads nowhere (`grant battery` would just report
-  // "nothing to grant").
+  // A package with no optional bundle (battery) has nothing to ask about
+  // So there is no empty prompt and no hint, as `grant battery` would only report nothing to grant
   it('does not ask or hint at `grant` for a package with no optional manifest bundle', async () => {
     mockEligibleApp();
     vi.mocked(resolveAddLayers).mockResolvedValue(['battery']);
-    vi.mocked(addLayersToApp).mockResolvedValue({
-      appliedLayers: ['battery'],
-      skippedLayers: [],
-    });
+    mockApplied(['battery']);
 
     await runAdd({ ...BASE_PARSED, expoPackages: new Set(['battery']) });
 
     expect(resolveGrantSelection).not.toHaveBeenCalled();
-    const outroText = vi
-      .mocked(clack.outro)
-      .mock.calls.map(([message]) => message)
-      .join('\n');
-    expect(outroText).not.toContain('grant');
+    expect(outroText()).not.toContain('grant');
   });
 
+  // The overwrite policy lives in `resolveAddOverwrite`
+  // This proves `runAdd` wires the real --force flag into it instead of choosing for itself
   it('wires the testing-overwrite confirm through to resolveAddOverwrite with --force', async () => {
     mockEligibleApp();
     vi.mocked(resolveAddLayers).mockResolvedValue(['testing']);
     vi.mocked(resolveAddOverwrite).mockResolvedValue(true);
     vi.mocked(addLayersToApp).mockImplementation(async options => {
       await options.confirmTestingOverwrite();
-      return { appliedLayers: ['testing'], skippedLayers: [] };
+      return {
+        appliedLayers: ['testing'],
+        skippedLayers: [],
+        hasManualBabelStep: false,
+      };
     });
 
     await runAdd({ ...BASE_PARSED, hasTesting: true, hasForce: true });

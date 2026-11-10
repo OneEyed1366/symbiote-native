@@ -115,8 +115,7 @@ const withoutFeedback = (
   commit('touchable-without-feedback', ownerProps, childProps, hasPress);
 
 describe('what the owner clones onto its child', () => {
-  // why: the headline. The owner is an anchor and commits nothing, so a name it carries is LOST
-  // unless it arrives here — this is what the primitive is.
+  // The owner commits nothing, so a name it carries is lost unless it lands on the child
   it('carries the owner’s accessibility names down to the child', () => {
     const { child } = nativeFeedback({
       accessibilityLabel: 'Close',
@@ -129,33 +128,27 @@ describe('what the owner clones onto its child', () => {
     expect(child.testID).toBe('sheet-close');
   });
 
-  // why: RN's `cloneElement` assigns EVERY key of its config, so an owner with no
-  // `accessibilityLabel` CLEARS the child's. A fold that only ever added would leave the child's own
-  // value standing, which reads as "the clone worked" on every case above.
+  // `cloneElement` assigns every key of its config, so an absent owner label clears the child's
   it('clears a child’s own value the owner does not carry', () => {
     const { child } = nativeFeedback({}, { accessibilityLabel: 'stale' });
 
     expect(child.accessibilityLabel).toBe(undefined);
   });
 
-  // why: the same rule on the other tag, asked separately. TWF's clone list is NOT TNF's — its
-  // passthrough half is copied only when SET (`:281`) — so one answer does not imply the other.
+  // TWF's passthrough half is copied only when set (`:281`), so TNF's answer does not imply it
   it('copies a set name on the without-feedback tag too', () => {
     const { child } = withoutFeedback({ accessibilityLabel: 'Close' });
 
     expect(child.accessibilityLabel).toBe('Close');
   });
 
-  // why: `accessible` defaults ON unless the app opts out with a literal `false` (`:369-372`), and
-  // it is the OWNER's prop that decides — the child never saw it.
+  // `accessible` defaults on unless the owner writes a literal `false` (`:369-372`)
   it('makes the child accessible unless the owner opts out', () => {
     expect(nativeFeedback({}).child.accessible).toBe(true);
     expect(nativeFeedback({ accessible: false }).child.accessible).toBe(false);
   });
 
-  // why: `focusable`'s middle leg is the OWNER's press listener, which is a name the behavior owns
-  // and therefore lives in no bag. It is the parent's bit that decides, not the child's — the case
-  // that makes this a parent-keyed rule rather than a self-keyed one.
+  // `focusable` reads the owner's press listener bit, which lives in no bag
   it('reads the owner’s press listener for focusable', () => {
     expect(nativeFeedback({}, {}, false).child.focusable).toBe(false);
     expect(nativeFeedback({}, {}, true).child.focusable).toBe(true);
@@ -164,8 +157,7 @@ describe('what the owner clones onto its child', () => {
     );
   });
 
-  // why: a screen reader reads `accessibilityState.disabled`, never the `disabled` prop, and the
-  // owner's `disabled` has to reach the child's state or a disabled touchable announces as enabled.
+  // A screen reader reads `accessibilityState.disabled`, never the `disabled` prop
   it('folds the owner’s disabled into the child’s accessibilityState', () => {
     const state = nativeFeedback({ disabled: true }).child.accessibilityState;
 
@@ -176,19 +168,14 @@ describe('what the owner clones onto its child', () => {
     ).toBe(true);
   });
 
-  // why: the OTHER half of TWF's split, and it is the half a shared rule would quietly lose. Its
-  // passthrough keys are copied only when SET, so an owner with no `testID` leaves the child's
-  // standing — where TNF's unconditional clone erases it. Asserted beside its TNF twin above
-  // because the two look like one rule and are not.
+  // Unlike TNF's unconditional clone, an owner with no `testID` leaves the child's standing
   it('leaves a child’s own value alone when the without-feedback owner carries none', () => {
     const { child } = withoutFeedback({}, { testID: 'mine' });
 
     expect(child.testID).toBe('mine');
   });
 
-  // why: the owner's aria props are on a node that is never committed, so `fabricProps`'s own aria
-  // fold — which reads the node being committed — can never see them. The rule folds the OWNER's bag
-  // before cloning, and without that an `aria-label` on a touchable reaches nothing at all.
+  // The owner is never committed, so the engine's own aria fold never sees its bag
   it('folds the owner’s aria aliases, which the engine’s own fold cannot see', () => {
     const { child } = nativeFeedback({
       'aria-label': 'Close',
@@ -199,20 +186,41 @@ describe('what the owner clones onto its child', () => {
     expect(child.importantForAccessibility).toBe('no-hide-descendants');
   });
 
-  // why: `id` is the W3C alias and beats a `nativeID` written beside it. `routeProp` settles that on
-  // the way in, so what the rule sees is one name — this asserts the two seams compose, which is the
-  // only place they can be seen together.
+  // Neither clone reads `role` (TNF `:353` takes `accessibilityRole` only)
+  it('does not turn the owner’s role into the child’s accessibilityRole', () => {
+    expect(nativeFeedback({ role: 'button' }).child.accessibilityRole).toBe(
+      undefined,
+    );
+    expect(withoutFeedback({ role: 'button' }).child.accessibilityRole).toBe(
+      undefined,
+    );
+  });
+
+  // TWF never reads `aria-label` (its aria list is the state, value, live, hidden, modal), TNF does
+  it('clones aria-label on the native-feedback tag only', () => {
+    expect(nativeFeedback({ 'aria-label': 'x' }).child.accessibilityLabel).toBe(
+      'x',
+    );
+    expect(
+      withoutFeedback({ 'aria-label': 'x' }).child.accessibilityLabel,
+    ).toBe(undefined);
+  });
+
+  it('lets aria-label win over accessibilityLabel on the native-feedback tag', () => {
+    expect(
+      nativeFeedback({ 'aria-label': 'alias', accessibilityLabel: 'own' }).child
+        .accessibilityLabel,
+    ).toBe('alias');
+  });
+
+  // `routeProp` settles `id` over `nativeID` before the rule sees one name
   it('lands the owner’s id on the child, with id winning', () => {
     const { child } = nativeFeedback({ id: 'from-id', nativeID: 'losing' });
 
     expect(child.nativeID).toBe('from-id');
   });
 
-  // why: TouchableWithoutFeedback.js's own clone is NOT `id ?? nativeID` — it composes
-  // `nativeID: props.id ?? props.nativeID` and THEN runs a `PASSTHROUGH_PROPS` loop (:279-282)
-  // that includes `nativeID` and unconditionally overwrites it with the raw authored value when
-  // set (:280 `props[prop] !== undefined`). So an app authoring BOTH ends up with `nativeID`
-  // winning here, the opposite of TouchableNativeFeedback's `id` above.
+  // TWF's passthrough loop (:279-282) overwrites `id ?? nativeID` with the raw `nativeID`
   it('lands the owner’s nativeID on the without-feedback child, with nativeID winning', () => {
     const { child } = withoutFeedback({
       id: 'losing',
@@ -222,11 +230,7 @@ describe('what the owner clones onto its child', () => {
     expect(child.nativeID).toBe('from-native-id');
   });
 
-  // why: NO RIPPLE OFF ANDROID. `getBackgroundProp` returns null there (`:402`), and the rule's
-  // Android half is `#ifdef ANDROID` — so this host, which is not Android, must write neither slot.
-  // The positive half of that branch is NOT reachable here and is recorded as the gap it is: a
-  // compile-time branch is only testable in a build that compiles it, the same hole
-  // `android_ripple` and `decelerationRate` already carry.
+  // `getBackgroundProp` is null off Android (`:402`); the Android half is `#ifdef`, built elsewhere
   it('writes no Android background off Android', () => {
     const { child } = nativeFeedback({ useForeground: true });
 
@@ -234,13 +238,7 @@ describe('what the owner clones onto its child', () => {
     expect(child.nativeForegroundAndroid).toBe(undefined);
   });
 
-  // why: THE OWNER'S WRITE HAS TO REACH THE CHILD, and nothing makes it on its own — `markPropsDirty`
-  // bubbles UP, so a prop written on the owner after mount dirties the owner and stops. The rule
-  // runs on the CHILD'S commit, so a child nothing dirtied is never re-folded and keeps the payload
-  // it mounted with. `SLOT_DERIVED` is what closes that, and this is what witnesses it.
-  //
-  // It moved here from the behavior's own vitest file with the rule: the dirtying is still JS, but
-  // the only way to SEE it is the payload the rule produces.
+  // `markPropsDirty` bubbles up, so the child is re-folded only because `SLOT_DERIVED` dirties it
   it('re-clones when an owner prop changes after mount', () => {
     const surface = createSurface(ROOT_TAG);
     const owner: ISymbioteNode = createElement(
@@ -262,13 +260,7 @@ describe('what the owner clones onto its child', () => {
     expect(committedPayloadOf(child)?.accessibilityLabel).toBe('After');
   });
 
-  // why: THE WILDCARD IS LIVE, asked with a key no clone list names. `SLOT_DERIVED_ALL` is what a
-  // `cloneElement` owner actually means — it re-clones on every render, whatever changed.
-  //
-  // `hitSlop` is the probe rather than `accessibilityLabel`, and that is the whole point: a NAMED
-  // list makes every key its own question, and the one it forgets fails silently. Break-tested by
-  // reducing `SLOT_DERIVED` to `['accessibilityLabel']`, which turned this red and left every other
-  // case in the file green.
+  // `hitSlop` probes the `SLOT_DERIVED_ALL` wildcard, a named list would forget keys silently
   it('dirties the child on a late write of any cloned key', () => {
     const surface = createSurface(ROOT_TAG);
     const owner: ISymbioteNode = createElement(
@@ -289,9 +281,7 @@ describe('what the owner clones onto its child', () => {
     expect(committedPayloadOf(child)?.hitSlop).toBe(8);
   });
 
-  // why: the LISTENER half of the same thing, and it needs its own case because a listener flip
-  // changes no prop — `onOwnedListenerChange` is the only thing that can dirty the child for it.
-  // Without that the bit crosses, the rule would read it, and the rule never runs.
+  // A listener flip changes no prop, only `onOwnedListenerChange` can dirty the child for it
   it('re-clones focusable when a press listener is wired after mount', () => {
     const surface = createSurface(ROOT_TAG);
     const owner: ISymbioteNode = createElement(
@@ -312,9 +302,7 @@ describe('what the owner clones onto its child', () => {
     expect(committedPayloadOf(child)?.focusable).toBe(true);
   });
 
-  // why: THE PRICE, and the reason this file is written. One crossing per touchable per commit for
-  // a forty-key bag — `tag-rule-cost.itest.ts` prices a fold by the size of what it marshals, so
-  // this is the most expensive fold still standing.
+  // The rule runs in C++, so no fold trips into JS per touchable per commit
   it('costs the child no trip into JS', () => {
     const feedback = nativeFeedback({ accessibilityLabel: 'Close' });
     print(`DEBUG touchable-native-feedback child folds=${feedback.folds}`);

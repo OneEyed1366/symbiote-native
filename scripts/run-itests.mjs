@@ -26,6 +26,11 @@ import { fileURLToPath } from 'node:url';
 
 import esbuild from 'esbuild';
 
+import {
+  reanimatedItestSeams,
+  reanimatedNodePaths,
+} from './reanimated-itest-seams.mjs';
+
 const require_ = createRequire(import.meta.url);
 
 /**
@@ -125,13 +130,14 @@ if (typeof globalThis.console === "undefined") {
     group: say("group"), groupEnd: function () {}, table: say("table"),
   };
 }
+// A bridgeless host always has this global and the engine's device-event hub refuses to start
+// without it. Nothing is reachable behind it, so Dimensions falls back to zero metrics
+if (typeof globalThis.RN$registerCallableModule !== "function") {
+  globalThis.RN$registerCallableModule = function () {};
+}
 if (typeof globalThis.window === "undefined") globalThis.window = globalThis;
 if (typeof globalThis.navigator === "undefined") {
   globalThis.navigator = { product: "ReactNative" };
-}
-// A bridgeless host provides this and the device event hub registers with it
-if (typeof globalThis.RN$registerCallableModule !== "function") {
-  globalThis.RN$registerCallableModule = function () {};
 }
 if (typeof URLSearchParams !== "function") {
   globalThis.URLSearchParams = class URLSearchParams {
@@ -200,13 +206,51 @@ const FLOW_STRIP = require_.resolve('@babel/plugin-transform-flow-strip-types');
 const RN_SOURCE =
   /\/node_modules\/(react-native|@react-native\/[^/]+)\/.*\.jsx?$/;
 
-// Opt-in per file: resolves `./X` to `X.ios.js` for React Native's own files only
-// Why it is scoped and opt-in: the `symbiote-itest-runner` skill
+/**
+ * Metro platform extensions for RN files only, opt-in via `@symbiote-platform-extensions`.
+ * Without them `Platform.js` resolves to itself, always-on it broke 154 of 158 itests at import
+ * (`NativePlatformConstantsIOS` needs a native module), so our own sources keep plain resolution
+ */
 const PLATFORM_EXTENSIONS_DIRECTIVE = '@symbiote-platform-extensions';
+const REACT_JSX_DIRECTIVE = '@symbiote-react-jsx';
 
-// Opt-in per file: counts what a stock arm asks Fabric to create, by view name
-// Why it lives in the banner and owes a restore call: the `symbiote-itest-runner` skill
+/**
+ * Count what a STOCK arm asks Fabric to create, by view name — the headless twin of
+ * `examples/*​/fabric-call-counter.ts`, and the only way to take that number here.
+ *
+ * It lives in the banner because React captures `createNode` before any test body runs
+ * Opt-in via `@symbiote-count-fabric-calls`, the file owes `__symbioteRestoreFabric()` after load
+ */
 const FABRIC_COUNT_DIRECTIVE = '@symbiote-count-fabric-calls';
+
+// A file asks for Fabric feature flags with `@symbiote-fabric-flags {"enableViewCulling":true}`,
+// on as many lines as it likes. The tester reads them once per process: `SYMBIOTE_FLAGS`
+const FABRIC_FLAGS_PATTERN = /@symbiote-fabric-flags\s+(\{.*\})/g;
+
+// A flag value `"*"` runs the file once per boolean, as Fantom's `@fantom_flags name:*` does
+const EVERY_VALUE = '*';
+
+// One entry per flag combination a file asks for, `flags` undefined when it asks for none
+function fabricFlagVariantsOf(file) {
+  const found = [...readFileSync(file, 'utf8').matchAll(FABRIC_FLAGS_PATTERN)];
+  if (found.length === 0) return [{ flags: undefined, label: '' }];
+  const merged = Object.assign({}, ...found.map(match => JSON.parse(match[1])));
+  const combinations = Object.entries(merged).reduce(
+    (variants, [name, value]) =>
+      variants.flatMap(variant =>
+        (value === EVERY_VALUE ? [true, false] : [value]).map(one => ({
+          ...variant,
+          [name]: one,
+        })),
+      ),
+    [{}],
+  );
+  const isExpanded = Object.values(merged).includes(EVERY_VALUE);
+  return combinations.map(flags => ({
+    flags: JSON.stringify(flags),
+    label: isExpanded ? `[${JSON.stringify(flags)}] ` : '',
+  }));
+}
 
 const FABRIC_COUNT_PRELUDE = `
 (function () {
@@ -261,14 +305,19 @@ const reactNativePlatformExtensions = {
   },
 };
 
-// RN's app bootstrap, emptied: React's Fabric renderer requires it and no headless run wants it
-// Why: the `symbiote-itest-runner` skill
+/**
+ * `ReactNativePrivateInitializeCore` is RN's app bootstrap, so it is emptied for every bundle.
+ * The stock renderer requires it for side effects, and it drags in LogBox and `.png` imports
+ */
 const RN_INITIALIZE_CORE = /ReactNativePrivateInitializeCore(\.js)?$/;
 // The `react-native` barrel reaches RN's experimental virtual-collection components through lazy
 // getters, and esbuild bundles them anyway - where `VirtualCollectionView.js` imports a
 // `VirtualViewMode` its sibling does not export and the build fails. `@react-native/virtualized-
 // lists` imports that barrel, so any stock `FlatList` arm hits it. Nothing headless renders one.
 const RN_VIRTUAL_COLLECTION = /virtualcollection\//;
+// RN's feature flags read their native spec through the legacy bridge, which does not exist here
+// A null spec leaves every flag on its JS default, the value a stock app without native flags sees
+const RN_FEATURE_FLAGS_SPEC = /specs\/NativeReactNativeFeatureFlags(\.js)?$/;
 
 const stubReactNativeBootstrap = {
   name: 'stub-react-native-initialize-core',
@@ -284,6 +333,14 @@ const stubReactNativeBootstrap = {
     build.onLoad(
       { filter: /.*/, namespace: 'rn-initialize-core-stub' },
       () => ({ contents: 'export {};', loader: 'js' }),
+    );
+    build.onResolve({ filter: RN_FEATURE_FLAGS_SPEC }, ({ path: request }) => ({
+      path: request,
+      namespace: 'rn-feature-flags-stub',
+    }));
+    build.onLoad(
+      { filter: /.*/, namespace: 'rn-feature-flags-stub' },
+      () => ({ contents: 'export default null;', loader: 'js' }),
     );
   },
 };
@@ -354,8 +411,8 @@ const solidJsx = {
       let cached = solidJsxCache.get(file);
       if (cached === undefined) {
         cached = (async () => {
-          // esbuild strips types and keeps the JSX, then babel compiles the JSX
-          // Two passes: babel cannot parse TypeScript here, and an app builds the same way
+          // esbuild strips TYPES and keeps the JSX (`jsx: 'preserve'`), then babel compiles it
+          // Two passes because babel cannot parse TypeScript without a preset this workspace lacks
           const typescript = await esbuild.transform(
             readFileSync(file, 'utf8'),
             {
@@ -478,11 +535,10 @@ function vueCompileSfc() {
 // SFC's content is fixed for the run.
 const vueSfcCache = new Map();
 
-// The compiled `<script setup>` keeps its TypeScript, which Metro's babel pass strips in an app
-// The `ts` loader is esbuild's twin of that pass
-async function compileVueFile(file) {
+async function compileVueFixture(file) {
   const compileSfc = await vueCompileSfc();
   const code = await compileSfc(readFileSync(file, 'utf8'), file);
+  // The compiled script still carries its TypeScript, the `ts` loader is esbuild's strip pass
   return { contents: code, loader: 'ts' };
 }
 
@@ -492,7 +548,7 @@ const vueSfc = {
     build.onLoad({ filter: /\.vue$/ }, ({ path: file }) => {
       let cached = vueSfcCache.get(file);
       if (cached === undefined) {
-        cached = compileVueFile(file);
+        cached = compileVueFixture(file);
         vueSfcCache.set(file, cached);
       }
       return cached;
@@ -525,33 +581,47 @@ const workspaceRoots = new Map(
     .filter(entry => entry !== undefined),
 );
 
-// A resolver and not an `alias` map: packages expose subpaths and an alias matches exactly
-// Resolution depends only on the specifier, never the importer, so it is cached per run
+/**
+ * A resolver rather than an `alias` map, because the packages expose SUBPATHS —
+ * `@symbiote-native/components/register`, `@symbiote-native/engine/mutation-buffer` — and an alias
+ * matches a specifier exactly. esbuild fills in the extension and the `/index` for us.
+ */
+// A specifier like `@symbiote-native/engine` recurs in nearly every bundle, and resolution depends
+// only on the specifier string, so it is cached instead of re-walking `existsSync` candidates
 const workspaceResolveCache = new Map();
 
-function subpathWithin(specifier, name) {
-  if (specifier === name) return 'index';
-  const prefix = `${name}/`;
-  return specifier.startsWith(prefix) ? specifier.slice(prefix.length) : undefined;
+function subpathWithin(specifier, packageName) {
+  if (specifier === packageName) return 'index';
+  if (specifier.startsWith(`${packageName}/`)) {
+    return specifier.slice(packageName.length + 1);
+  }
+  return undefined;
 }
 
-// A path returned from `onResolve` is final, so esbuild never tries extensions or an index file
-function firstExistingSource(base) {
-  return [
-    `${base}.ts`,
-    `${base}.tsx`,
-    path.join(base, 'index.ts'),
-    path.join(base, 'index.tsx'),
-    base,
-  ].find(candidate => existsSync(candidate));
+// The Android arm resolves our own sources the way Metro does on a device: `X.android.ts` and
+// `X/index.android.ts` win over the base file. Without it every name table is the iOS one
+const platformSuffixes = () => (shouldRunAndroid ? ['.android', ''] : ['']);
+
+// Returning a path from `onResolve` is final, esbuild would not try extensions or an index file
+function firstExistingModule(source, subpath) {
+  const base = path.join(source, subpath);
+  const found = platformSuffixes().flatMap(suffix => [
+    `${base}${suffix}.ts`,
+    `${base}${suffix}.tsx`,
+    path.join(base, `index${suffix}.ts`),
+    path.join(base, `index${suffix}.tsx`),
+  ])
+    .concat(base)
+    .find(candidate => existsSync(candidate));
+  return found === undefined ? undefined : { path: found };
 }
 
-function resolveWorkspaceSource(specifier) {
+function resolveWorkspace(specifier) {
   for (const [name, source] of workspaceRoots) {
     const subpath = subpathWithin(specifier, name);
     if (subpath === undefined) continue;
-    const found = firstExistingSource(path.join(source, subpath));
-    if (found !== undefined) return { path: found };
+    const resolved = firstExistingModule(source, subpath);
+    if (resolved !== undefined) return resolved;
   }
   return undefined;
 }
@@ -559,33 +629,47 @@ function resolveWorkspaceSource(specifier) {
 const workspaceSources = {
   name: 'symbiote-workspace-sources',
   setup(build) {
-    build.onResolve({ filter: /^@symbiote-native\// }, ({ path: specifier }) => {
-      if (!workspaceResolveCache.has(specifier)) {
-        workspaceResolveCache.set(specifier, resolveWorkspaceSource(specifier));
-      }
-      return workspaceResolveCache.get(specifier);
-    });
+    build.onResolve(
+      { filter: /^@symbiote-native\// },
+      ({ path: specifier }) => {
+        if (!workspaceResolveCache.has(specifier)) {
+          workspaceResolveCache.set(specifier, resolveWorkspace(specifier));
+        }
+        return workspaceResolveCache.get(specifier);
+      },
+    );
   },
 };
-
 const testsDir = path.join(root, 'core/engine/cpp/tests/js');
-// Correctness runs on `build`, timings on `build-release`, and neither replaces the other
-// Why Debug is the default: the `symbiote-itest-runner` skill
+// `SYMBIOTE_ITEST_BUILD=build-release` picks the optimized tester. Default Debug (`NDEBUG` OFF) is
+// deliberate — `react_native_assert` is the point — but it also enables `REACT_NATIVE_DEBUG`
+// consistency checks walking the whole child list per mutation: O(N²) here, O(N) in the ship build.
+
+// Correctness runs on `build`, timings run on `build-release`. Neither replaces the other.
 const buildDirectory = process.env.SYMBIOTE_ITEST_BUILD ?? 'build';
 
-// `__DEV__` and `NODE_ENV` track the build, so a release run never times the development React
-// The stock arm needs it too: see the `symbiote-itest-runner` skill
+// The JS half of the `build`/`build-release` split: `__DEV__`/`NODE_ENV` must track it too.
+// Pinned to development, `build-release` would time the DEVELOPMENT React (`react/index.js` picks
+// `react.development.js` off `NODE_ENV`) — the JS twin of never benchmarking a Debug native build.
+
+// It also blocks the stock arm: `ReactFabric-prod` is production-shaped, and a development
+// `createElement` reaching for `dispatcher.getOwner()` renders and reports nothing
 const isBenchBuild = buildDirectory !== 'build';
 const binary = path.join(
   root,
   `core/engine/cpp/tests/${buildDirectory}/symbiote_tester`,
 );
 
-// `SYMBIOTE_ITEST_BYTECODE=1` runs `hermesc -O` bytecode, which is what a device runs
-// `-Xes6-block-scoping` is required: without it closures in `report()` capture the last case
-// Unset, `build-release` uses it too, т.к. its heap budgets are calibrated there, `=0` opts out
+// `SYMBIOTE_ITEST_BYTECODE=1` compiles each bundle with `hermesc -O` and runs the BYTECODE — what a
+// device runs. `runtime.evaluateJavaScript(StringBuffer(source))` compiles at load WITHOUT the
+// optimizer, so a release app's `.hbc` (`-O`) is not what this harness measures by default.
+
+// `-Xes6-block-scoping` IS NOT OPTIONAL: `hermesc` defaults it off, so `const one` in a `for…of`
+// stops being per-iteration and every closure in `report()`'s case chain captures the LAST case —
+// a wrong ANSWER, not an error. A single-case fixture passes happily, which is how this hides.
+// Unset, `build-release` runs bytecode too: its heap budgets are calibrated there, `=0` opts out
 const bytecodeSetting = process.env.SYMBIOTE_ITEST_BYTECODE;
-const isBytecodeRequested =
+const shouldRunBytecode =
   bytecodeSetting === '1' ||
   (bytecodeSetting === undefined && buildDirectory === 'build-release');
 
@@ -611,15 +695,13 @@ function findHermesc() {
   return existsSync(fetched) ? fetched : undefined;
 }
 
-const hermesc = isBytecodeRequested ? findHermesc() : undefined;
+const hermesc = shouldRunBytecode ? findHermesc() : undefined;
 if (bytecodeSetting === '1' && hermesc === undefined) {
   console.error(
     'SYMBIOTE_ITEST_BYTECODE=1 but no hermesc found - run `node scripts/fetch-hermes.mjs`',
   );
   process.exit(2);
 }
-// The default falls back to source when there is no compiler, an explicit `=1` does not
-const isBytecodeEnabled = hermesc !== undefined;
 
 function compileToBytecode(bundle) {
   const out = `${bundle.replace(/\.js$/, '')}.hbc`;
@@ -651,31 +733,39 @@ function reportRun(run) {
   let failures = 0;
   for (const line of run.stdout.split('\n').filter(Boolean)) {
     if (line.startsWith('FAIL ')) failures += 1;
-    console.log(line);
+    console.log(run.label === undefined ? line : `${run.label}${line}`);
   }
   if (run.status === 0 && run.signal === null) return failures;
   // A tester killed by a SIGNAL exits with `status` `null` and writes NOTHING to stderr, so without
   // the file name and the signal a dead run is indistinguishable from a silent one
   const how =
-    run.signal === null ? `exit status ${run.status}` : `killed by ${run.signal}`;
+    run.signal === null
+      ? `exit status ${run.status}`
+      : `killed by ${run.signal}`;
   const silent = run.stdout.trim() === '' ? ', no output' : '';
   console.error(`CRASH ${path.relative(testsDir, run.file)} - ${how}${silent}`);
   if (run.stderr.trim() !== '') console.error(run.stderr.trim());
   return failures + 1;
 }
 
-// `*.android.itest.ts` runs only against `build-android`, every other file only against the rest
-// Each arm's fixtures assume their own platform, see the `symbiote-itest-runner` skill
+/**
+ * `*.android.itest.ts` runs only on `build-android`, every other file only on the other builds
+ * A hard split because each arm's fixtures assume their own platform, like Metro's `.ios.js` suffix
+ */
 const ANDROID_SUFFIX = '.android.itest.ts';
-const isAndroidBuild = buildDirectory === 'build-android';
+const shouldRunAndroid = buildDirectory === 'build-android';
 
-// Recursive, with a subdirectory per subject like the vitest suites these files come from
+/**
+ * Recursive, a subdirectory per subject mirrors how the vitest suites are laid out
+ */
 function itestsUnder(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     const full = path.join(directory, entry.name);
     if (entry.isDirectory()) return itestsUnder(full);
-    if (entry.name.endsWith(ANDROID_SUFFIX)) return isAndroidBuild ? [full] : [];
-    if (isAndroidBuild) return [];
+    if (entry.name.endsWith(ANDROID_SUFFIX)) {
+      return shouldRunAndroid ? [full] : [];
+    }
+    if (shouldRunAndroid) return [];
     return entry.name.endsWith('.itest.ts') || entry.name.endsWith('.itest.tsx')
       ? [full]
       : [];
@@ -700,11 +790,11 @@ const nodePaths = [
   ...[...workspaceRoots.values()].map(source =>
     path.join(path.dirname(source), 'node_modules'),
   ),
-].filter(existsSync);
+].filter(existsSync).concat(reanimatedNodePaths(root));
 
-// The tester is a clean per-process invocation with no shared file or port, so runs may overlap
-// The binary wall time dominates a run, not the bundling this file already caches
-
+// The tester binary is a clean per-process invocation — one bundle in on argv, stdout/stderr out,
+// no shared file or port across runs — so nothing here needs the runs to be sequential. The binary
+// wall time dominates a run, not the bundling this file already caches.
 // A release build holds timing budgets, so its testers run a quarter of the cores at a time
 // `SYMBIOTE_ITEST_JOBS` sets the count, bundling is not timed and always uses every core
 const cores = availableParallelism();
@@ -714,8 +804,10 @@ const testConcurrency = Math.max(
     (isBenchBuild ? Math.floor(cores / 4) : cores),
 );
 
-// A slot refills the moment it frees, so a fast file never idles behind a slow benchmark
-// A fixed `Promise.all` chunk would, see the `symbiote-itest-runner` skill
+/**
+ * A fixed chunk of `Promise.all` stalls on its slowest member, and benchmarks mix with unit tests
+ * Here a slot refills the moment it frees, from one shared queue, so a fast file never waits
+ */
 function createLimiter(max) {
   let active = 0;
   const queue = [];
@@ -737,12 +829,13 @@ function createLimiter(max) {
     });
 }
 
-const limitConcurrency = createLimiter(testConcurrency);
-const limitBuilds = createLimiter(cores);
+const limitTestRun = createLimiter(testConcurrency);
 
-function runTester(bundle) {
+function runTester(bundle, flags) {
   return new Promise((resolve, reject) => {
-    const child = spawn(binary, [bundle]);
+    const env =
+      flags === undefined ? process.env : { ...process.env, SYMBIOTE_FLAGS: flags };
+    const child = spawn(binary, [bundle], { env });
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', chunk => {
@@ -766,107 +859,139 @@ let failed = 0;
 let buildMs = 0;
 let runMs = 0;
 
-// Flattened relative path, so equal basenames in two subdirectories never share a bundle
-function bundlePathFor(file) {
-  const flat = path
-    .relative(testsDir, file)
-    .replace(/[\\/]/g, '__')
-    .replace(/\.tsx?$/, '');
-  return path.join(out, `${flat}.js`);
-}
-
-function hasDirective(file, directive) {
-  return readFileSync(file, 'utf8').includes(directive);
-}
-
-function esbuildOptionsFor(file, bundle) {
-  return {
-    entryPoints: [file],
-    bundle: true,
-    outfile: bundle,
-    format: 'iife',
-    // The runtime is current, so this only strips syntax the bundler cannot leave to it
-    target: 'es2022',
-    platform: 'neutral',
-    mainFields: ['module', 'main'],
-    resolveExtensions: [
-      '.ts',
-      '.tsx',
-      '.mjs',
-      '.js',
-      '.jsx',
-      '.json',
-      '.svelte',
-      '.vue',
-    ],
-    nodePaths,
-    // `browser` picks Svelte's client build, the default side is SSR and its `mount()` throws
-    conditions: ['browser', 'import', 'default'],
-    // Angular's JIT reads legacy decorators, esbuild defaults to standard ones
-    // `useDefineForClassFields: false` stops a defined field overwriting the decorator's work
-    tsconfigRaw: {
-      compilerOptions: {
-        experimentalDecorators: true,
-        useDefineForClassFields: false,
-      },
-    },
-    banner: {
-      js:
-        PLATFORM_PRELUDE +
-        (hasDirective(file, FABRIC_COUNT_DIRECTIVE) ? FABRIC_COUNT_PRELUDE : ''),
-    },
-    // RN's development FlatList reaches LogBox, whose chevrons are `.png` requires
-    loader: { '.png': 'empty' },
-    // A JSI runtime has no Metro to inline these, and the debug build keeps `__DEV__` true
-    // Angular's own dev switch is not a `define` here, see the `symbiote-itest-runner` skill
-    define: {
-      __DEV__: isBenchBuild ? 'false' : 'true',
-      'process.env.NODE_ENV': isBenchBuild ? '"production"' : '"development"',
-      // Where `runBenchSuite` writes a Hermes sampling-profile per step; empty = no profiling.
-      __SYMBIOTE_PROFILE_DIR__: JSON.stringify(
-        process.env.SYMBIOTE_PROFILE_DIR ?? '',
-      ),
-    },
-    plugins: [
-      workspaceSources,
-      solidJsx,
-      svelteComponents,
-      vueSfc,
-      stubReactNativeBootstrap,
-      ...(hasDirective(file, PLATFORM_EXTENSIONS_DIRECTIVE)
-        ? [reactNativePlatformExtensions]
-        : []),
-      reactNativeFlow,
-    ],
-    logLevel: 'silent',
-  };
-}
-
-// Paired with its source file, since a bundle path is a flattened temp name
-// Bytecode counts as build time: a release app compiles it at build time too
-async function buildBundle(file) {
-  const bundle = bundlePathFor(file);
-  await esbuild.build(esbuildOptionsFor(file, bundle));
-  return {
-    file,
-    bundle: isBytecodeEnabled ? await compileToBytecode(bundle) : bundle,
-  };
-}
-
 try {
-  const buildStart = performance.now();
+  const limitBuild = createLimiter(cores);
+  // Builds overlap now, so `buildMs` is the sum of each build's own duration
+  const timeBuild = async run => {
+    const start = performance.now();
+    try {
+      return await run();
+    } finally {
+      buildMs += performance.now() - start;
+    }
+  };
+  const buildBundle = async file => {
+    // Named by the path relative to the tests root, flattened — two files of the same basename in
+    // different subdirectories would otherwise write over each other's bundle.
+    const bundle = path.join(
+      out,
+      `${path
+        .relative(testsDir, file)
+        .replace(/[\\/]/g, '__')
+        .replace(/\.tsx?$/, '')}.js`,
+    );
+    await timeBuild(() => esbuild.build({
+      entryPoints: [file],
+      bundle: true,
+      outfile: bundle,
+      format: 'iife',
+      // The runtime is JavaScriptCore on macOS, which is current — this only has to strip the
+      // syntax the bundler cannot leave to it, not lower to an old baseline.
+      target: 'es2022',
+      platform: 'neutral',
+      mainFields: ['module', 'main'],
+      resolveExtensions: [
+        ...(shouldRunAndroid ? ['.android.ts', '.android.tsx'] : []),
+        '.ts',
+        '.tsx',
+        '.mjs',
+        '.js',
+        '.jsx',
+        '.json',
+        '.svelte',
+        '.vue',
+      ],
+      nodePaths,
+      // `browser` is for Svelte and is not cosmetic: its `.` export splits on it, and the
+      // `default`/`worker` side is the SSR runtime whose `mount()` throws outright. Vitest's Svelte
+      // project sets the same condition for the same reason.
+      conditions: ['browser', 'import', 'default'],
+      // A JSI runtime has no `process` and no Metro to inline these. `__DEV__` stays TRUE on
+      // purpose: it is what keeps React Native's own invariants and warnings armed, which is the
+      // same reason the C++ side is built Debug.
+      // What the platform supplies and a bare JSI runtime does not. On a device this is React
+      // Native's `InitializeCore`; Hermes carries `queueMicrotask` outright, JavaScriptCore does
+      // not, and Vue's scheduler reaches for it on the first render. The body is the standard
+      // one-liner, not an invention.
+      // Angular's JIT compiler reads LEGACY decorator metadata — `@Input()` on a field, applied
+      // the TypeScript way. esbuild defaults to the standard-decorators semantics, and Angular
+      // rejects those outright ("Standard Angular field decorators are not supported in JIT mode").
+      // `useDefineForClassFields: false` travels with it for the same reason: a defined (rather
+      // than assigned) field would overwrite what the decorator installed.
+      tsconfigRaw: {
+        compilerOptions: {
+          experimentalDecorators: true,
+          useDefineForClassFields: false,
+          // A test that names the directive renders JSX of the adapter, as an example app does
+          ...(readFileSync(file, 'utf8').includes(REACT_JSX_DIRECTIVE)
+            ? { jsx: 'react-jsx', jsxImportSource: '@symbiote-native/react' }
+            : {}),
+        },
+      },
+      banner: {
+        js:
+          PLATFORM_PRELUDE +
+          (readFileSync(file, 'utf8').includes(FABRIC_COUNT_DIRECTIVE)
+            ? FABRIC_COUNT_PRELUDE
+            : ''),
+      },
+      // RN's development FlatList reaches LogBox, whose chevrons are `.png` requires; nothing here
+      // paints an image, so they bundle as empty modules.
+      loader: { '.png': 'empty' },
+      define: {
+        __DEV__: isBenchBuild ? 'false' : 'true',
+        'process.env.NODE_ENV': isBenchBuild ? '"production"' : '"development"',
+        // Where `runBenchSuite` writes a Hermes sampling-profile per step; empty = no profiling.
+        __SYMBIOTE_PROFILE_DIR__: JSON.stringify(
+          process.env.SYMBIOTE_PROFILE_DIR ?? '',
+        ),
+      },
+      // ANGULAR'S OWN DEV SWITCH IS A THIRD ONE — neither `__DEV__` nor `NODE_ENV` reaches it, and
+      // `initNgDevMode` turns itself ON when the global is undefined (`ng_dev_mode.ts:85`). Every
+      // Angular arm this directory has ever timed ran under it.
+      //
+      // IT IS DELIBERATELY NOT A `define` HERE, and that was tried first. A compile-time `false`
+      // also strips the metadata a component definition builds at class-definition time, which is
+      // MORE than a Metro bundle gets — so it would measure a build the device cannot have and
+      // publish the difference as ours. `mount()` calls Angular's own `enableProdMode()` off the
+      // `__DEV__` above instead, which is exactly what ships, so these arms measure that.
+      plugins: [
+        workspaceSources,
+        reanimatedItestSeams(root),
+        solidJsx,
+        svelteComponents,
+        vueSfc,
+        stubReactNativeBootstrap,
+        ...(readFileSync(file, 'utf8').includes(PLATFORM_EXTENSIONS_DIRECTIVE)
+          ? [reactNativePlatformExtensions]
+          : []),
+        reactNativeFlow,
+      ],
+      logLevel: 'silent',
+    }));
+    // Counted as BUILD time, not run time: a release app does this step at build time too
+    // Paired with its SOURCE file, since a bundle path is a flattened temp name
+    const built = shouldRunBytecode
+      ? await timeBuild(() => compileToBytecode(bundle))
+      : bundle;
+    return { file, bundle: built };
+  };
   const bundles = await Promise.all(
-    found.map(file => limitBuilds(() => buildBundle(file))),
+    found.map(file => limitBuild(() => buildBundle(file))),
   );
-  buildMs += performance.now() - buildStart;
 
   const runStart = performance.now();
-  // Every bundle is queued at once and the limiter caps how many run together
-  // Printing walks them in submission order, whichever finishes first
-  const runPromises = bundles.map(({ file, bundle }) =>
-    limitConcurrency(() => runTester(bundle).then(run => ({ ...run, file }))),
+  // Every bundle is queued at once and the limiter caps how many run concurrently
+  // Printing walks them in submission order, so output stays grouped as a sequential run's
+  const runPromises = bundles.flatMap(({ file, bundle }) =>
+    fabricFlagVariantsOf(file).map(({ flags, label }) =>
+      limitTestRun(() =>
+        runTester(bundle, flags).then(run => ({ ...run, file, label })),
+      ),
+    ),
   );
-  for await (const run of runPromises) failed += reportRun(run);
+  const runs = await Promise.all(runPromises);
+  for (const run of runs) failed += reportRun(run);
   runMs += performance.now() - runStart;
 } finally {
   // `SYMBIOTE_KEEP_BUNDLES=1` leaves them on disk and says where. A stack trace out of the tester

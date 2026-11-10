@@ -18,19 +18,6 @@ re-exports of the same `core`.
   move once an `expo-video` wrapper exists.
 </Aside>
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -244,10 +231,12 @@ something this wrapper can fix. Test with your real videos, and handle the rejec
 **How do I get a thumbnail of a remote video?** Pass the URL, and `headers` if it needs
 authentication. Long downloads can be slow, so a local file is more reliable.
 
-Sources: [Expo docs: VideoThumbnails (deprecated)](https://docs.expo.dev/versions/latest/sdk/video-thumbnails/),
-[expo/expo#7832 getThumbnailAsync fails on Android](https://github.com/expo/expo/issues/7832),
-[expo/expo#19165 does not generate images on Android 12](https://github.com/expo/expo/issues/19165),
-[expo/expo#12429 could not generate thumbnail for a .mov on Android 7](https://github.com/expo/expo/issues/12429).
+Sources:
+
+- [Expo docs: VideoThumbnails (deprecated)](https://docs.expo.dev/versions/latest/sdk/video-thumbnails/)
+- [expo/expo#7832 getThumbnailAsync fails on Android](https://github.com/expo/expo/issues/7832)
+- [expo/expo#19165 does not generate images on Android 12](https://github.com/expo/expo/issues/19165)
+- [expo/expo#12429 could not generate thumbnail for a .mov on Android 7](https://github.com/expo/expo/issues/12429)
 
 ## How the wrapper works
 

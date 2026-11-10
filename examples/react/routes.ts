@@ -9,6 +9,15 @@ export const ROUTE_NAME = {
   HeaderOptions: 'HeaderOptions',
   SheetDemo: 'SheetDemo',
   TabsDemo: 'TabsDemo',
+  NativeTabs: 'NativeTabs',
+  HeaderViews: 'HeaderViews',
+  Gestures: 'Gestures',
+  Events: 'Events',
+  OverlayContainers: 'OverlayContainers',
+  TransitionProgress: 'TransitionProgress',
+  InsetsStatusBar: 'InsetsStatusBar',
+  StackTransitions: 'StackTransitions',
+  RuntimeConfig: 'RuntimeConfig',
   DrawerDemo: 'DrawerDemo',
   NestedNavigators: 'NestedNavigators',
   HooksDemo: 'HooksDemo',
@@ -18,6 +27,11 @@ export const ROUTE_NAME = {
   Benchmark: 'Benchmark',
   StyleShowcase: 'StyleShowcase',
   JsiNavigationCost: 'JsiNavigationCost',
+  Reanimated: 'Reanimated',
+  FrameworkHub: 'FrameworkHub',
+  NavigationHub: 'NavigationHub',
+  PackagesHub: 'PackagesHub',
+  BenchmarksHub: 'BenchmarksHub',
 } as const;
 
 export type IRouteName = (typeof ROUTE_NAME)[keyof typeof ROUTE_NAME];

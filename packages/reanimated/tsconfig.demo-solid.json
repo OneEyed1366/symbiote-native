@@ -1,0 +1,32 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "../..",
+    "composite": false,
+    "declaration": false,
+    "noEmit": true,
+    "types": ["node"],
+    "jsx": "preserve",
+    "jsxImportSource": "@symbiote-native/solid",
+    "paths": {
+      "react-native-reanimated": ["./node_modules/react-native-reanimated"],
+      "react-native-reanimated/src/*": [
+        "./node_modules/react-native-reanimated/lib/typescript/*"
+      ],
+      "react-native-worklets": ["./node_modules/react-native-worklets"],
+      "@symbiote-native/solid": ["../../adapters/solid/src/index.ts"],
+      "@symbiote-native/solid/jsx-runtime": [
+        "../../adapters/solid/src/jsx-runtime.ts"
+      ],
+      "@symbiote-native/solid/jsx-dev-runtime": [
+        "../../adapters/solid/src/jsx-runtime.ts"
+      ],
+      "@symbiote-native/reanimated": ["./src/core/index.ts"],
+      "@symbiote-native/reanimated/solid": ["./src/solid/index.ts"]
+    }
+  },
+  "include": [
+    "../../examples/solid/screens/reanimated",
+    "../../examples/solid/components/ActionButton.tsx"
+  ]
+}

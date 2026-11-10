@@ -18,8 +18,6 @@ import {
 } from '@symbiote-native/test-utils';
 import { readCommitProfile } from '@symbiote-native/engine';
 import {
-  buildOffsets,
-  computeWindow,
   subscribeListDiagnostics,
   type IListDiagnosticFrame,
 } from '@symbiote-native/components';
@@ -43,23 +41,36 @@ const flush = (): Promise<void> =>
 const settle = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 55));
 
-// Pump the incremental fill until the committed window reaches the target, then stop. A fixed step
-// count would have to assume the worst case, and every extra 55ms tick here lands on the WHOLE
-// suite - flat-list-array-style.test.ts settles on wall clock and reads a slow neighbour as a
-// free-running change detector.
-async function fillToTarget(frames: IListDiagnosticFrame[]): Promise<void> {
-  for (let step = 0; step < 120; step += 1) {
-    const frame = frames[frames.length - 1];
-    if (
-      frame !== undefined &&
-      frame.first <= frame.targetFirst &&
-      frame.last >= frame.targetLast
-    )
-      return;
-    const before = frames.length;
-    await settle();
-    if (frames.length === before) return;
-  }
+// Frames must land one after another, each flush drains the event before the next one fires
+function inSequence(
+  count: number,
+  task: (index: number) => Promise<void>,
+): Promise<void> {
+  return Array.from({ length: count }).reduce<Promise<void>>(
+    (chain, _unused, index) => chain.then(() => task(index)),
+    Promise.resolve(),
+  );
+}
+
+const MAX_FILL_TICKS = 120;
+
+// Pumps the incremental fill until the committed window reaches the target, then stops
+// A fixed tick count would assume the worst case, and each extra 55ms tick lands on the whole
+// suite: `flat-list-array-style.test.ts` settles on wall clock and reads a slow neighbour as drift
+async function fillToTarget(
+  frames: IListDiagnosticFrame[],
+  ticksLeft = MAX_FILL_TICKS,
+): Promise<void> {
+  const frame = frames[frames.length - 1];
+  const isFilled =
+    frame !== undefined &&
+    frame.first <= frame.targetFirst &&
+    frame.last >= frame.targetLast;
+  if (isFilled || ticksLeft === 0) return;
+  const before = frames.length;
+  await settle();
+  if (frames.length === before) return;
+  await fillToTarget(frames, ticksLeft - 1);
 }
 
 function handleFor(testID: string): unknown {
@@ -149,9 +160,7 @@ beforeEach(() => {
 afterEach(() => unmount(ROOT_TAG));
 
 describe('the cost of a scroll frame inside a VirtualizedList', () => {
-  // why: the regression that pins the fix. Before it, this was SCROLL_BURST screen re-runs and
-  // SCROLL_BURST * ROW_COUNT row re-runs - one full screen template execution per scroll frame,
-  // 60 times a second on a sticky screen.
+  // Pins the fix for one full screen template execution per scroll frame, 60 times a second
   it('does not re-run the ancestor screen for a scroll that moves no cell', async () => {
     mount(ROOT_TAG, VListCostScreen);
     await flush();
@@ -160,19 +169,15 @@ describe('the cost of a scroll frame inside a VirtualizedList', () => {
     const screenBefore = screen().templateReads;
     const rowsBefore = screen().rowReads;
 
-    for (let index = 0; index < SCROLL_BURST; index += 1) {
+    await inSequence(SCROLL_BURST, async index => {
       fabric.fireEvent(host, SCROLL_EVENT, {
         contentOffset: { x: 0, y: index },
       });
       await flush();
-    }
+    });
 
-    // ZERO: this list never receives a viewport, so its window is the initialNumToRender prefix and
-    // no offset can move it - the screen owes nothing for any of the ten frames. It read ONE while
-    // the gate compared the last-rendered window against the one before it, which lags the state by
-    // a pass and paid for a move that had already happened; predicting the window from the LIVE
-    // offset instead (isWindowSettled) drops that stale pass, which is why this number went 1 -> 0
-    // rather than the property weakening. Before either gate existed: 10 and 50.
+    // No viewport arrives, so the window stays the `initialNumToRender` prefix
+    // `isWindowSettled` predicts it from the live offset, a lagging compare paid one stale pass
     expect(
       screen().templateReads - screenBefore,
       'the screen template must not re-run per scroll frame, only when the window moves',
@@ -206,7 +211,7 @@ const VIEWPORT = 320;
 const FLING_STEP = 120;
 const FLING_FRAMES = 20;
 // Past the 3200px overscan, so the window slides instead of growing.
-const FLING_START = 6000;
+const FLING_START = 6_000;
 
 function pathBLayout(
   _data: unknown,
@@ -226,9 +231,9 @@ function pathBLayout(
   };
 }
 
-interface IEntry {
+type IEntry = {
   id: string;
-}
+};
 
 const ENTRIES: readonly IEntry[] = Array.from(
   { length: ENTRY_COUNT },
@@ -287,14 +292,6 @@ class VListFlingScreen {
   }
 }
 
-// computeWindow's cost is EXACTLY readable off its own result: the first loop steps `first` times
-// from index 0, the second steps `last - first` times, so one call walks `last + 2` entries. That
-// makes `isWindowSettled`'s per-frame price a number rather than an estimate, with no probe inside
-// the shipped code.
-function windowScanSteps(window: { first: number; last: number }): number {
-  return window.last + 2;
-}
-
 function flingReport(): string[] {
   return report;
 }
@@ -310,10 +307,8 @@ describe('the cost of a FLING frame on PATH B geometry', () => {
       layout: { x: 0, y: 0, width: 320, height: VIEWPORT },
     });
     await flush();
-    // Get into the STEADY state before timing. windowSize 21 on a 320px viewport buys
-    // (21-1)/2 * 320 = 3200px of overscan on each side, so below offset 3200 the window's leading
-    // edge never leaves index 0 and a scroll only ever GROWS the window - which prices a first
-    // paint, not a fling. Park past the overscan and let the fill reach target first.
+    // Park past the overscan and let the fill reach target before timing
+    // `windowSize` 21 on 320px buys 3200px per side, below that a scroll only grows the window
     const frames: IListDiagnosticFrame[] = [];
     const stop = subscribeListDiagnostics({
       onFrame: frame => frames.push(frame),
@@ -329,15 +324,14 @@ describe('the cost of a FLING frame on PATH B geometry', () => {
     readCommitProfile();
     const screenBefore = flingScreen!.templateReads;
 
-    let offset = FLING_START;
     const flingStart = performance.now();
-    for (let frame = 0; frame < FLING_FRAMES; frame += 1) {
-      offset += FLING_STEP;
+    await inSequence(FLING_FRAMES, async frame => {
       fabric.fireEvent(host, 'topScroll', {
-        contentOffset: { x: 0, y: offset },
+        contentOffset: { x: 0, y: FLING_START + (frame + 1) * FLING_STEP },
       });
-      await flush();
-    }
+      // A far-ahead window slides on the batching tick, not on the scroll event
+      await settle();
+    });
     const flingMs = performance.now() - flingStart;
     stop();
 
@@ -347,40 +341,6 @@ describe('the cost of a FLING frame on PATH B geometry', () => {
     const meanWidth =
       widths.reduce((sum, width) => sum + width, 0) /
       Math.max(1, widths.length);
-    // Every recompute pays deriveMetrics' own computeWindow; every scroll tick additionally pays
-    // isWindowSettled's. Both are the same scan over the same table.
-    const settleSteps = frames.reduce(
-      (sum, frame) =>
-        sum +
-        windowScanSteps({ first: frame.targetFirst, last: frame.targetLast }),
-      0,
-    );
-
-    // isWindowSettled ALONE, on the real table, at the same offsets, on this host. Isolated rather
-    // than differenced: removing the call changes the mark pattern and therefore what the rest of
-    // the frame does, so a subtractive A/B would price a different scenario.
-    const table = buildOffsets(
-      ENTRY_COUNT,
-      new Map<number, number>(),
-      new Map<number, number>(),
-      (index: number) => pathBLayout(undefined, index),
-      ROW_HEIGHT,
-      ROW_HEIGHT,
-    );
-    const settleOnlyStart = performance.now();
-    for (let frame = 1; frame <= FLING_FRAMES; frame += 1) {
-      computeWindow(
-        ENTRY_COUNT,
-        table.offsets,
-        table.lengths,
-        FLING_START + frame * FLING_STEP,
-        VIEWPORT,
-        21,
-        10,
-      );
-    }
-    const settleOnlyMs = performance.now() - settleOnlyStart;
-
     const per = (value: number): string => (value / FLING_FRAMES).toFixed(1);
     report.push(
       `ANGULAR fling, ${FLING_FRAMES} frames of ${FLING_STEP}px over ${ENTRY_COUNT} entries`,
@@ -393,12 +353,11 @@ describe('the cost of a FLING frame on PATH B geometry', () => {
         `outletDestroys=${per(angular.outletDestroys)}`,
       `  per frame: nodesCreated=${per(angular.nodesCreated)} nodesInserted=${per(angular.nodesInserted)} ` +
         `nodesRemoved=${per(angular.nodesRemoved)}`,
-      // Two numbers, not seven: the walk counters died with the walk. JS holds no tree, so
-      // nodesVisited / propNoops / childScans / childFlattens are not observable from here.
+      // The walk counters died with the walk and JS holds no tree
+      // so `nodesVisited`, `propNoops`, `childScans` and `childFlattens` are not observable here
       `  per frame: engine commits=${per(commit.commits)} propWrites=${per(commit.propWrites)}`,
       `  per frame: deriveMetrics=${per(frames.length)} windowWidth=${meanWidth.toFixed(1)} ` +
         `cellsRebuilt=${per(frames.length * meanWidth)}`,
-      `  per frame: isWindowSettled scan steps=${per(settleSteps)} (of ${ENTRY_COUNT} entries)`,
       `  per frame: screen template re-runs=${per(flingScreen!.templateReads - screenBefore)}`,
       `  windows: ${frames
         .map(f => `[${f.first},${f.last}]`)
@@ -413,8 +372,6 @@ describe('the cost of a FLING frame on PATH B geometry', () => {
       `  per frame: buildOffsets steps=${ENTRY_COUNT} (${ENTRY_COUNT} getItemLayout objects + 2 arrays)`,
       `  wall clock, THIS HOST ONLY (desktop V8, not Hermes):`,
       `    whole fling ${flingMs.toFixed(2)} ms -> ${(flingMs / FLING_FRAMES).toFixed(3)} ms/frame`,
-      `    isWindowSettled in isolation ${(settleOnlyMs / FLING_FRAMES).toFixed(4)} ms/frame ` +
-        `= ${((settleOnlyMs / flingMs) * 100).toFixed(2)}% of the frame`,
     );
     writeFileSync(
       process.env['SYMBIOTE_FLING_REPORT'] ?? '/dev/null',
@@ -424,12 +381,10 @@ describe('the cost of a FLING frame on PATH B geometry', () => {
     expect(
       frames.length,
       'the fling must move the window every frame, or this measures nothing',
-      // >=, not ==: a batch-fill timer can land inside the burst under a loaded run and add one
-      // more recompute. It costs the same and does not change what is being priced.
+      // `>=` since a batch-fill timer can land inside the burst under load and add a recompute
     ).toBeGreaterThanOrEqual(FLING_FRAMES);
-    // THE PROPERTY. A frame slides the window by four cells; the other ~229 are the same item at
-    // the same index and have nothing to re-read. Re-stamping them is pure waste, and it is the
-    // largest single term in the frame - larger than the whole shared reducer pass.
+    // A frame slides the window by four cells, the other ~229 have nothing to re-read
+    // Re-stamping them is pure waste and the largest term, above the whole shared reducer pass
     expect(
       angular.outletUpdates,
       'a sliding window must re-stamp only the cells that entered it',
@@ -440,17 +395,14 @@ describe('the cost of a FLING frame on PATH B geometry', () => {
     ).toBeGreaterThan(0);
   });
 
-  // The discriminator. Without it, "never re-stamp anything" passes the test above and ships a list
-  // that never repaints - RN's contract is that extraData is the marker for "the data object did
-  // not change but the cells must re-render".
+  // Discriminator: "never re-stamp" would pass the test above and ship a list that never repaints
+  // RN's contract is that `extraData` marks "same data object, cells must re-render"
   it('re-stamps every cell in the window when extraData changes', async () => {
     mount(ROOT_TAG, VListFlingScreen);
     await flush();
 
-    // No viewport and no settle, deliberately. Without a layout the window IS the
-    // initialNumToRender prefix and nothing can grow it, so the count is exact and the case costs
-    // no wall clock - every 55ms fill tick spent here lands on the whole suite, and
-    // flat-list-array-style.test.ts settles on wall clock next door.
+    // No viewport and no settle: the window is the `initialNumToRender` prefix, count is exact
+    // A 55ms fill tick would land on the whole suite, `flat-list-array-style.test.ts` runs next
     const frames: IListDiagnosticFrame[] = [];
     const stop = subscribeListDiagnostics({
       onFrame: frame => frames.push(frame),

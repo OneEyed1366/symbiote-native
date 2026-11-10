@@ -1,22 +1,17 @@
 /**
- * Symbiote canary app entry: composes the native stack navigator
- * (@symbiote-native/navigation/vue, driven by react-native-screens' RNSScreen/
- * RNSScreenStack native views) over the full demo screen surface. Menu is the initial
- * route — a menu of buttons, one per navigator/feature @symbiote-native/navigation exports;
- * Canary is unchanged and reachable from the menu's first row. Details has no menu row of its
- * own — it's the DeepLinking demo's resolution target (symbiotecanaryvuetsx://details/:id), reached
- * only through that tour stop. The actual canary surface (every @symbiote-native/vue
- * primitive) lives in ./screens/CanaryScreen — the FORMER content of this file, relocated
- * once the app grew a real Menu as its initial route.
+ * Canary app entry: the native stack navigator over every demo screen, starting at Menu
+ * Menu lists four sections, each opens a hub with its stops; Details is reached only by deep link
  *
  * @format
  */
 
 import './App.css';
+import './navigation.css';
 import { defineComponent, onMounted, ref } from 'vue';
 import { Stack, useLinkingIntegration } from '@symbiote-native/navigation/vue';
 import type { INavigatorHandle } from '@symbiote-native/navigation/vue';
 import { MenuScreen } from './screens/MenuScreen';
+import { HUB_SCREENS } from './screens/SectionHubScreen';
 import { CanaryScreen } from './screens/CanaryScreen';
 import { DetailsScreen } from './screens/DetailsScreen';
 import {
@@ -27,14 +22,11 @@ import {
   SheetDemoScreen,
   sheetDemoScreenOptions,
 } from './screens/SheetDemoScreen';
-import { TabsDemoScreen } from './screens/TabsDemoScreen';
-import { DrawerDemoScreen } from './screens/DrawerDemoScreen';
-import { NestedNavigatorsScreen } from './screens/NestedNavigatorsScreen';
+import { DEMO_SCREENS } from './screens/demo-screens';
 import { HooksDemoScreen } from './screens/HooksDemoScreen';
-import { DeepLinkingScreen } from './screens/DeepLinkingScreen';
-import { StatePersistenceScreen } from './screens/StatePersistenceScreen';
 import { ApiPlaygroundScreen } from './screens/ApiPlaygroundScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
+import { ReanimatedScreen } from './screens/ReanimatedScreen';
 import { StyleShowcaseScreen } from './screens/StyleShowcaseScreen';
 import { APP_LINKING_CONFIG } from './navigation-linking';
 import { ROUTE_NAME } from './routes';
@@ -48,13 +40,9 @@ const App = defineComponent({
 
     onMounted(() => hide());
 
-    // Vue's useLinkingIntegration takes the Stack's Ref ITSELF (not a resolved handle) and reads
-    // `.value` lazily inside its own onMounted — Vue's onMounted callbacks fire bottom-up
-    // (children mount, and their onMounted queues drain, before the parent's own onMounted
-    // queue runs), so by the time this composable's onMounted fires, Stack below has already
-    // mounted and populated `stackHandle.value` via its own expose(). No React-style
-    // LinkingRunner child-mount workaround is needed here — see linking.ts's header comment for
-    // the full React-vs-Vue timing rationale.
+    // Takes the Ref of the Stack itself and reads `.value` in its own `onMounted`
+    // Children mount first, so the Stack has filled `stackHandle` through `expose()` by then
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- a Vue composable inside `setup()`
     useLinkingIntegration(APP_LINKING_CONFIG, stackHandle);
 
     return () => (
@@ -70,6 +58,14 @@ const App = defineComponent({
             headerUserInterfaceStyle: 'dark',
           }}
         />
+        {HUB_SCREENS.map(hub => (
+          <Stack.Screen
+            key={hub.name}
+            name={hub.name}
+            component={hub.component}
+            options={hub.options}
+          />
+        ))}
         <Stack.Screen
           name={ROUTE_NAME.Canary}
           component={CanaryScreen}
@@ -93,9 +89,7 @@ const App = defineComponent({
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },
             headerUserInterfaceStyle: 'dark',
-            // Edge-flicker investigation experiment: 'default' resolved to an ~480ms native
-            // transition (measured via dlog). Explicit values here to check whether pinning
-            // stackAnimation/transitionDuration changes the artifact's presence/character.
+            // Pinned, as the default animation resolved to a slower native transition
             stackAnimation: 'slide_from_right',
             transitionDuration: 300,
           }}
@@ -105,49 +99,18 @@ const App = defineComponent({
           component={HeaderOptionsScreen}
           options={headerOptionsScreenOptions}
         />
+        {DEMO_SCREENS.map(demo => (
+          <Stack.Screen
+            key={demo.name}
+            name={demo.name}
+            component={demo.component}
+            options={demo.options}
+          />
+        ))}
         <Stack.Screen
           name={ROUTE_NAME.SheetDemo}
           component={SheetDemoScreen}
           options={sheetDemoScreenOptions}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.TabsDemo}
-          component={TabsDemoScreen}
-          options={{
-            title: 'Tabs Demo',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.DrawerDemo}
-          component={DrawerDemoScreen}
-          options={{
-            title: 'Drawer Demo',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.NestedNavigators}
-          component={NestedNavigatorsScreen}
-          options={{
-            title: 'Nested Navigators',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.structure,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
         />
         <Stack.Screen
           name={ROUTE_NAME.HooksDemo}
@@ -163,38 +126,25 @@ const App = defineComponent({
           }}
         />
         <Stack.Screen
-          name={ROUTE_NAME.DeepLinking}
-          component={DeepLinkingScreen}
-          options={{
-            title: 'Deep Linking',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.routing,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
-          name={ROUTE_NAME.StatePersistence}
-          component={StatePersistenceScreen}
-          options={{
-            title: 'State Persistence',
-            headerShown: true,
-            headerTintColor: LINE_COLOR.routing,
-            headerTranslucent: true,
-            headerTitleColor: '#ffffff',
-            headerStyle: { backgroundColor: '#0b1622' },
-            headerUserInterfaceStyle: 'dark',
-          }}
-        />
-        <Stack.Screen
           name={ROUTE_NAME.ApiPlayground}
           component={ApiPlaygroundScreen}
           options={{
             title: 'API Playground',
             headerShown: true,
-            headerTintColor: LINE_COLOR.framework,
+            headerTintColor: LINE_COLOR.introspection,
+            headerTranslucent: true,
+            headerTitleColor: '#ffffff',
+            headerStyle: { backgroundColor: '#0b1622' },
+            headerUserInterfaceStyle: 'dark',
+          }}
+        />
+        <Stack.Screen
+          name={ROUTE_NAME.Reanimated}
+          component={ReanimatedScreen}
+          options={{
+            title: 'Reanimated',
+            headerShown: true,
+            headerTintColor: LINE_COLOR.performance,
             headerTranslucent: true,
             headerTitleColor: '#ffffff',
             headerStyle: { backgroundColor: '#0b1622' },

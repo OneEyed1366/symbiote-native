@@ -60,20 +60,13 @@ describe('React: `activity-indicator` as a tag', () => {
     // only because the behavior built it, so this is what fails when `./register` is dropped.
     const host = hostOf('ind');
     expect(host.viewName).toBe('RCTView');
-    // The centering style and the spinner's whole payload — the size translation, the two defaults,
-    // the platform colour — are the ENGINE's rules now
-    // (`core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`), and this host builds its
-    // payload through the TypeScript `fabricProps`, which carries no copy of them. What is left for
-    // an adapter to prove is the half that is its own: the tag reached the behavior and the second
-    // node exists, which is exactly what fails when `./register` is dropped.
+    // The payload rules are `activity-indicator-payload.itest.ts`'s, this host has no copy
     expect(host.children.map(node => node.viewName)).toEqual([
       'ActivityIndicatorView',
     ]);
   });
 
-  // why: RN spreads `...restProps` onto the SPINNER and keeps only `onLayout`/`style` on the View
-  // (ActivityIndicator.js:99,113). A prop landing on the wrong node is invisible to any assertion
-  // that only checks the tree it DID reach, so both sides are pinned.
+  // RN spreads `restProps` onto the spinner and keeps only `onLayout` and `style` on the View
   it('routes an app prop to the spinner and keeps the style on the host', () => {
     mount(
       ROOT_TAG,
@@ -88,5 +81,19 @@ describe('React: `activity-indicator` as a tag', () => {
     expect(host.payload.margin).toBe(4);
     expect(Object.hasOwn(host.payload, 'testID')).toBe(false);
     expect(host.children[0].payload.testID).toBe('spin');
+  });
+
+  it('puts accessibilityLabel on the spinner, not on the host', () => {
+    mount(
+      ROOT_TAG,
+      createElement('activity-indicator', {
+        nativeID: 'ind',
+        accessibilityLabel: 'Loading content',
+      }),
+    );
+
+    const host = hostOf('ind');
+    expect(host.children[0].payload.accessibilityLabel).toBe('Loading content');
+    expect(Object.hasOwn(host.payload, 'accessibilityLabel')).toBe(false);
   });
 });

@@ -47,6 +47,10 @@ function isPresent<T>(value: unknown): value is T {
 }
 
 async function prepareMotionNode() {
+  // The reset dropped the wired host, and the fresh modules below read `Dimensions` through it
+  await import('../../../vitest.rn-host.setup');
+  // Device events ride RN's own emitter through the host, which no callable module registers here
+  deviceHub = (await import('./react-native-host')).DeviceEventEmitter;
   const registry = await import('./style-registry');
   const subscriptions = await import('./style-registry/media-subscriptions');
   const accessibility = await import('./media-accessibility');
@@ -79,6 +83,7 @@ describe('prefers-reduced-motion from the accessibility module', () => {
   });
 
   it('is wired by creating a surface, with no registration by hand', async () => {
+    await import('../../../vitest.rn-host.setup');
     const registry = await import('./style-registry');
     const { createSurface } = await import('./surface');
     const { createElement, routeProp } = await import('./node');

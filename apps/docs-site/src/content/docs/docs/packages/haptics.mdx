@@ -9,23 +9,10 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 [`expo-haptics`](https://github.com/expo/expo/tree/main/packages/expo-haptics) —
 `impactAsync`, `notificationAsync`, `selectionAsync`, and `performAndroidHapticsAsync` — so every
 SymbioteNative adapter can trigger vibration feedback. Like [local auth](/docs/packages/local-auth/),
-it's built on `expo-modules-core`; every function here is a fire-and-forget async call with no
+it's built on `expo-modules-core`. Every function here is a fire-and-forget async call with no
 per-instance state or event stream, so there's even less adapter surface than local-auth's
-`authenticateAsync` — no result union to branch on, just a `Promise<void>` you can leave unawaited
+`authenticateAsync`. There is no result union to branch on, just a `Promise<void>` you can leave unawaited
 from a press handler.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 ## Installation
 
@@ -38,16 +25,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --h
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-haptics` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-haptics`' native code is discovered by `expo-modules-autolinking`, a
   different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every future `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -315,8 +302,8 @@ Feedback effects driven directly by Android's haptics engine, via `performAndroi
 
 - **Most `AndroidHaptics` members only exist on newer API levels.** `expo-haptics` resolves each
   one by _reflection_ against `HapticFeedbackConstants`, looking the field up by name; when the
-  field is missing it falls back to a hard-coded five — `Clock_Tick`, `Context_Click`,
-  `Keyboard_Tap`, `Long_Press`, `Virtual_Key` — and every other member rejects with
+  field is missing it falls back to a hard-coded five (`Clock_Tick`, `Context_Click`,
+  `Keyboard_Tap`, `Long_Press`, `Virtual_Key`). Every other member rejects with
   `HapticsNotSupportedException`. The full set is only guaranteed on API 34+.
 - **`performAndroidHapticsAsync` needs a foreground activity.** The Android module looks up
   `android.R.id.content` on the current activity and calls `performHapticFeedback` on that view;
@@ -327,9 +314,9 @@ Feedback effects driven directly by Android's haptics engine, via `performAndroi
   gets silence on iOS rather than an error.
 - **Android's `impactAsync`/`notificationAsync`/`selectionAsync` are `Vibrator` waveforms, not the
   haptics engine.** They need `android.permission.VIBRATE`, which merges into your app from
-  `expo-haptics`' own `AndroidManifest.xml` at build time — there is no runtime prompt and nothing
+  `expo-haptics`' own `AndroidManifest.xml` at build time. There is no runtime prompt and nothing
   to request, but the permission does appear in your merged manifest even if you only ever call
-  `performAndroidHapticsAsync`, which uses the haptics engine and needs no permission.
+  `performAndroidHapticsAsync`. That one uses the haptics engine and needs no permission.
 
 ## Common questions
 
@@ -348,10 +335,10 @@ Sources: [Expo docs: Haptics](https://docs.expo.dev/versions/latest/sdk/haptics/
 
 ## How the wrapper works
 
-`@symbiote-native/haptics` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-haptics` itself** — that
-package's own JS hard-imports `Platform` from the `expo` meta-package (which this project never
-installs), so its functions and enums are hand-ported, verbatim, into this package's own `core/`,
-changing only that one import line to pull `Platform` from `expo-modules-core` instead:
+`@symbiote-native/haptics` ships **zero React/Vue/Angular/Svelte/Solid logic in `expo-haptics` itself**.
+That package's own JS hard-imports `Platform` from the `expo` meta-package, which this project never
+installs. So its functions and enums are hand-ported, verbatim, into this package's own `core/`.
+Only that one import line changes, to pull `Platform` from `expo-modules-core` instead:
 
 ```
 packages/haptics/src/
@@ -366,7 +353,7 @@ packages/haptics/src/
 ```
 
 Same shape as [local auth](/docs/packages/local-auth/): every function here is stateless and
-one-shot, so there is nothing for a hook, composable, or service to subscribe to or clean up —
-each adapter entry is a single-file re-export with no lifecycle code at all. The native code
-itself is never vendored or copied — `expo-modules-autolinking` resolves it straight out of
+one-shot, so there is nothing for a hook, composable, or service to subscribe to or clean up.
+Each adapter entry is a single-file re-export with no lifecycle code at all. The native code
+itself is never vendored or copied: `expo-modules-autolinking` resolves it straight out of
 `node_modules` (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

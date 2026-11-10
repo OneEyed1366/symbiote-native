@@ -24,10 +24,12 @@ import {
   type IEventSubscription,
 } from '@symbiote-native/engine';
 
-export function createColorScheme(): Accessor<IColorSchemeName | null> {
-  const [colorScheme, setColorScheme] = createSignal<IColorSchemeName | null>(
-    Appearance.getColorScheme(),
-  );
+export function createColorScheme(): Accessor<
+  IColorSchemeName | null | undefined
+> {
+  const [colorScheme, setColorScheme] = createSignal<
+    IColorSchemeName | null | undefined
+  >(Appearance.getColorScheme());
 
   // No post-subscribe re-read, unlike React/Vue/Svelte: those subscribe from an effect, a tick
   // after the seed read, so a change can slip between the two. Here both statements run in one

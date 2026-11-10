@@ -1,35 +1,49 @@
+<script lang="ts" module>
+  import type { ISvelteScreenOptions } from '@symbiote-native/navigation/svelte';
+  import { LINE_COLOR } from '../navigation-lines';
+
+  export const drawerDemoScreenOptions: ISvelteScreenOptions = {
+    title: 'Drawer Demo',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.structure,
+    headerTranslucent: true,
+    headerTitleColor: '#ffffff',
+    headerStyle: { backgroundColor: '#0b1622' },
+    headerUserInterfaceStyle: 'dark',
+  };
+</script>
+
 <script lang="ts">
-  // Drawer demo: a swipeable Drawer navigator with 2 Drawer.Screens, a non-default drawerPosition
-  // ('right') and drawerType ('slide') to prove those props actually flow through to
-  // render-drawer.ts's geometry, plus imperative open/toggle/close buttons (DrawerHomeScreen/
-  // DrawerSettingsScreen) alongside the swipe gesture. The `drawerContent` SNIPPET below supplies
-  // the menu panel (Drawer ships no built-in one) — Svelte's twin of React's renderDrawerContent
-  // render PROP and Vue's scoped slot; a snippet WITH a parameter is exactly that shape.
-  // `<DrawerScreen>` is the same standalone-imported marker pattern TabsDemoScreen.svelte uses for
-  // `<TabScreen>`. Svelte twin of examples/vue-sfc/screens/DrawerDemoScreen.vue.
   import { Drawer, DrawerScreen } from '@symbiote-native/navigation/svelte';
   import type { IDrawerContentSlotProps } from '@symbiote-native/navigation/svelte';
   import DrawerHomeScreen from './DrawerHomeScreen.svelte';
   import DrawerSettingsScreen from './DrawerSettingsScreen.svelte';
+  import { provideDrawerPanel } from './drawer/drawer-panel';
+  import {
+    DEFAULT_DRAWER_SETTINGS,
+    drawerPropsOf,
+  } from './drawer/drawer-settings';
+  import { createPanelState } from './panel.svelte';
 
-  const drawerStyle = { backgroundColor: '#262626' };
+  const DRAWER_STYLE = { backgroundColor: '#13243a' };
+  const homeOptions = { title: 'Home', drawerLabel: 'Home' };
+  const settingsOptions = { title: 'Settings', drawerLabel: 'Settings' };
+
+  // The panel lives here, above the Drawer, so its two screens share it and it outlives a switch
+  const panel = createPanelState(DEFAULT_DRAWER_SETTINGS);
+  provideDrawerPanel(panel);
 </script>
 
 <Drawer
   initialRouteName="Home"
-  drawerPosition="right"
-  drawerType="slide"
-  {drawerStyle}
+  {...drawerPropsOf(panel.settings)}
+  drawerStyle={DRAWER_STYLE}
 >
-  <DrawerScreen
-    name="Home"
-    component={DrawerHomeScreen}
-    options={{ title: 'Home', drawerLabel: 'Home' }}
-  />
+  <DrawerScreen name="Home" component={DrawerHomeScreen} options={homeOptions} />
   <DrawerScreen
     name="Settings"
     component={DrawerSettingsScreen}
-    options={{ title: 'Settings', drawerLabel: 'Settings' }}
+    options={settingsOptions}
   />
   {#snippet drawerContent(slot: IDrawerContentSlotProps)}
     <safe-area-view testID="drawer-panel" class="section-tight drawer-panel">

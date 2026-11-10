@@ -14,6 +14,9 @@ import {
   type IPlatformConfig,
 } from './native/native-animated';
 
+// The second argument of every value constructor and of the `useAnimated*` hooks
+export type IAnimatedValueConfig = { useNativeDriver?: boolean };
+
 export class AnimatedValue extends AnimatedWithChildren {
   private value: number;
   private readonly startingValue: number;
@@ -25,7 +28,7 @@ export class AnimatedValue extends AnimatedWithChildren {
   // Set while this value is chasing a moving target (Animated.spring toValue: node).
   private tracking: AnimatedTracking | null = null;
 
-  constructor(value: number) {
+  constructor(value: number, config?: IAnimatedValueConfig) {
     super();
     if (typeof value !== 'number') {
       throw new Error('AnimatedValue: Attempting to set value to undefined');
@@ -34,9 +37,16 @@ export class AnimatedValue extends AnimatedWithChildren {
     this.value = value;
     this.offset = 0;
     this.animation = null;
+    if (config?.useNativeDriver) this.__makeNative();
   }
 
   override __detach(): void {
+    if (this.isNative) {
+      // Забираем значение из native, иначе после отцепления JS откатится назад
+      nativeAnimated.getValue(this.__getNativeTag(), value => {
+        this.value = value - this.offset;
+      });
+    }
     this.stopAnimation();
     this.stopListeningToNativeValueUpdates();
     super.__detach();
@@ -138,16 +148,12 @@ export class AnimatedValue extends AnimatedWithChildren {
     }
   }
 
-  // Owns the native-driver "start" handshake end-to-end: make this value native, mint
-  // its tag, hand the curve to the native module, and on completion sync the JS value
-  // (no re-flush; native already moved the view). The driver (BaseAnimation.
-  // startNativeIfNeeded) supplies only what it owns - curve config, animation id,
-  // platform bag, end callback - never touching __makeNative / __getNativeTag /
-  // __onNativeUpdate / flushValue directly; those internals live here.
+  // Старт нативной анимации целиком на значении, драйвер даёт только кривую, id и колбэк.
+  // Колбэк получает весь результат, `value` и `offset` в нём как у RN
   __startNativeAnimation(
     config: INativeAnimationConfig,
     nativeId: number,
-    onEnd: (finished: boolean) => void,
+    onEnd: IEndCallback,
     platformConfig?: IPlatformConfig,
   ): void {
     this.__makeNative(platformConfig);
@@ -156,7 +162,7 @@ export class AnimatedValue extends AnimatedWithChildren {
       this.__getNativeTag(),
       config,
       result => {
-        onEnd(result.finished);
+        onEnd(result);
         if (result.value !== undefined) {
           this.__onNativeUpdate(result.value, result.offset);
           flushValue(this);
@@ -177,7 +183,13 @@ export class AnimatedValue extends AnimatedWithChildren {
       this.animation.stop();
     }
     this.animation = null;
-    callback?.(this.__getValue());
+    if (callback === undefined) return;
+    if (this.isNative) {
+      // Живое значение знает только native, JS-копия отстаёт на время анимации
+      nativeAnimated.getValue(this.__getNativeTag(), callback);
+    } else {
+      callback(this.__getValue());
+    }
   }
 
   // Chase a moving target: the AnimatedTracking subscribes to the target node and
@@ -190,7 +202,7 @@ export class AnimatedValue extends AnimatedWithChildren {
     tracking.update();
   }
 
-  private stopTracking(): void {
+  stopTracking(): void {
     if (this.tracking !== null) {
       this.tracking.__detach();
       this.tracking = null;
@@ -220,18 +232,18 @@ export class AnimatedValue extends AnimatedWithChildren {
       this.animation.stop();
     }
     this.animation = animation;
-    animation.start(
-      this.value,
-      value => {
+    animation.start({
+      fromValue: this.value,
+      onUpdate: value => {
         this.updateValue(value, true);
       },
-      result => {
+      onEnd: result => {
         this.animation = null;
         callback?.(result);
       },
       previousAnimation,
-      this,
-    );
+      animatedValue: this,
+    });
   }
 
   private updateValue(value: number, flush: boolean): void {

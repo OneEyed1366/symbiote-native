@@ -25,12 +25,8 @@ import {
   type OnInit,
 } from '@angular/core';
 import {
-  computeInset,
-  configureKeyboardAvoidingAnimation,
+  createKeyboardAvoidingModel,
   keyboardAvoidingEventNamesFor,
-  readKeyboardAnimationTiming,
-  readKeyboardFrame,
-  readLayoutFrame,
   readPrefersCrossFadeTransitions,
   resolveAccessibilityProps,
   resolveKeyboardAvoidingLayout,
@@ -39,12 +35,10 @@ import {
   type IAriaProps,
   type IKeyboardAvoidingBehavior,
   type IKeyboardAvoidingLayout,
-  type IMeasuredFrame,
 } from '@symbiote-native/components';
 import {
   Keyboard,
   Platform,
-  dlog,
   isSymbioteEvent,
   type IEventSubscription,
   type IStyleProp,
@@ -64,15 +58,15 @@ export type { IKeyboardAvoidingBehavior } from '@symbiote-native/components';
 // Mirrors React's IKeyboardAvoidingViewProps minus children (Angular takes children via
 // <ng-content>), declared per-adapter over the shared accessibility base since a framework-specific
 // children field keeps it from being fully shared across adapters.
-export interface IAngularKeyboardAvoidingViewProps
-  extends IAccessibilityProps, IAriaProps {
-  behavior?: IKeyboardAvoidingBehavior;
-  enabled?: boolean;
-  keyboardVerticalOffset?: number;
-  contentContainerStyle?: IStyleProp<IViewStyle>;
-  style?: IStyleProp<IViewStyle>;
-  onLayout?: (event: ISymbioteEvent) => void;
-}
+export type IAngularKeyboardAvoidingViewProps = IAccessibilityProps &
+  IAriaProps & {
+    behavior?: IKeyboardAvoidingBehavior;
+    enabled?: boolean;
+    keyboardVerticalOffset?: number;
+    contentContainerStyle?: IStyleProp<IViewStyle>;
+    style?: IStyleProp<IViewStyle>;
+    onLayout?: (event: ISymbioteEvent) => void;
+  };
 
 // What the component itself takes as plain @Input()s: the full surface minus onLayout and the
 // accessibility callbacks, which it exposes as real @Output() EventEmitters instead (see the
@@ -133,36 +127,41 @@ export class KeyboardAvoidingView
   @Input() testID?: string;
   @Input() nativeID?: string;
 
-  // How far the view must move so it no longer overlaps the keyboard. A plain field, not reactive:
-  // OnPush + zoneless means a keyboard event mutates it and pulls the view via markForCheck.
+  // Plain field, the model sets it and `markForCheck` pulls the OnPush view
   private inset = 0;
-  // Mutable, not state: changing the measured frame alone shouldn't re-render; it feeds the next
-  // keyboard event's inset math (React's frameRef / initialHeightRef, Vue's frame / initialHeight).
-  private frame?: IMeasuredFrame;
-  private initialHeight?: number;
-  // The iOS "Prefer Cross-Fade Transitions" setting, read once per mount. Deliberately a plain
-  // field and NOT markForCheck'd when the promise lands: it is a device setting that cannot change
-  // mid-session, and it feeds only the NEXT keyboard event's math — never the current render — so
-  // under zoneless CD there is nothing to repaint at resolve time. The keyboard event that does use
-  // it already calls markForCheck itself.
+  // A device setting that cannot change mid-session, learning it must not repaint
   private prefersCrossFadeTransitions = false;
   private subscriptions: IEventSubscription[] = [];
 
   private readonly changeDetector = inject(ChangeDetectorRef);
-  // This component's OWN host — the non-painting anchor `class="..."` at the use site resolves
-  // onto (see anchorHostStyle's doc comment) — NOT a ViewChild into the inner view (this
-  // component has none; the wrapper IS the outer template node hostProps binds onto).
+  // This component's own host, the anchor that `class` at the use site resolves onto
   private readonly elementRef = inject(ElementRef);
 
+  // Options are read at event time, т.к. an `@Input` can change under a live subscription
+  private readonly model = createKeyboardAvoidingModel({
+    options: () => ({
+      behavior: this.behavior,
+      enabled: this.enabled !== false,
+      keyboardVerticalOffset:
+        this.keyboardVerticalOffset ?? DEFAULT_VERTICAL_OFFSET,
+    }),
+    setInset: value => {
+      this.inset = value;
+      this.changeDetector.markForCheck();
+    },
+    prefersCrossFade: () => this.prefersCrossFadeTransitions,
+  });
+
   ngOnInit(): void {
-    // TWO events, picked per host, never three: iOS takes the will* pair so the view rides up with
-    // the keyboard animation, Android the did* pair. The change-frame notification is deliberately
-    // absent — with an undocked/split/floating iOS keyboard it fires BEFORE the hide, so listening
-    // to it applies a frame captured mid-dismissal (RN KeyboardAvoidingView.js's own comment).
+    // iOS takes the `will*` pair so the view rides up with the keyboard, Android the `did*` pair
     const events = keyboardAvoidingEventNamesFor(Platform.OS);
     this.subscriptions = [
-      Keyboard.addListener(events.show, payload => this.onShow(payload)),
-      Keyboard.addListener(events.hide, () => this.onHide()),
+      Keyboard.addListener(events.show, payload => {
+        this.model.keyboardShown(payload);
+        // An unchanged inset skips `setInset`, the event still has to carry a new `@Input` down
+        this.changeDetector.markForCheck();
+      }),
+      Keyboard.addListener(events.hide, this.model.keyboardHidden),
     ];
     // The core wrapper, not AccessibilityInfo directly: the engine's iOS getter REJECTS on a
     // native error (RN parity), and nobody awaits this read, so an unwrapped call would surface
@@ -177,47 +176,10 @@ export class KeyboardAvoidingView
     this.subscriptions = [];
   }
 
-  private onShow(payload: unknown): void {
-    const keyboard = readKeyboardFrame(payload);
-    const offset = this.keyboardVerticalOffset ?? DEFAULT_VERTICAL_OFFSET;
-    const next = computeInset(this.frame, keyboard, offset, {
-      // Read off the field at event time, not captured when the subscription was built: `behavior`
-      // is an @Input that can change under a long-lived subscription, and a stale one keeps
-      // applying the old mode's math (it gates the previous-inset correction below).
-      behavior: this.behavior,
-      // The inset CURRENTLY applied (RN's this.state.bottom), read off the field at event time so
-      // 'height' mode's fixpoint correction sees the live value: that mode SHRINKS the wrapper by
-      // the inset, so the next onLayout reports a frame shorter by exactly that much.
-      previousInset: this.inset,
-      prefersCrossFadeTransitions: this.prefersCrossFadeTransitions,
-    });
-    // RN's `_updateBottomIfNecessary` skips the animation when the inset did not change.
-    if (next !== this.inset)
-      configureKeyboardAvoidingAnimation(
-        readKeyboardAnimationTiming(payload),
-        this.enabled !== false,
-      );
-    dlog(`KeyboardAvoidingView show -> inset ${next}`);
-    this.inset = next;
-    this.changeDetector.markForCheck();
-  }
-
-  private onHide(): void {
-    dlog('KeyboardAvoidingView hide -> inset 0');
-    this.inset = 0;
-    this.changeDetector.markForCheck();
-  }
-
-  // The wrapper's onLayout measures the frame BEFORE forwarding to the caller's onLayout, so the
-  // next keyboard event's inset math has the view's real position (React/Vue's handleLayout).
+  // Measured before the caller's `layout` output fires
   handleLayout(event: unknown): void {
     if (!isSymbioteEvent(event)) return;
-    const measured = readLayoutFrame(event.nativeEvent.layout);
-    if (measured !== undefined) {
-      this.frame = measured;
-      if (this.initialHeight === undefined)
-        this.initialHeight = measured.height;
-    }
+    this.model.laidOut(event.nativeEvent.layout);
     this.layout.emit(event);
   }
 
@@ -227,14 +189,12 @@ export class KeyboardAvoidingView
     return this.enabled === false ? 0 : this.inset;
   }
 
-  // The behavior + effective inset → wrapper/inner styles and the nesting decision (the shared core
-  // of RN's render). Recomputed per CD pass, the Angular twin of React/Vue's per-render call.
-  // Named `resolvedLayout`, not `layout` — that name is now the onLayout @Output() EventEmitter.
+  // Not `layout`, that name is the `onLayout` output
   private get resolvedLayout(): IKeyboardAvoidingLayout {
     return resolveKeyboardAvoidingLayout({
       behavior: this.behavior,
       effectiveInset: this.effectiveInset,
-      initialHeight: this.initialHeight,
+      initialHeight: this.model.initialHeight(),
       style: this.style,
       contentContainerStyle: this.contentContainerStyle,
     });

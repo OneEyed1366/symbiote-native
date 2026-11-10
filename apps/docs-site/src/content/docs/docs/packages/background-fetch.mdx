@@ -24,19 +24,6 @@ here for periodic execution.
 Every export is a plain async function — no hook/composable/service to wrap, so every adapter's
 entry point is a plain re-export of the same core.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ------------------ | ------- |
-| React              | ✅ live |
-| Vue                | ✅ live |
-| Angular            | ✅ live |
-| Svelte             | ✅ live |
-| Solid              | ✅ live |
-
 ## Installation
 
 ```sh
@@ -152,7 +139,9 @@ so the system can schedule future fetches. Android ignores the value.
 **iOS needs a background mode.** `UIBackgroundModes: fetch` is added for you through the task
 manager's link manifest.
 
-Sources: [Expo docs: BackgroundFetch](https://docs.expo.dev/versions/latest/sdk/background-fetch/),
-[expo/expo#35551 registerTaskAsync rejected on Android, release build only](https://github.com/expo/expo/issues/35551),
-[expo/expo#33596 background fetch does not execute the task on Android](https://github.com/expo/expo/issues/33596),
-[expo/expo#36492 background task never executing](https://github.com/expo/expo/issues/36492).
+Sources:
+
+- [Expo docs: BackgroundFetch](https://docs.expo.dev/versions/latest/sdk/background-fetch/)
+- [expo/expo#35551 registerTaskAsync rejected on Android, release build only](https://github.com/expo/expo/issues/35551)
+- [expo/expo#33596 background fetch does not execute the task on Android](https://github.com/expo/expo/issues/33596)
+- [expo/expo#36492 background task never executing](https://github.com/expo/expo/issues/36492)

@@ -1,10 +1,6 @@
-// Image static methods (RN's Image.getSize/prefetch/queryCache/etc). Both iOS and Android specs
-// register under the same module name ('ImageLoader'), so this stays flat, non-platform-split —
-// only the Android prefetch call signature differs (a second requestId arg), branched below.
-
-// The native result crosses the I/O boundary as unknown; we never cast it, we narrow its shape.
-// This is a stateful, native-bridge-touching imperative module with no view of its own — it
-// belongs here alongside Alert/Share, not in a view/render-*.ts file.
+// Image statics (`getSize`, `prefetch`, `queryCache`) over the one `ImageLoader` native module
+// TODO(rn-port): RN keeps these on the `Image` component module, which loads React's renderer
+// Reaching them through the host would put React into every other adapter's bundle
 
 import { dlog } from './debug';
 import {
@@ -25,24 +21,27 @@ export type IImageCacheStatus = 'memory' | 'disk' | 'disk/memory';
 type ISizeSuccess = (width: number, height: number) => void;
 type ISizeFailure = (error: unknown) => void;
 
-// The ImageLoader native module surface we consume. One name, two signatures: Android's
-// prefetchImage takes a second requestId arg (abortRequest keys off it), iOS takes only uri and
-// throws on the extra arg, so the call below branches on Platform.OS.
+// One name, two signatures: Android's `prefetchImage` takes a second `requestId`
+// iOS throws on the extra arg, so the call branches on `Platform.OS`
 type INativeImageLoader = {
   getSize(uri: string): Promise<unknown>;
   getSizeWithHeaders(
     uri: string,
     headers: Record<string, string>,
   ): Promise<unknown>;
-  // The arg is optional so the iOS call passes exactly one — a second arg makes the bridgeless
-  // TurboModule throw "Exception in HostFunction".
+  // Optional so iOS passes exactly one arg, a second makes the bridgeless module throw
   prefetchImage(uri: string, requestId?: number): Promise<unknown>;
+  // iOS only, and an older host may not have it
+  prefetchImageWithMetadata?(
+    uri: string,
+    queryRootName: string,
+    rootTag: number,
+  ): Promise<unknown>;
   abortRequest?(requestId: number): void;
   queryCache(uris: string[]): Promise<unknown>;
 };
 
-// The native module name RN registers this under. A module name like this is only provable on a
-// real host — a headless fake answers to any name.
+// A module name is only provable on a real host, a headless fake answers to any name
 const IMAGE_LOADER_MODULE = 'ImageLoader';
 
 let imageLoaderModule: INativeImageLoader | null | undefined;
@@ -58,8 +57,7 @@ function getImageLoader(): INativeImageLoader | null {
   return imageLoaderModule;
 }
 
-// Narrow native's getSize result. The spec resolves a `[width, height]` array, but tolerate a
-// `{width, height}` object too (getSizeWithHeaders uses that shape).
+// The spec resolves a `[width, height]` array, `getSizeWithHeaders` an object
 function toImageSize(result: unknown): IImageSize {
   if (Array.isArray(result) && isNumber(result[0]) && isNumber(result[1])) {
     return { width: result[0], height: result[1] };
@@ -85,8 +83,13 @@ function requireLoader(method: string): INativeImageLoader {
   return loader;
 }
 
-// Image.ios.js / Image.android.js: the promise when no success callback is given; otherwise the
-// result goes to the callbacks and nothing is returned, a missing `failure` becoming a warning.
+// A throw inside `load`, a missing module included, becomes a rejection like any native failure
+async function sizeOf(load: () => Promise<unknown>): Promise<IImageSize> {
+  return toImageSize(await load());
+}
+
+// As `Image.ios.js`: the promise without a success callback, else the result goes to the callbacks
+// A missing `failure` becomes a warning
 function deliverSize(
   promise: Promise<IImageSize>,
   uri: string,
@@ -104,7 +107,7 @@ function deliverSize(
   return undefined;
 }
 
-// Overloaded as RN types it: the promise without callbacks, nothing with them.
+// Overloaded as RN types it: the promise without callbacks, nothing with them
 function getSize(uri: string): Promise<IImageSize>;
 function getSize(
   uri: string,
@@ -116,9 +119,7 @@ function getSize(
   success?: ISizeSuccess,
   failure?: ISizeFailure,
 ): Promise<IImageSize> | undefined {
-  const promise = Promise.resolve()
-    .then(() => requireLoader('getSize').getSize(uri))
-    .then(toImageSize);
+  const promise = sizeOf(() => requireLoader('getSize').getSize(uri));
   return deliverSize(promise, uri, success, failure);
 }
 
@@ -138,21 +139,18 @@ function getSizeWithHeaders(
   success?: ISizeSuccess,
   failure?: ISizeFailure,
 ): Promise<IImageSize> | undefined {
-  const promise = Promise.resolve()
-    .then(() =>
-      requireLoader('getSizeWithHeaders').getSizeWithHeaders(uri, headers),
-    )
-    .then(toImageSize);
+  const promise = sizeOf(() =>
+    requireLoader('getSizeWithHeaders').getSizeWithHeaders(uri, headers),
+  );
   return deliverSize(promise, uri, success, failure);
 }
 
-// Android keys an in-flight prefetch by a monotonic requestId (so abortRequest can cancel it);
-// RN's Image.android.js generates the same way. iOS ignores the arg.
+const ANDROID_OS = 'android';
+
+// Android keys an in-flight prefetch by a monotonic `requestId` so `abortRequest` can cancel it
 let prefetchRequestId = 0;
 
-// Download a remote image into the disk cache. Resolves to whether it succeeded. `callback`
-// receives the requestId (RN's Image.android.js shape) so the caller can later pass it to
-// abortPrefetch.
+// Resolves to whether native fetched it, `callback` gets the `requestId` for `abortPrefetch`
 async function prefetch(
   uri: string,
   callback?: (requestId: number) => void,
@@ -160,27 +158,43 @@ async function prefetch(
   prefetchRequestId += 1;
   const requestId = prefetchRequestId;
   if (typeof callback === 'function') callback(requestId);
-  const loader = requireLoader('prefetch');
-  return (
-    Promise.resolve()
-      // Android's prefetchImage keys an abortable request on requestId; iOS takes ONLY the uri and
-      // throws on an extra arg (bridgeless TurboModule arg-count check). Match RN's per-platform call.
-      .then(() =>
-        Platform.OS === 'android'
-          ? loader.prefetchImage(uri, requestId)
-          : loader.prefetchImage(uri),
-      )
-      .then(result => result === true)
-      .catch((error: unknown) => {
-        dlog(`Image.prefetch failed for ${uri}: ${String(error)}`);
-        throw error;
-      })
-  );
+  try {
+    const loader = requireLoader('prefetch');
+    // iOS takes only the uri, an extra arg throws in the bridgeless TurboModule
+    const result =
+      Platform.OS === ANDROID_OS
+        ? await loader.prefetchImage(uri, requestId)
+        : await loader.prefetchImage(uri);
+    return result === true;
+  } catch (error: unknown) {
+    dlog(`Image.prefetch failed for ${uri}: ${String(error)}`);
+    throw error;
+  }
 }
 
-// Cancel an in-flight prefetch by the requestId prefetch handed back. Android only (mirrors
-// Image.android.js -> NativeImageLoaderAndroid.abortRequest); a missing abortRequest (iOS,
-// headless) is a no-op rather than a throw.
+// iOS hands native the query root and a root tag (0 when absent), Android is plain `prefetch`
+async function prefetchWithMetadata(
+  uri: string,
+  queryRootName: string,
+  rootTag?: number,
+  callback?: (requestId: number) => void,
+): Promise<boolean> {
+  const loader = requireLoader('prefetchWithMetadata');
+  const withMetadata = loader.prefetchImageWithMetadata;
+  if (Platform.OS === ANDROID_OS || withMetadata === undefined) {
+    return prefetch(uri, callback);
+  }
+  const result = await withMetadata.call(
+    loader,
+    uri,
+    queryRootName,
+    rootTag ?? 0,
+  );
+  return result === true;
+}
+
+// Cancels an in-flight prefetch by its `requestId`, Android only
+// A missing `abortRequest` (iOS, headless) is a no-op rather than a throw
 function abortPrefetch(requestId: number): void {
   const loader = getImageLoader();
   if (loader === null || typeof loader.abortRequest !== 'function') {
@@ -192,8 +206,8 @@ function abortPrefetch(requestId: number): void {
   loader.abortRequest(requestId);
 }
 
-// Narrow native's queryCache result: an object mapping each known uri to its cache status.
-// Unknown statuses are dropped rather than trusted blindly.
+// Native answers an object mapping each known uri to its cache status
+// Unknown statuses are dropped rather than trusted
 const CACHE_STATUS: Record<string, IImageCacheStatus> = {
   memory: 'memory',
   disk: 'disk',
@@ -218,9 +232,8 @@ async function queryCache(
   return Promise.resolve()
     .then(() => {
       const loader = requireLoader('queryCache');
-      // The native queryCache never rejects (RCTImageLoader resolves getImageCacheStatus), so a
-      // rejection here is a JS/native boundary fault: log whether the method is even callable and
-      // the arg shape, to tell "not a function" (interop gap) from a marshalling reject.
+      // Native `queryCache` never rejects, so a rejection is a boundary fault
+      // The log tells "not a function" (interop gap) from a marshalling reject
       dlog(
         `Image.queryCache: typeof loader.queryCache=${typeof loader.queryCache} uris=${uris.length}`,
       );
@@ -233,8 +246,7 @@ async function queryCache(
     });
 }
 
-// Pure JS: run the currently-installed source resolver (the same machinery the Image component
-// uses via resolveImageSource). The app injects the real one with setImageSourceResolver.
+// Pure JS: runs the installed source resolver, injected by the app with `setImageSourceResolver`
 function resolveAssetSource(source: IImageSourceProp): unknown {
   return resolveImageSource(source);
 }
@@ -243,6 +255,7 @@ export type IImageStatics = {
   getSize: typeof getSize;
   getSizeWithHeaders: typeof getSizeWithHeaders;
   prefetch: typeof prefetch;
+  prefetchWithMetadata: typeof prefetchWithMetadata;
   abortPrefetch: typeof abortPrefetch;
   queryCache: typeof queryCache;
   resolveAssetSource: typeof resolveAssetSource;
@@ -252,6 +265,7 @@ export const imageStatics: IImageStatics = {
   getSize,
   getSizeWithHeaders,
   prefetch,
+  prefetchWithMetadata,
   abortPrefetch,
   queryCache,
   resolveAssetSource,

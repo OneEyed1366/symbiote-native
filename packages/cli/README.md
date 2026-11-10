@@ -65,6 +65,13 @@ already-generated `--testing` layer's files.
 SymbioteNative app is bare React Native. `--expo-modules` layers in autolinking alone (`expo` +
 `expo-modules-link`); every Expo-backed package (`@symbiote-native/battery`, `.../sensors`, …)
 is its own flag (`--battery`, `--sensors`, …) and implies `--expo-modules` without asking twice.
+
+`--reanimated` adds `@symbiote-native/reanimated` with the two native peers it needs
+(`react-native-reanimated` and `react-native-worklets`, pinned) and writes
+`react-native-worklets/plugin` as the last entry of `plugins` in `babel.config.js`. Native code
+changed, so run `pod install` in `ios/` and rebuild. On `add`, a `babel.config.js` with no
+`plugins` list is left alone and the step is printed instead.
+
 See [`templates/layers/README.md`](templates/layers/README.md) for the full layer list and what
 each one touches.
 
@@ -73,25 +80,35 @@ each one touches.
 ```
 src/
   index.ts                    # entry point — argv → subcommand routing, error reporting
-  cli.ts                      # hand-rolled argv parser (no dependency)
-  prompts.ts                  # @clack/prompts wrappers for every option this CLI resolves
+  cli.ts                      # hand-rolled argv parser (no dependency), flags in two tables
+  prompts.ts                  # @clack/prompts wrappers for every option `new` resolves
+  add-layer-prompts.ts        # the `add` prompt: layer options, already-added filtering
+  prompt-helpers.ts           # cancel handling and the interactive-terminal check
+  core-layers.ts              # CORE_LAYERS: the hand-named layers, one flag each
   detect-package-manager.ts   # npm_config_user_agent → npm | pnpm | yarn
   detect-framework.ts         # cwd package.json deps → react | vue | angular | solid | svelte
   template-dir.ts             # (framework, vueFlavor) → templates/js/<dir> name
+  templates-root.ts           # where templates/ sits, in dev and in the bundle
   get-command.ts              # (pm, 'install'|'dev') → printable shell command
-  generate.ts                 # scaffoldApp() — the actual copy/merge orchestration
-  add-layers.ts               # addLayersToApp() — extends an EXISTING app with optional layers
+  generate.ts                 # scaffoldApp(): the copy/merge orchestration
+  scaffold-layers.ts          # the layers `new` applies on top of the base template
+  add-layers.ts               # addLayersToApp(): extends an EXISTING app with optional layers
+  add-expo-modules-layer.ts   # the splices `add` applies for expo-modules
+  add-splash-screen-layer.ts  # the splices `add` applies for splash-screen
   detect-added-layers.ts      # cwd package.json deps -> which optional layers are already present
   errors.ts                   # CliUsageError, NotSymbioteAppError
-  expo-package-layers.ts      # EXPO_PACKAGE_LAYERS — one entry per Expo-backed package
+  expo-package-layers.ts      # EXPO_PACKAGE_LAYERS: one entry per Expo-backed package
   utils/
     render-template.ts        # recursive copy, package.json merge, .gitignore append
+    merge-layer-fragment.ts   # a layer's package.json.fragment.json into the app's
+    apply-reanimated-layer.ts # fragment + worklets plugin last in babel.config.js
     deep-merge.ts
     sort-dependencies.ts
     json.ts
   commands/
     new.ts                    # resolves options, calls scaffoldApp(), prints install/dev commands
     add.ts                    # eligibility guard + resolveAddLayers, calls addLayersToApp()
+    offer-grants.ts           # asks for policy-sensitive Android bundles after either command
 templates/                    # see templates/README.md
 build.config.ts               # rolldown config for the bundle.js publish artifact
 ```
@@ -100,16 +117,16 @@ Mirrors [`create-vue`](https://www.npmjs.com/package/create-vue)'s toolchain cho
 runtime dependencies, bundled to a single dependency-free `bundle.js` at publish time.
 `render-template.ts` / `deep-merge.ts` / `sort-dependencies.ts` are ported from it directly.
 Argv parsing is hand-rolled rather than a `commander`/`yargs` dependency, for the same
-fast-`npx`-cold-start reason create-vue avoids one — it still supports `--flag=value` alongside
-`--flag value`, "did you mean" suggestions for a typo'd command/flag, and rejects
+fast-`npx`-cold-start reason create-vue avoids one. It still supports `--flag=value` alongside
+`--flag value`, and "did you mean" suggestions for a typo'd command or flag. It rejects
 `--flag=value` on a boolean flag loudly rather than silently ignoring it.
 
 ## Status
 
-Real and verified against scaffolded-app fixtures: argv parsing, every interactive prompt,
-package-manager/framework autodetection, the full `templates/` tree (every framework × every
-optional layer in [`templates/layers`](templates/layers)), and `add`'s idempotent native-file
-text-splices.
+Real and verified against scaffolded-app fixtures: argv parsing, every interactive prompt, and
+package-manager and framework autodetection. So are the full `templates/` tree (every framework x
+every optional layer in [`templates/layers`](templates/layers)) and `add`'s idempotent
+native-file text-splices.
 
 Not wired in yet: the root `pnpm run build`/`prepublish-build` pipeline doesn't invoke this
 package's `rolldown` build — every other publishable package goes through `tsc --build` +

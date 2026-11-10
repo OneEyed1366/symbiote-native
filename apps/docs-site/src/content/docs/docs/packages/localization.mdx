@@ -9,24 +9,11 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 [`expo-localization`](https://docs.expo.dev/versions/latest/sdk/localization/) — the device's
 locale list and preferred calendar settings — so every SymbioteNative adapter can reach it, not
 just React. Unlike [network](/docs/packages/network/)'s single `useNetworkState`, this package
-ships **two independent getters**, `getLocales`/`getCalendars`, each synchronous (a direct
-JSI-bridged native call, no `await`) and each with its own native change listener and its own
-reactive hook per adapter (`useLocales`, `useCalendars`) — mirroring
+ships **two independent getters**, `getLocales`/`getCalendars`. Each is synchronous (a direct
+JSI-bridged native call, no `await`) and has its own native change listener and its own
+reactive hook per adapter (`useLocales`, `useCalendars`). This mirrors
 [battery](/docs/packages/battery/)'s shape of several distinct hooks in one package rather than
 one combined hook.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 ## Installation
 
@@ -39,16 +26,16 @@ Scaffolding or extending a SymbioteNative app? `npx @symbiote-native/cli new --l
 [`@symbiote-native/cli`](https://github.com/OneEyed1366/symbiote-native/tree/master/packages/cli).
 
 `expo-localization` and `expo-modules-core` come along as regular dependencies, pinned to exact
-versions — never install either yourself, and never add the `expo` meta-package to your project
-(it bundles its own Metro/Babel pipeline, which conflicts with this project's own).
+versions. Never install either yourself. Never add the `expo` meta-package to your project either,
+as it bundles its own Metro/Babel pipeline, which conflicts with this project's own.
 
 <Aside type="danger" title="Native setup is required before first use">
   `expo-localization`'s native code is discovered by `expo-modules-autolinking`,
   a different mechanism from the `react-native.config.cjs`/podspec autolinking
-  every other SymbioteNative wrapper uses — and it isn't the standard Expo setup
-  flow either, since this project never installs the `expo` meta-package. Follow
-  [How to: wire up an Expo native
-  module](/docs/howtos/expo-native-module-setup/) once per app first; it covers
+  every other SymbioteNative wrapper uses. It isn't the standard Expo setup
+  flow either, since this project never installs the `expo` meta-package.
+  Follow [How to: wire up an Expo native
+  module](/docs/howtos/expo-native-module-setup/) once per app first. It covers
   this package and every other `expo-modules-core` package with zero further
   native changes.
 </Aside>
@@ -273,12 +260,12 @@ Sources: [Expo docs: Localization](https://docs.expo.dev/versions/latest/sdk/loc
 
 ## How the wrapper works
 
-`@symbiote-native/localization` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-localization` itself
-— its types and functions are hand-ported, verbatim, into this package's own `core/`, resolving
+`@symbiote-native/localization` ships zero React/Vue/Angular/Svelte/Solid logic in `expo-localization` itself.
+Its types and functions are hand-ported, verbatim, into this package's own `core/`. They resolve
 the native module through `expo-modules-core`'s `requireNativeModule` rather than the `expo`
 meta-package this project never installs. One native module fans out two independent event
 streams (locale settings vs. calendar settings) through the same `addListener`, keyed by event
-name — the same trick [battery](/docs/packages/battery/)'s native module uses for its own
+name. [battery](/docs/packages/battery/)'s native module uses the same trick for its own
 multiple event names on one `addListener`:
 
 ```
@@ -299,7 +286,7 @@ packages/localization/src/
 Two independent getters, each with its own native change listener and its own reactive hook per
 adapter — mirroring `@symbiote-native/battery`'s shape of shipping several distinct hooks in one
 package, not one combined hook. Each hook/composable/rune/service seeds its return value from the
-matching synchronous `get*()` call (no initial "loading" state needed — the native call is sync,
-not async) and recomputes it whenever the matching listener fires. The native code itself is
-never vendored or copied — `expo-modules-autolinking` resolves it straight out of `node_modules`
+matching synchronous `get*()` call, with no initial "loading" state needed since the native call is sync,
+not async. It recomputes the value whenever the matching listener fires. The native code itself is
+never vendored or copied: `expo-modules-autolinking` resolves it straight out of `node_modules`
 (see [the native setup guide](/docs/howtos/expo-native-module-setup/)).

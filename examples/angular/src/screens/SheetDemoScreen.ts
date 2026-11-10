@@ -1,77 +1,91 @@
-import { Component } from '@angular/core';
+import { Component, computed, viewChild } from '@angular/core';
+import type { AfterViewInit, TemplateRef } from '@angular/core';
 import { SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
-import { injectStackNavigation } from '@symbiote-native/navigation/angular';
-import type { IAngularScreenOptions } from '@symbiote-native/navigation/angular';
+import { injectRoute } from '@symbiote-native/navigation/angular';
+import type { IScreenOptionsResolver } from '@symbiote-native/navigation/angular';
+import { ScreenHero } from '../components/ScreenHero';
+import { LINE_COLOR } from '../navigation-lines';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-import { ActionButton } from '../components/ActionButton';
+import { SheetBody } from './sheet/SheetBody';
+import { SheetPanel } from './sheet/SheetPanel';
+import { readSheetSettings, sheetOptionsOf } from './sheet/sheet-settings';
+import { sheetLog } from './sheet/use-sheet-log';
 
-// Registered on the root Stack's <ng-template symbioteScreen [options]="sheetDemoScreenOptions">
-// (App.ts) — a plain options object is enough here (unlike headerOptionsScreenOptions's resolver)
-// since none of these fields need the live navigation handle. Twin of
-// ../../react/screens/SheetDemoScreen.tsx's sheetDemoScreenOptions — see that file's own comment
-// for the full formSheet/RNSScreenContentWrapper rationale (framework-agnostic, unchanged here).
-export const sheetDemoScreenOptions: IAngularScreenOptions = {
-  title: 'Sheet Demo',
-  headerShown: true,
-  headerTintColor: LINE_COLOR.presentation,
-  headerTitleColor: '#ffffff',
-  headerStyle: { backgroundColor: '#0b1622' },
-  headerUserInterfaceStyle: 'dark',
-  stackPresentation: 'formSheet',
-  sheetAllowedDetents: [0.3, 0.6, 1],
-  sheetGrabberVisible: true,
-  sheetCornerRadius: 20,
-  sheetInitialDetentIndex: 0,
+// The footer is a template and the resolver runs outside any component
+// So `SheetFooterTemplate` files it here once rendered
+const footerCell: { template?: TemplateRef<unknown> } = {};
+
+// The panel is a plain screen, a sheet is the same route pushed again with the panel as params
+// The header stays opaque, a `formSheet` has its own header height accounting
+export const sheetDemoScreenOptions: IScreenOptionsResolver = ({ route }) => {
+  const settings = readSheetSettings(route.params);
+  return {
+    title: settings.isSheet ? 'Sheet' : 'Sheet presentation',
+    headerShown: true,
+    headerTintColor: LINE_COLOR.presentation,
+    headerTitleColor: '#ffffff',
+    headerStyle: { backgroundColor: '#0b1622' },
+    headerUserInterfaceStyle: 'dark',
+    ...sheetOptionsOf(settings),
+    sheetFooter:
+      settings.isSheet && settings.hasFooter ? footerCell.template : undefined,
+    onSheetDetentChanged: ({ index, isStable }) =>
+      sheetLog.append(
+        'detent',
+        `detent ${index}, ${isStable ? 'stable' : 'moving'}`,
+        { isTick: !isStable },
+      ),
+  };
 };
 
-/**
- * Screen is PUSHED with stackPresentation: 'formSheet'; drag the grabber between the three
- * detents. Angular twin of ../../react/screens/SheetDemoScreen.tsx — skips SafeAreaView on
- * purpose: react-native-screens' formSheet content-sizing search only walks scroll-view's direct
- * native subviews.
- */
+// Rendered once beside the stack, App lists it in `OPTION_TEMPLATE_HOSTS`
+@Component({
+  selector: 'SheetFooterTemplate',
+  standalone: true,
+  imports: [SYMBIOTE_ELEMENTS],
+  template: `
+    <ng-template #footer>
+      <view testID="sheet-footer-bar" class="sheet-footer">
+        <text class="sheet-footer-text">Sheet footer</text>
+      </view>
+    </ng-template>
+  `,
+})
+export class SheetFooterTemplate implements AfterViewInit {
+  private readonly footer = viewChild.required<TemplateRef<unknown>>('footer');
+
+  ngAfterViewInit(): void {
+    footerCell.template = this.footer();
+  }
+}
+
+// The scroll view is the first child with no `SafeAreaView` above it, so a taller detent fills it
 @Component({
   selector: 'SheetDemoScreen',
   standalone: true,
-  imports: [ActionButton, SYMBIOTE_ELEMENTS],
+  imports: [ScreenHero, SheetBody, SheetPanel, SYMBIOTE_ELEMENTS],
   template: `
-    <scroll-view class="screen" contentContainerStyle="section">
-      <view [class]="lineTagClass">
-        <text class="line-tag-text">{{ lineTagLabel }}</text>
-      </view>
-      <view class="hero-card">
-        <view class="hero-badge" [style]="heroBadgeStyle">
-          <text class="hero-badge-text">SH</text>
+    <scroll-view testID="sheet-scroll" class="screen">
+      @if (isSheet()) {
+        <SheetBody></SheetBody>
+      } @else {
+        <view class="scroll-content">
+          <ScreenHero
+            [route]="screenRoute"
+            title="Sheet presentation"
+            body="Pick how the sheet looks and behaves, then present it. A sheet is this route pushed again."
+          ></ScreenHero>
+          <SheetPanel></SheetPanel>
         </view>
-        <view class="hero-copy">
-          <text class="hero-title">Sheet presentation</text>
-          <text class="hero-body">
-            Pushed with stackPresentation: formSheet and three detents — drag
-            the grabber between 30%, 60%, and full height.
-          </text>
-        </view>
-      </view>
-      <text class="info-text">
-        stackPresentation: formSheet · detents 30% / 60% / 100% · drag the
-        grabber
-      </text>
-      <ActionButton
-        testID="sheet-dismiss"
-        title="Dismiss"
-        (press)="navigation.pop()"
-        [color]="lineColorPresentation"
-      ></ActionButton>
+      }
     </scroll-view>
   `,
 })
 export class SheetDemoScreen {
-  readonly navigation = injectStackNavigation();
+  private readonly route = injectRoute();
 
-  readonly lineColorPresentation = LINE_COLOR.presentation;
-  readonly heroBadgeStyle = { backgroundColor: LINE_COLOR.presentation };
-
-  private readonly lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.SheetDemo];
-  readonly lineTagClass = `line-tag line-tag-${this.lineInfo.line}`;
-  readonly lineTagLabel = `${this.lineInfo.code} · ${this.lineInfo.label}`;
+  readonly screenRoute = ROUTE_NAME.SheetDemo;
+  readonly isSheet = computed(
+    () => readSheetSettings(this.route().params).isSheet,
+  );
 }

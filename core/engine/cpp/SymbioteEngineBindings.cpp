@@ -75,8 +75,8 @@ jsi::Value allocInt32Array(
 }
 
 /**
- * Counts the shadow trees of the real `UIManager`, or -1 when `getBinding` finds none
- * -1 means Fabric installed its binding after us, 0 means a real UIManager that holds no surface
+ * Count of shadow trees the real `UIManager` holds, or -1 when it was unreachable
+ * A bring-up probe, not a commit hook: -1 is a missing binding, 0 a UIManager with no surface
  */
 jsi::Value probeUIManager(
     jsi::Runtime &runtime,
@@ -198,8 +198,9 @@ void installBindings(jsi::Runtime &runtime) {
   install("teardownSubtreesOf", 1, &Tree::teardownSubtreesOf);
   install("ancestorsOf", 1, &Tree::ancestorsOf);
   install("committedRecordOf", 1, &Tree::committedRecordOf);
-  // A test read kept on this list, since the bag it returns is retained per node for diffing
-  // `Tree::committedPayloadOf` says why `getDebugProps` and `rawProps` cannot replace it
+  install("shadowNodeOf", 1, &Tree::shadowNodeOf);
+  // A TEST read, on this list as the bag it returns is already retained per node for diffing
+  // See `Tree::committedPayloadOf` for why RN's `getDebugProps` and `rawProps` cannot give it
   install("committedPayloadOf", 1, &Tree::committedPayloadOf);
 
   install("dispatchCommand", 3, &Tree::dispatchCommand);

@@ -55,12 +55,11 @@ describe('what a behavior installs on the node it attaches to', () => {
     for (const [tag, component] of TAGS) {
       counts.set(tag, installsOn(tag, component));
     }
-    print(
-      `DEBUG INSTALLS ${[...counts]
-        .filter(([, count]) => count > 0)
-        .map(([tag, count]) => `${tag} ${count}`)
-        .join(' · ')}`,
-    );
+    const installing = [...counts]
+      .filter(([, count]) => count > 0)
+      .map(([tag, count]) => `${tag} ${count}`)
+      .join(' · ');
+    print(`DEBUG INSTALLS ${installing}`);
 
     for (const [tag] of TAGS) {
       const allowed =

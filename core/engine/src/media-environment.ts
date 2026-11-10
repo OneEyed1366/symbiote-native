@@ -1,12 +1,14 @@
 // Builds the `@media` snapshot from the runtime modules and keeps it current
 // Starts on the first conditional class, so an app without `@media` never reads these modules
 
-import { Appearance } from './appearance';
-import { Dimensions } from './dimensions';
-import { I18nManager } from './i18n-manager';
 import type { IEventSubscription } from './native-events';
-import { PixelRatio } from './pixel-ratio';
 import { Platform } from './platform';
+import {
+  Appearance,
+  Dimensions,
+  I18nManager,
+  PixelRatio,
+} from './react-native-host';
 import type { IMediaEnvironment } from './style-registry/media-evaluate';
 import {
   applyMediaEnvironment,

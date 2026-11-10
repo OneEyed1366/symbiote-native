@@ -31,6 +31,7 @@ export type {
   IMetroTransformer,
   IMetroTransformParams,
 } from './metro-transformer/index.ts';
+export { relabelForUpstream } from './metro-transformer/relabel-for-upstream.ts';
 export {
   compileScss,
   compileSass,

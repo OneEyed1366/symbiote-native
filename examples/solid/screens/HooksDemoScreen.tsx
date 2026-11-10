@@ -1,91 +1,125 @@
-// Introspection demo: createFocusEffect bumps a counter every time this screen (re)gains focus and
-// stamps the moment it loses it; createIsFocused renders the live true/false; createNavigationState
-// selects the whole route-name stack straight out of the root Stack's reducer state. Navigate away
-// and back (or push another screen) to watch all three move.
-//
-// THIS IS NOT A RENAME OF THE REACT/SVELTE SCREEN. Solid splits the navigator's lifecycle surface
-// by what each function DOES: `use*` consumes something already on the owner chain (useNavigation /
-// useRoute — Solid's own `useContext` sense), `create*` owns a signal, an effect or a subscription.
-// All three helpers here own subscriptions, so all three are `create*`, and the two that return
-// values return ACCESSORS — called at each use site, never destructured.
-//
-// createFocusEffect's closure needs no memoization, unlike React's useCallback requirement: a Solid
-// body runs ONCE, so the effect is read once and closed over directly. There is no dependency array
-// to go stale.
-//
-// <Index>, not <For>: the list is plain strings and a stack can legitimately hold the same route
-// name twice, which <For>'s value-keyed reconciliation cannot tell apart. <Index> keys by position
-// and hands the item down as an accessor — the shape a list of primitives wants. It is imported
-// explicitly: an un-imported control-flow name resolves against the RENDERER module and reads back
-// `undefined`, which builds fine and throws at runtime (.claude/rules/solid-descriptor-bridge.md §3).
-
-import { Index, createSignal } from 'solid-js';
+import { createSignal, Index } from 'solid-js';
 import {
   createFocusEffect,
   createIsFocused,
   createNavigationState,
+  useStackNavigation,
 } from '@symbiote-native/navigation/solid';
+import { ActionButton } from '../components/ActionButton';
+import { Recipe } from '../components/Recipe';
+import { ScreenHero } from '../components/ScreenHero';
+import { recipeById } from '../navigation-recipes';
+import { LINE_COLOR } from '../navigation-lines';
 import { ROUTE_NAME } from '../routes';
-import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
-import './HooksDemoScreen.css';
 
-export function HooksDemoScreen() {
+const COLOR = LINE_COLOR.introspection;
+const effectOnce = recipeById('hooks-effect-once');
+const isFocusedRecipe = recipeById('hooks-is-focused');
+const stateRecipe = recipeById('hooks-navigation-state');
+const paramsRecipe = recipeById('hooks-route-params');
+
+// Kept apart so each recipe holds only the values it reads, the body of a Solid screen runs once
+function FocusEffectRecipe() {
+  const navigation = useStackNavigation();
+  const mountedAt = new Date().toLocaleTimeString();
   const [focusCount, setFocusCount] = createSignal(0);
   const [lastBlurAt, setLastBlurAt] = createSignal<number | undefined>(
     undefined,
   );
-  const isFocused = createIsFocused();
-  const routeNames = createNavigationState(state =>
-    state.routes.map(route => route.name),
-  );
-  const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.HooksDemo];
-
   createFocusEffect(() => {
     setFocusCount(count => count + 1);
     return () => setLastBlurAt(Date.now());
   });
+  return (
+    <Recipe recipe={effectOnce}>
+      <text testID="hooks-mounted-at" class="info-text">
+        {`mounted once, at ${mountedAt}`}
+      </text>
+      <text testID="hooks-focus-count" class="info-text">
+        {`createFocusEffect ran: ${focusCount()}`}
+      </text>
+      <text class="info-text">
+        {lastBlurAt() === undefined
+          ? 'not blurred yet'
+          : `last blurred at ${lastBlurAt()}`}
+      </text>
+      <ActionButton
+        testID="hooks-push-details"
+        title="Push Details"
+        onPress={() => navigation().push(ROUTE_NAME.Details)}
+        color={COLOR}
+      />
+    </Recipe>
+  );
+}
 
+function IsFocusedRecipe() {
+  const isFocused = createIsFocused();
+  return (
+    <Recipe recipe={isFocusedRecipe}>
+      <text testID="hooks-is-focused" class="info-text">
+        {`createIsFocused(): ${isFocused()}`}
+      </text>
+    </Recipe>
+  );
+}
+
+function NavigationStateRecipe() {
+  const navigation = useStackNavigation();
+  const routeNames = createNavigationState(state =>
+    state.routes.map(route => route.name),
+  );
+  return (
+    <Recipe recipe={stateRecipe}>
+      <Index each={routeNames()}>
+        {(name, index) => (
+          <text class="list-row-text">{`${index}. ${name()}`}</text>
+        )}
+      </Index>
+      <ActionButton
+        testID="hooks-push-self"
+        title="Push this screen again"
+        onPress={() => navigation().push(ROUTE_NAME.HooksDemo)}
+        color={COLOR}
+      />
+    </Recipe>
+  );
+}
+
+function RouteParamsRecipe() {
+  const navigation = useStackNavigation();
+  return (
+    <Recipe recipe={paramsRecipe}>
+      <ActionButton
+        testID="hooks-push-details-params"
+        title="Push Details with params"
+        onPress={() =>
+          navigation().push(ROUTE_NAME.Details, { openedFrom: 'hooks' })
+        }
+        color={COLOR}
+      />
+    </Recipe>
+  );
+}
+
+// One recipe per question: a one-time mount value against `createFocusEffect`, `createIsFocused`,
+// the route stack from `createNavigationState` and params sent with `push`
+export function HooksDemoScreen() {
   return (
     <safe-area-view class="screen">
-      <view class="demo-section">
-        <view class={`line-tag line-tag-${lineInfo.line}`}>
-          <text class="line-tag-text">{`${lineInfo.code} · ${lineInfo.label}`}</text>
+      <scroll-view testID="hooks-scroll" class="screen">
+        <view class="scroll-content">
+          <ScreenHero
+            route={ROUTE_NAME.HooksDemo}
+            title="Hooks"
+            body="Focus and state hooks of the navigator, each one answering a question people search for."
+          />
+          <FocusEffectRecipe />
+          <IsFocusedRecipe />
+          <NavigationStateRecipe />
+          <RouteParamsRecipe />
         </view>
-        <view class="hero-card">
-          <view
-            class="hero-badge"
-            style={{ backgroundColor: LINE_COLOR.introspection }}
-          >
-            <text class="hero-badge-text">HK</text>
-          </view>
-          <view class="hero-copy">
-            <text class="hero-title">Navigation primitives</text>
-            <text class="hero-body">
-              createFocusEffect, createIsFocused and createNavigationState —
-              introspecting the navigator's own live state from inside a screen.
-            </text>
-          </view>
-        </view>
-        <text testID="hooks-is-focused" class="info-text">
-          {`createIsFocused(): ${isFocused()}`}
-        </text>
-        <text testID="hooks-focus-count" class="info-text">
-          {`createFocusEffect focus count: ${focusCount()}`}
-        </text>
-        <text class="info-text">
-          {lastBlurAt() === undefined
-            ? 'not blurred yet'
-            : `last blurred at ${lastBlurAt()}`}
-        </text>
-        <text class="note-text">
-          createNavigationState() · current route stack
-        </text>
-        <Index each={routeNames()}>
-          {(name, index) => (
-            <text class="hooks-list-row">{`${index}. ${name()}`}</text>
-          )}
-        </Index>
-      </view>
+      </scroll-view>
     </safe-area-view>
   );
 }

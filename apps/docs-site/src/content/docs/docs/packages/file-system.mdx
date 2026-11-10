@@ -7,26 +7,13 @@ import { Aside } from '@astrojs/starlight/components';
 
 Read, write, copy, move and download files on the device. `@symbiote-native/file-system` wraps
 [`expo-file-system`](https://github.com/expo/expo/tree/main/packages/expo-file-system) for every
-SymbioteNative adapter and ports both of upstream's surfaces: the default export is the modern
-`File`/`Directory`/`Paths` API built on JSI shared objects; the legacy function-based API (read/
-write/copy/move/delete, directory listing, disk-space queries, resumable download/upload, Android
-Storage Access Framework) lives at the `/legacy` subpath.
+SymbioteNative adapter and ports both of upstream's surfaces. The default export is the modern
+`File`/`Directory`/`Paths` API built on JSI shared objects. The legacy function-based API lives at
+the `/legacy` subpath. It covers read/write/copy/move/delete, directory listing, disk-space
+queries, resumable download/upload, and the Android Storage Access Framework.
 
 Which directory? `Paths.document` is for data the user expects to keep. `Paths.cache` is for
 anything you can re-create, and the OS may clear it when storage runs low.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ------------------ | ------- |
-| React              | ✅ live |
-| Vue                | ✅ live |
-| Angular            | ✅ live |
-| Svelte             | ✅ live |
-| Solid              | ✅ live |
 
 ## Installation
 
@@ -181,10 +168,12 @@ create it. Use `file.write()` to replace the contents of a file you own.
 **Why are there two APIs?** The class API (`File`, `Directory`, `Paths`) is upstream's default.
 The function API is kept at `/legacy` for code that already uses it.
 
-Sources: [Expo forums: unable to download file in expected location](https://forums.expo.dev/t/unable-to-download-file-in-expected-location/19632),
-[expo/expo#20298 requestDirectoryPermissionsAsync opens a file dialog](https://github.com/expo/expo/issues/20298),
-[Expo docs: FileSystem (legacy)](https://docs.expo.dev/versions/latest/sdk/filesystem-legacy/),
-[DEV: expo-file-system cacheDirectory has to be cleaned](https://dev.to/dmitryame/expo-filesystem-cachedirectory-has-to-be-cleaned-2ifd).
+Sources:
+
+- [Expo forums: unable to download file in expected location](https://forums.expo.dev/t/unable-to-download-file-in-expected-location/19632)
+- [expo/expo#20298 requestDirectoryPermissionsAsync opens a file dialog](https://github.com/expo/expo/issues/20298)
+- [Expo docs: FileSystem (legacy)](https://docs.expo.dev/versions/latest/sdk/filesystem-legacy/)
+- [DEV: expo-file-system cacheDirectory has to be cleaned](https://dev.to/dmitryame/expo-filesystem-cachedirectory-has-to-be-cleaned-2ifd)
 
 ## Legacy API (`/legacy`)
 

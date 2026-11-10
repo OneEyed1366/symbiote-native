@@ -5,26 +5,25 @@
 // StatusBarManager; a real color processor (setColorProcessor) proves setBackgroundColor
 // hands native a PROCESSED int, not the raw CSS string.
 //
-// index.android.ts now imports applyStatusBarProps/statusBarImperative/statusBarCurrentHeight
-// from the bare '@symbiote-native/engine' specifier (Metro-correct: it resolves engine's own
-// relative './status-bar' import to index.android.ts on a real Android host). Outside Metro,
-// that bare specifier always resolves engine's iOS build (see status-bar/index.ts's header), so
-// this test mocks it to the real Android implementation — the same fix
-// accessibility-info-android.test.tsx applies via a deep import, done here through vi.mock so
-// index.android.ts's own import stays the clean, production-correct one.
+// Outside Metro the bare `@symbiote-native/engine` specifier resolves the iOS build, so this test
+// mocks it to the real Android implementation and the component keeps its production import
 
 import { type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+type IEngine = typeof import('@symbiote-native/engine');
+
+function actualEngine(): Promise<IEngine> {
+  return vi.importActual('@symbiote-native/engine');
+}
+
 vi.mock('@symbiote-native/engine', async () => {
-  const actual = await vi.importActual<
-    typeof import('@symbiote-native/engine')
-  >('@symbiote-native/engine');
+  const actual = await actualEngine();
   const android =
     await import('../../../../../core/engine/src/status-bar/index.android');
   return {
     ...actual,
-    applyStatusBarProps: android.applyStatusBarProps,
+    createStatusBarEntry: android.createStatusBarEntry,
     statusBarImperative: android.statusBarImperative,
     statusBarCurrentHeight: android.statusBarCurrentHeight,
   };
@@ -47,10 +46,10 @@ const RED_INT = 0xff_ff_00_00; // ARGB: opaque red
 const BAR_STYLE = 'light-content';
 const ROOT_TAG = 280;
 
-interface IRecordedCall {
+type IRecordedCall = {
   method: string;
   args: unknown[];
-}
+};
 
 const recorded: IRecordedCall[] = [];
 
@@ -88,6 +87,10 @@ Object.assign(globalThis, {
     return module;
   },
 });
+
+// The stack sends to native once per frame, from `setImmediate`
+const frame = (): Promise<void> =>
+  new Promise(resolve => setImmediate(resolve));
 
 function find(method: string): IRecordedCall | undefined {
   return recorded.find(call => call.method === method);
@@ -137,8 +140,9 @@ describe('StatusBar (Android)', () => {
     expect(StatusBar.currentHeight).toBe(STATUS_BAR_HEIGHT);
   });
 
-  it('drives setColor / setTranslucent / setStyle from component props', () => {
+  it('drives setColor / setTranslucent / setStyle from component props', async () => {
     mount(ROOT_TAG, <App />);
+    await frame();
 
     // StatusBar renders null, so the tree is just the app View.
     const root = live.nodeOf(live.appRoot());

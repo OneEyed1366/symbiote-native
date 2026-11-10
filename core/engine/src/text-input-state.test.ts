@@ -10,10 +10,11 @@ import {
   focusTextInput,
   setInputBlurred,
   setInputFocused,
+  TextInputState,
 } from './text-input-state';
 
 const fabric = installRecordingFabric();
-let nextRootTag = 9900;
+let nextRootTag = 9_900;
 
 function mountNode() {
   const surface = createSurface((nextRootTag += 1));
@@ -117,5 +118,20 @@ describe('setInputBlurred', () => {
     setInputBlurred(first);
 
     expect(currentlyFocusedInput()).toBe(second);
+  });
+});
+
+describe('TextInputState', () => {
+  // `TextInput.State` is the public handle on the same tracker, apps and keyboard libraries read it
+  it('exposes the focus tracker the way RN does on TextInput.State', () => {
+    const node = mountNode();
+
+    TextInputState.focusTextInput(node);
+    expect(TextInputState.currentlyFocusedInput()).toBe(node);
+    expect(commandNames()).toEqual(['focus']);
+
+    TextInputState.blurTextInput(node);
+    expect(TextInputState.currentlyFocusedInput()).toBe(null);
+    expect(commandNames()).toEqual(['focus', 'blur']);
   });
 });

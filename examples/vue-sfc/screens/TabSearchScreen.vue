@@ -1,25 +1,29 @@
-<!-- Tabs demo · Search tab: registered with a tabBarBadge (TabsDemoScreen.vue's <TabScreen>). Vue SFC twin of TabsDemoScreen.tsx's inline TabSearchScreen. -->
+<!-- Prints what `jumpTo` passed in, and writes back through `setParams` with its own key -->
 <script setup lang="ts">
-import { useIsFocused } from '@symbiote-native/navigation/vue';
-import { ROUTE_NAME } from '../routes';
-import { ROUTE_LINE_INFO } from '../navigation-lines';
+import { useIsFocused, useRoute, useTabNavigation } from '@symbiote-native/navigation/vue';
+import ActionButton from '../components/ActionButton.vue';
+import { LINE_COLOR } from '../navigation-lines';
 
+const route = useRoute();
+const tabs = useTabNavigation();
 const isFocused = useIsFocused();
-const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.TabsDemo];
+const COLOR = LINE_COLOR.structure;
 </script>
 
 <template>
-  <safe-area-view class="screen">
-    <view class="section">
-      <view :class="`line-tag line-tag-${lineInfo.line}`">
-        <text class="line-tag-text">
-          {{ `${lineInfo.code} · ${lineInfo.label}` }}
-        </text>
-      </view>
-      <text class="section-label"> Search tab </text>
-      <text class="info-text">
-        {{ `focused: ${isFocused}` }}
+  <scroll-view class="screen" contentInsetAdjustmentBehavior="automatic">
+    <view class="scroll-content">
+      <text class="section-label">Search tab</text>
+      <text class="info-text">{{ `focused: ${isFocused}` }}</text>
+      <text testID="tabs-search-params" class="info-text">
+        {{ `params: ${JSON.stringify(route.params) ?? 'none'}` }}
       </text>
+      <ActionButton
+        testID="tabs-set-params"
+        title="setParams on this tab"
+        :onPress="() => tabs.setParams({ touched: true }, route.key)"
+        :color="COLOR"
+      />
     </view>
-  </safe-area-view>
+  </scroll-view>
 </template>

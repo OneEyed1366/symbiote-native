@@ -14,6 +14,7 @@ import {
   RESPONDER_TERMINATE,
   RESPONDER_TERMINATION_REQUEST,
   SHOULD_SET_NAMES,
+  type IShouldSetPhase,
 } from './names';
 
 // The node that claimed the responder for the in-flight touch, or undefined when nobody did.
@@ -33,7 +34,7 @@ export function clearResponder(): void {
 // re-claim would let its should-set consume the frame from under its own `onResponderMove`
 function findWantsResponder(
   path: ISymbioteNode[],
-  phase: 'start' | 'move',
+  phase: IShouldSetPhase,
   nativeEvent: Record<string, unknown>,
   skip: ISymbioteNode | undefined,
 ): ISymbioteNode | undefined {
@@ -145,7 +146,7 @@ function transferTo(
 // winner is granted; with an incumbent it is asked to relinquish first
 export function negotiateResponder(
   target: ISymbioteNode,
-  phase: 'start' | 'move',
+  phase: IShouldSetPhase,
   nativeEvent: Record<string, unknown>,
 ): void {
   const { path, skip } = scopeFor(target);

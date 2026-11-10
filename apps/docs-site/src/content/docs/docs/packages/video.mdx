@@ -8,19 +8,6 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 `@symbiote-native/video` wraps [`expo-video`](https://docs.expo.dev/versions/latest/sdk/video/), so
 every SymbioteNative adapter can play video, not just React.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -229,19 +216,21 @@ the player closes.
 `clearVideoCacheAsync()` to empty it.
 
 **How do I play audio in the background or in Picture in Picture?** It needs native setup first,
-see [Background playback and Picture in Picture](#background-playback-and-picture-in-picture):
-`audio` in `UIBackgroundModes` on iOS, the background-playback bundle on Android, and
+see [Background playback and Picture in Picture](#background-playback-and-picture-in-picture).
+That means `audio` in `UIBackgroundModes` on iOS, the background-playback bundle on Android, and
 `android:supportsPictureInPicture="true"` on the main activity.
 
-Sources: [Expo docs: Video](https://docs.expo.dev/versions/latest/sdk/video/),
-[expo/expo#35012 black screen when reusing a player on Android](https://github.com/expo/expo/issues/35012),
-[expo/expo#31248 one player in several VideoViews on Android](https://github.com/expo/expo/issues/31248),
-[expo/expo#31722 contentFit cover overlaps on Android](https://github.com/expo/expo/issues/31722),
-[androidx/media#1107 the ExoPlayer bug behind it](https://github.com/androidx/media/issues/1107),
-[expo/expo#30275 VideoView ignores zIndex on Android](https://github.com/expo/expo/issues/30275),
-[expo/expo#34630 touch events on VideoView on Android](https://github.com/expo/expo/issues/34630),
-[expo/expo#33804 player not released on unmount](https://github.com/expo/expo/issues/33804),
-[expo/expo#9899 fullscreen orientation on Android](https://github.com/expo/expo/issues/9899).
+Sources:
+
+- [Expo docs: Video](https://docs.expo.dev/versions/latest/sdk/video/)
+- [expo/expo#35012 black screen when reusing a player on Android](https://github.com/expo/expo/issues/35012)
+- [expo/expo#31248 one player in several VideoViews on Android](https://github.com/expo/expo/issues/31248)
+- [expo/expo#31722 contentFit cover overlaps on Android](https://github.com/expo/expo/issues/31722)
+- [androidx/media#1107 the ExoPlayer bug behind it](https://github.com/androidx/media/issues/1107)
+- [expo/expo#30275 VideoView ignores zIndex on Android](https://github.com/expo/expo/issues/30275)
+- [expo/expo#34630 touch events on VideoView on Android](https://github.com/expo/expo/issues/34630)
+- [expo/expo#33804 player not released on unmount](https://github.com/expo/expo/issues/33804)
+- [expo/expo#9899 fullscreen orientation on Android](https://github.com/expo/expo/issues/9899)
 
 ## How the wrapper works
 

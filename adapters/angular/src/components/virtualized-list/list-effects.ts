@@ -2,7 +2,6 @@
 // reducer only knows a delay for (the incremental fill and the viewability debounce)
 
 import {
-  EMPTY_OFFSET,
   LIST_ACTION_KIND,
   LIST_EFFECT_KIND,
   type IListAction,
@@ -24,13 +23,14 @@ export type IEffectHost<ItemT> = {
   }>;
 };
 
-type IViewableEffect<ItemT> = Extract<
-  IListEffect<ItemT>,
-  { kind: typeof LIST_EFFECT_KIND.fireViewable }
+type IScheduledViewable = Extract<
+  IListEffect<unknown>,
+  { kind: typeof LIST_EFFECT_KIND.scheduleViewable }
 >;
 
 export class ListEffectRunner<ItemT> {
-  private viewableTimer: ReturnType<typeof setTimeout> | null = null;
+  // RN never cancels a `minimumViewTime` timer, each one comes due and the reducer filters it
+  private readonly viewableTimers = new Set<ReturnType<typeof setTimeout>>();
   private batchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly host: IEffectHost<ItemT>) {}
@@ -40,7 +40,8 @@ export class ListEffectRunner<ItemT> {
   }
 
   dispose(): void {
-    if (this.viewableTimer !== null) clearTimeout(this.viewableTimer);
+    for (const timer of this.viewableTimers) clearTimeout(timer);
+    this.viewableTimers.clear();
     if (this.batchTimer !== null) clearTimeout(this.batchTimer);
   }
 
@@ -71,7 +72,12 @@ export class ListEffectRunner<ItemT> {
         this.scheduleRefill(effect.delay);
         break;
       case LIST_EFFECT_KIND.fireViewable:
-        this.fireViewable(effect, inputs);
+        inputs.viewabilityPairs[effect.pairIndex]?.onViewableItemsChanged(
+          effect.info,
+        );
+        break;
+      case LIST_EFFECT_KIND.scheduleViewable:
+        this.scheduleViewable(effect);
         break;
     }
   }
@@ -84,33 +90,15 @@ export class ListEffectRunner<ItemT> {
     }, delay);
   }
 
-  private fireViewable(
-    effect: IViewableEffect<ItemT>,
-    inputs: IListReducerInputs<ItemT>,
-  ): void {
-    const fire = (): void => {
-      for (const pair of inputs.viewabilityPairs) {
-        pair.onViewableItemsChanged({
-          ...effect.info,
-          viewabilityConfig: pair.viewabilityConfig,
-        });
-      }
+  private scheduleViewable(effect: IScheduledViewable): void {
+    const timer = setTimeout(() => {
+      this.viewableTimers.delete(timer);
       this.host.dispatch({
-        kind: LIST_ACTION_KIND.viewableFired,
-        map: effect.map,
+        kind: LIST_ACTION_KIND.viewableDue,
+        pairIndex: effect.pairIndex,
+        indices: effect.indices,
       });
-    };
-    if (this.viewableTimer !== null) {
-      clearTimeout(this.viewableTimer);
-      this.viewableTimer = null;
-    }
-    if (effect.delay <= EMPTY_OFFSET) {
-      fire();
-      return;
-    }
-    this.viewableTimer = setTimeout(() => {
-      this.viewableTimer = null;
-      fire();
     }, effect.delay);
+    this.viewableTimers.add(timer);
   }
 }

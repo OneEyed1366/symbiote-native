@@ -2,7 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "build"
+    "outDir": "build",
+    "paths": {
+      "react-native-screens/src/fabric/tabs/TabsScreenIOSNativeComponent": [
+        "./src/vendor-specs/tabs-screen-ios.d.ts"
+      ]
+    }
   },
   "include": ["src"],
   "exclude": [

@@ -11,21 +11,8 @@ SymbioteNative adapter can hide the native launch screen and drive its fade-out 
 importing that library's React hook body. Unlike the
 [slider wrapper](/docs/packages/slider/), bootsplash has no native **view** to
 register: it exposes only an imperative TurboModule (`hide`/`isVisible`/`getConstants()`), so
-there is nothing for the engine's `ViewConfig` path to reach — every adapter calls straight into
+there is nothing for the engine's `ViewConfig` path to reach. Every adapter calls straight into
 the same native module.
-
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | ✅ live |
-| Android     | ✅ live |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | ✅ live |
-| Vue               | ✅ live |
-| Angular           | ✅ live |
-| Svelte            | ✅ live |
-| Solid             | ✅ live |
 
 ## Installation
 
@@ -110,7 +97,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     </script>
     ```
 
-    Bare `hide()` on mount, matching `examples/svelte/App.svelte` — this repo's own canary calls
+    Bare `hide()` on mount, matching `examples/svelte/App.svelte`. This repo's own canary calls
     it exactly this way at the app root, inside an `$effect` with no dependency, since a Svelte
     component's `<script>` body itself runs only once and there is no ongoing state to react to.
 
@@ -247,9 +234,9 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
     `HideAnimationService.connect()` is Angular's twin of the React hook / Vue composable — Angular
     has no per-instance hook, so state and lifecycle live in DI instead; `connect()` also takes a
     config getter and returns a `Signal`. Unlike React's `{...container}` spread or Vue's
-    `v-bind="hideAnimation.container"`, Angular has no generic prop-spread — `onLayout`/`onLoadEnd`
+    `v-bind="hideAnimation.container"`, Angular has no generic prop-spread. `onLayout`/`onLoadEnd`
     must be wired explicitly through the real `(layout)`/`(loadEnd)` outputs `View`/`Image` expose,
-    calling the readiness callbacks `container.onLayout`/`logo.onLoadEnd` by hand; skipping them
+    calling the readiness callbacks `container.onLayout`/`logo.onLoadEnd` by hand. Skipping them
     means the readiness gate never completes and `hide()` never fires.
 
   </TabItem>
@@ -360,13 +347,13 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
 
 - **Calling `hide()` on your very first render is safe — it queues rather than failing.** iOS holds
   the resolver until a 0.35 s timer started during native init reports that the system launch
-  screen has faded out; Android re-posts the request every 100 ms while the module is still
+  screen has faded out. Android re-posts the request every 100 ms while the module is still
   initializing or no activity is resumed. The promise settles late; it does not reject.
 - **`useHideAnimation` hides the native screen without a fade.** It calls `hide({ fade: false })`
   itself the moment the readiness gate closes, because your `animate()` owns the fade-out —
   `hide({ fade: true })` only matters when you hide the splash by hand.
 - **`animate()` runs at most once per mount.** The controller latches after the first call, and the
-  logo/brand readiness flags are captured when it is constructed — a config that later drops its
+  logo/brand readiness flags are captured when it is constructed. A config that later drops its
   `logo`/`brand` source does not flip them back. If `ready` never becomes `true`, or a readiness
   callback is never wired, `hide()` never fires and the splash stays up.
 - **Native constants are read once, on first render.** `darkModeEnabled` is what picks
@@ -379,7 +366,7 @@ has mounted. `hide()`/`isVisible()` carry zero framework dependency — they are
 
 ## How the wrapper works
 
-`@symbiote-native/splash-screen` ships **zero native metadata** of its own — the native launch
+`@symbiote-native/splash-screen` ships **zero native metadata** of its own. The native launch
 screen is generated once by the bundled `symbiote-splash-screen` CLI (a thin passthrough to
 `react-native-bootsplash`'s own generator) and wired into the app's native entry points by hand,
 see the [native-setup how-to](/docs/howtos/splash-screen/). The package's own
@@ -397,11 +384,11 @@ packages/splash-screen/src/
 ```
 
 Every adapter's `useHideAnimation` constructs the **same** `HideAnimationController` once, reads
-native constants once, and re-syncs the controller's config through its own reactivity primitive
-— a React effect with no dependency array, a Vue `watchEffect`, an Angular `effect()`, a Svelte
-`$effect`. The style
+native constants once, and re-syncs the controller's config through its own reactivity primitive.
+That is a React effect with no dependency array, a Vue `watchEffect`, an Angular `effect()`, or a
+Svelte `$effect`. The style
 computation itself (`computeHideAnimationStyles`) is a faithful, framework-agnostic port of
-`react-native-bootsplash`'s own `useHideAnimation` `useMemo` body, so the container/logo/brand
-prop bags are byte-for-byte the same shape upstream produces — the same logic/lifecycle split as
+`react-native-bootsplash`'s own `useHideAnimation` `useMemo` body. So the container/logo/brand
+prop bags are byte-for-byte the same shape upstream produces. It is the same logic/lifecycle split as
 every other SymbioteNative component (see
 [how it works](/docs/how-it-works/)).

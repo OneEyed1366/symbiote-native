@@ -1,12 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { CliUsageError } from './errors.js';
-import { EXPO_PACKAGE_LAYERS } from './expo-package-layers.js';
+import type { IExpoPackageLayerName } from './expo-package-layers.js';
 import type { IDiscoveredBundle } from './grant-bundles.js';
+import { useNonInteractiveTerminal } from './non-interactive-terminal.test-helper.js';
 import {
-  buildAddLayerOptions,
-  dropAlreadyAdded,
-  resolveAddLayers,
-  resolveAddOverwrite,
   resolveAppName,
   resolveBundleId,
   resolveFeatures,
@@ -20,43 +17,43 @@ import {
 } from './prompts.js';
 import { defaultBundleId } from './utils/native-identity.js';
 
-// Every resolver below already returns synchronously when its value is explicit — these tests
-// cover the OTHER escape hatch: no value given, but nothing to prompt on (piped stdin, CI, a
-// Docker build). Forcing `isTTY` off proves the resolver never reaches `clack.*` — if it did,
-// the prompt would hang the test runner forever waiting on a stdin that never answers.
+const NO_FEATURES = {
+  isJavascript: false,
+  hasNavigation: false,
+  hasExpoModules: false,
+  hasTesting: false,
+  hasSplashScreen: false,
+  hasSlider: false,
+  hasReanimated: false,
+  expoPackages: new Set<IExpoPackageLayerName>(),
+};
+
+const DEFAULT_FEATURES = {
+  hasTypescript: true,
+  hasNavigation: false,
+  hasExpoModules: false,
+  hasTesting: false,
+  hasSplashScreen: false,
+  hasSlider: false,
+  hasReanimated: false,
+  expoPackages: new Set(),
+};
+
+// Every resolver below already returns at once when its value is explicit
+// These tests cover the other escape hatch: no value given, but nothing to prompt on (piped
+// stdin, CI, a Docker build), so a resolver that reached `clack.*` would hang the runner
 describe('prompts in a non-interactive terminal', () => {
-  const originalIsTTY = process.stdin.isTTY;
+  useNonInteractiveTerminal();
 
-  const originalUserAgent = process.env.npm_config_user_agent;
-
-  beforeEach(() => {
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: false,
-      configurable: true,
-    });
-    // The test runner itself was invoked through pnpm, which sets this env var — clear it so
-    // resolvePackageManager's own detection doesn't short-circuit before the fallback under test.
-    delete process.env.npm_config_user_agent;
-  });
-
-  afterEach(() => {
-    Object.defineProperty(process.stdin, 'isTTY', {
-      value: originalIsTTY,
-      configurable: true,
-    });
-    if (originalUserAgent !== undefined)
-      process.env.npm_config_user_agent = originalUserAgent;
-  });
-
-  it('resolveAppName fails fast — no default app name exists', async () => {
+  it('resolveAppName fails fast, as no default app name exists', async () => {
     await expect(resolveAppName(undefined)).rejects.toThrow(CliUsageError);
   });
 
-  it('resolveFramework fails fast — no default framework exists', async () => {
+  it('resolveFramework fails fast, as no default framework exists', async () => {
     await expect(resolveFramework(undefined)).rejects.toThrow(CliUsageError);
   });
 
-  it('resolveVueFlavor fails fast — no default flavor exists', async () => {
+  it('resolveVueFlavor fails fast, as no default flavor exists', async () => {
     await expect(resolveVueFlavor(undefined)).rejects.toThrow(CliUsageError);
   });
 
@@ -85,117 +82,54 @@ describe('prompts in a non-interactive terminal', () => {
   });
 
   it('resolveFeatures falls back to its default selection with no prompt', async () => {
-    await expect(
-      resolveFeatures('react', {
-        isJavascript: false,
-        hasNavigation: false,
-        hasExpoModules: false,
-        hasTesting: false,
-        hasSplashScreen: false,
-        hasSlider: false,
-        expoPackages: new Set(),
-      }),
-    ).resolves.toEqual({
-      hasTypescript: true,
-      hasNavigation: false,
-      hasExpoModules: false,
-      hasTesting: false,
-      hasSplashScreen: false,
-      hasSlider: false,
-      expoPackages: new Set(),
-    });
+    await expect(resolveFeatures('react', NO_FEATURES)).resolves.toEqual(
+      DEFAULT_FEATURES,
+    );
   });
 
-  // Picking an Expo-backed package (e.g. --battery) implies the autolinking wiring — the
-  // developer never separately ticks/passes "Expo-modules autolinking" too.
+  it('resolveFeatures keeps a feature that a flag already switched on', async () => {
+    await expect(
+      resolveFeatures('react', { ...NO_FEATURES, hasReanimated: true }),
+    ).resolves.toEqual({ ...DEFAULT_FEATURES, hasReanimated: true });
+  });
+
+  // Picking an Expo-backed package (--battery) implies the autolinking wiring
+  // The developer never also ticks "Expo-modules autolinking"
   it('resolveFeatures implies hasExpoModules from an explicit Expo-package flag', async () => {
     await expect(
       resolveFeatures('react', {
-        isJavascript: false,
-        hasNavigation: false,
-        hasExpoModules: false,
-        hasTesting: false,
-        hasSplashScreen: false,
-        hasSlider: false,
+        ...NO_FEATURES,
         expoPackages: new Set(['battery']),
       }),
     ).resolves.toEqual({
-      hasTypescript: true,
-      hasNavigation: false,
+      ...DEFAULT_FEATURES,
       hasExpoModules: true,
-      hasTesting: false,
-      hasSplashScreen: false,
-      hasSlider: false,
       expoPackages: new Set(['battery']),
     });
   });
 
-  // Angular's AOT pipeline has no plain-JS mode — resolveFeatures silently forces TypeScript on
-  // regardless of --javascript. That's the right call when TypeScript is merely unspecified, but
-  // an EXPLICIT, contradicted --javascript should error rather than vanish with no feedback, same
-  // as any other flag combination this CLI rejects instead of silently picking a side.
+  // Angular's AOT pipeline has no plain-JS mode, so TypeScript is forced on when unspecified
+  // An explicit, contradicted --javascript errors instead of vanishing with no feedback
   it('resolveFeatures rejects --javascript together with --framework angular', async () => {
-    await expect(
-      resolveFeatures('angular', {
-        isJavascript: true,
-        hasNavigation: false,
-        hasExpoModules: false,
-        hasTesting: false,
-        hasSplashScreen: false,
-        hasSlider: false,
-        expoPackages: new Set(),
-      }),
-    ).rejects.toThrow(CliUsageError);
-    await expect(
-      resolveFeatures('angular', {
-        isJavascript: true,
-        hasNavigation: false,
-        hasExpoModules: false,
-        hasTesting: false,
-        hasSplashScreen: false,
-        hasSlider: false,
-        expoPackages: new Set(),
-      }),
-    ).rejects.toThrow(/angular.*requires TypeScript/i);
+    const withJavascript = { ...NO_FEATURES, isJavascript: true };
+
+    await expect(resolveFeatures('angular', withJavascript)).rejects.toThrow(
+      CliUsageError,
+    );
+    await expect(resolveFeatures('angular', withJavascript)).rejects.toThrow(
+      /angular.*requires TypeScript/i,
+    );
   });
 
-  // `add --testing` on an app that already has detox.config.js can't pop a confirm prompt in CI —
-  // it must default to the SAFE choice (skip, don't clobber) rather than hang or silently overwrite.
-  it('resolveAddOverwrite without --force skips (resolves false) with no prompt', async () => {
-    await expect(resolveAddOverwrite(false, 'Overwrite?')).resolves.toBe(false);
-  });
-
-  it('resolveAddOverwrite with --force always resolves true, interactive or not', async () => {
-    await expect(resolveAddOverwrite(true, 'Overwrite?')).resolves.toBe(true);
-  });
-
-  // Piped/CI `new` can't pop a confirm prompt — same safe-by-default shape as resolveAddOverwrite:
-  // resolve false (skip git init) rather than hang or silently init a repo nobody asked for.
+  // Piped or CI `new` cannot pop a confirm, so it resolves false instead of hanging
+  // That skips git init rather than initialising a repo nobody asked for
   it('resolveGitInit skips (resolves false) with no prompt, non-interactively', async () => {
     await expect(resolveGitInit()).resolves.toBe(false);
   });
 
-  // No layer flags and no interactive terminal to ask in — same fail-fast shape as
-  // resolveFramework/resolveAppName above, but only when there's actually something left to add.
-  it('resolveAddLayers with no flags and remaining layers fails fast, non-interactively', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: false,
-          hasNavigation: false,
-          hasTesting: false,
-          hasSlider: false,
-          hasSplashScreen: false,
-        },
-        new Set(),
-      ),
-    ).rejects.toThrow(CliUsageError);
-  });
-
-  // why: granting a bundle means requesting a permission that triggers Play Console policy
-  // review — that decision can't be made up by a non-interactive default the way, say,
-  // resolveStyling's "css" fallback can. No terminal to ask in must fail fast, not guess.
-  it('resolveGrantSelection fails fast — a policy-sensitive bundle needs an interactive choice', async () => {
+  // Granting a bundle requests a permission that triggers a Play Console policy review
+  // No default can stand in for that choice, so no terminal to ask in must fail fast
+  it('resolveGrantSelection fails fast, as a policy-sensitive bundle needs an interactive choice', async () => {
     const candidates: IDiscoveredBundle[] = [
       {
         packageName: '@symbiote-native/location',
@@ -210,245 +144,5 @@ describe('prompts in a non-interactive terminal', () => {
     await expect(resolveGrantSelection(candidates)).rejects.toThrow(
       CliUsageError,
     );
-  });
-
-  it('resolveAddLayers with no flags and nothing left to add resolves to an empty list, no prompt', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: false,
-          hasNavigation: false,
-          hasTesting: false,
-          hasSlider: false,
-          hasSplashScreen: false,
-        },
-        new Set([
-          'navigation',
-          'expo-modules',
-          'testing',
-          'slider',
-          'splash-screen',
-          ...EXPO_PACKAGE_LAYERS.map(layer => layer.id),
-        ]),
-      ),
-    ).resolves.toEqual([]);
-  });
-});
-
-// Explicit flags short-circuit resolveAddLayers before it ever needs a terminal — covered outside
-// the non-interactive describe block above since interactivity is irrelevant to this path.
-describe('resolveAddLayers with explicit flags', () => {
-  // why: an explicit --navigation on an app that already has navigation must NOT silently
-  // re-render its App/MenuScreen/DetailsScreen — that would blow away real customization the
-  // developer made after `new`.
-  it('drops an explicitly-flagged layer that is already added, without --force', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: false,
-          hasNavigation: true,
-          hasTesting: true,
-          hasSlider: false,
-          hasSplashScreen: false,
-        },
-        new Set(['navigation']),
-        false,
-      ),
-    ).resolves.toEqual(['testing']);
-  });
-
-  // why: --force is the escape hatch for "yes, reset this layer's files back to the template
-  // defaults" — the one case where re-applying an already-added layer is the actual intent.
-  it('re-applies an already-added layer when --force is passed', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: false,
-          hasNavigation: true,
-          hasTesting: true,
-          hasSlider: false,
-          hasSplashScreen: false,
-        },
-        new Set(['navigation']),
-        true,
-      ),
-    ).resolves.toEqual(['navigation', 'testing']);
-  });
-
-  it('includes splash-screen when explicitly flagged', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: false,
-          hasNavigation: false,
-          hasTesting: false,
-          hasSlider: false,
-          hasSplashScreen: true,
-        },
-        new Set(),
-        false,
-      ),
-    ).resolves.toEqual(['splash-screen']);
-  });
-
-  it('returns empty when every explicitly-flagged layer is already added and not forced', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: false,
-          hasNavigation: true,
-          hasTesting: false,
-          hasSlider: false,
-          hasSplashScreen: false,
-        },
-        new Set(['navigation']),
-        false,
-      ),
-    ).resolves.toEqual([]);
-  });
-
-  // An Expo-package flag (e.g. --battery) implies `expo-modules` — the developer never has to
-  // pass both. Real-world motivation: same shape as resolveFeatures' implication for "new".
-  it('implies expo-modules from an explicit Expo-package flag', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: false,
-          hasNavigation: false,
-          hasTesting: false,
-          hasSlider: false,
-          hasSplashScreen: false,
-          expoPackages: new Set(['battery']),
-        },
-        new Set(),
-        false,
-      ),
-    ).resolves.toEqual(['battery', 'expo-modules']);
-  });
-
-  it('does not duplicate expo-modules when it is already explicitly flagged too', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: true,
-          hasNavigation: false,
-          hasTesting: false,
-          hasSlider: false,
-          hasSplashScreen: false,
-          expoPackages: new Set(['battery']),
-        },
-        new Set(),
-        false,
-      ),
-    ).resolves.toEqual(['expo-modules', 'battery']);
-  });
-
-  it('implies expo-modules even when it is already added (idempotent re-apply)', async () => {
-    await expect(
-      resolveAddLayers(
-        {
-          hasExpoModules: false,
-          hasNavigation: false,
-          hasTesting: false,
-          hasSlider: false,
-          hasSplashScreen: false,
-          expoPackages: new Set(['battery']),
-        },
-        new Set(['expo-modules']),
-        false,
-      ),
-    ).resolves.toEqual(['battery', 'expo-modules']);
-  });
-});
-
-// An already-added layer stays in the multiselect, disabled with why, instead of vanishing — a
-// shrinking menu with no visible reason looks like a bug, not a filter.
-
-// Grouped under "Core layers" / "Expo packages" (clack's groupMultiselect): the 21 Expo packages
-// alone outnumber every other layer, so a flat list would bury "Navigation" past all of them.
-describe('buildAddLayerOptions', () => {
-  function findOption(
-    groups: ReturnType<typeof buildAddLayerOptions>,
-    value: string,
-  ) {
-    return Object.values(groups)
-      .flat()
-      .find(option => option.value === value);
-  }
-
-  it('marks an already-added layer disabled, with an "already added" hint', () => {
-    const groups = buildAddLayerOptions(new Set(['navigation']));
-    expect(findOption(groups, 'navigation')).toMatchObject({
-      disabled: true,
-      hint: 'already added',
-    });
-  });
-
-  it('leaves a not-yet-added layer enabled, with its normal hint', () => {
-    const groups = buildAddLayerOptions(new Set());
-    expect(findOption(groups, 'navigation')).toMatchObject({
-      disabled: false,
-      hint: '@symbiote-native/navigation',
-    });
-  });
-
-  it('groups the 5 hand-named layers under "Core layers" and every Expo package under "Expo packages"', () => {
-    const groups = buildAddLayerOptions(new Set());
-    expect(groups['Core layers']).toHaveLength(5);
-    expect(groups['Expo packages']).toHaveLength(EXPO_PACKAGE_LAYERS.length);
-  });
-
-  it('lists every layer regardless of what is already added — nothing is filtered out', () => {
-    const alreadyAdded = new Set([
-      'navigation',
-      'expo-modules',
-      'testing',
-      'slider',
-      'splash-screen',
-    ]);
-    const groups = buildAddLayerOptions(alreadyAdded);
-    expect(Object.values(groups).flat()).toHaveLength(
-      5 + EXPO_PACKAGE_LAYERS.length,
-    );
-  });
-
-  it.each(EXPO_PACKAGE_LAYERS)(
-    'marks $id disabled once already added',
-    layer => {
-      const groups = buildAddLayerOptions(new Set([layer.id]));
-      expect(findOption(groups, layer.id)).toMatchObject({
-        disabled: true,
-        hint: 'already added',
-      });
-    },
-  );
-});
-
-// why: clack's groupMultiselect never enforces `disabled` — confirmed against @clack/core
-// 1.4.3's GroupMultiSelectPrompt.toggleValue (reads only `option.group`) and against
-// groupMultiselect's own render path (no "disabled" branch): the option looks disabled but
-// stays checkable. This is the real gate — an already-added layer is dropped unless --force,
-// whatever the prompt actually returns.
-describe('dropAlreadyAdded', () => {
-  it('drops a layer that is already added', () => {
-    expect(
-      dropAlreadyAdded(
-        ['navigation', 'testing'],
-        new Set(['navigation']),
-        false,
-      ),
-    ).toEqual(['testing']);
-  });
-
-  it('keeps a layer that is not already added', () => {
-    expect(dropAlreadyAdded(['navigation'], new Set(), false)).toEqual([
-      'navigation',
-    ]);
-  });
-
-  it('keeps an already-added layer when --force is passed', () => {
-    expect(
-      dropAlreadyAdded(['navigation'], new Set(['navigation']), true),
-    ).toEqual(['navigation']);
   });
 });

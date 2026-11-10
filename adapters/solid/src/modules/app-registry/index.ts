@@ -13,6 +13,7 @@ import type { Component } from 'solid-js';
 import {
   createAppRegistry,
   dlog,
+  HeadlessJsTaskError,
   type IAppParameters,
   type IRunnable,
 } from '@symbiote-native/engine';
@@ -65,8 +66,9 @@ const { AppRegistry, setHostRegistrar } = createAppRegistry<
   IWrapperComponentProvider
 >(runnableFor);
 
-export { AppRegistry, setHostRegistrar };
+export { AppRegistry, HeadlessJsTaskError, setHostRegistrar };
 export type {
+  IAppConfig,
   IAppParameters,
   IRunnable,
   IHostRegistrar,

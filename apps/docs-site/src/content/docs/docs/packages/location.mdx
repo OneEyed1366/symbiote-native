@@ -16,19 +16,6 @@ Functions and streams live in a shared core. The three permission hooks
 (`useForegroundPermissions`, `useBackgroundPermissions`, `useMotionActivityPermissions`) are
 per-adapter, and Angular gets one `*PermissionsService` each.
 
-| OS platform | Support |
-| ----------- | ------- |
-| iOS         | live    |
-| Android     | live    |
-
-| Framework adapter | Support |
-| ----------------- | ------- |
-| React             | live    |
-| Vue               | live    |
-| Angular           | live    |
-| Svelte            | live    |
-| Solid             | live    |
-
 ## Installation
 
 ```sh
@@ -340,17 +327,19 @@ Improve Location Accuracy to feed GPS data. iOS Simulator: Features > Location, 
 terminates the app. On Android a terminated app does not restart for a location event; on iOS the
 system relaunches it for a geofence event.
 
-Sources: [Expo docs: Location](https://docs.expo.dev/versions/latest/sdk/location/),
-[expo/expo#33981 getCurrentPositionAsync and permissions delays on some Android devices](https://github.com/expo/expo/issues/33981),
-[expo/expo#39851 getCurrentPositionAsync hangs indefinitely](https://github.com/expo/expo/issues/39851),
-[expo/expo#26825 getCurrentPositionAsync never returns the location](https://github.com/expo/expo/issues/26825),
-[expo/expo#14076 location stops updating after 5 to 10 minutes on Android](https://github.com/expo/expo/issues/14076).
+Sources:
+
+- [Expo docs: Location](https://docs.expo.dev/versions/latest/sdk/location/)
+- [expo/expo#33981 getCurrentPositionAsync and permissions delays on some Android devices](https://github.com/expo/expo/issues/33981)
+- [expo/expo#39851 getCurrentPositionAsync hangs indefinitely](https://github.com/expo/expo/issues/39851)
+- [expo/expo#26825 getCurrentPositionAsync never returns the location](https://github.com/expo/expo/issues/26825)
+- [expo/expo#14076 location stops updating after 5 to 10 minutes on Android](https://github.com/expo/expo/issues/14076)
 
 ## How the wrapper works
 
-`expo-location`'s JS is hand-ported into this package's `core/` (functions, the watch-subscription
-machinery shared by position, heading and motion watches, the geolocation polyfill), resolving the
-native module through `expo-modules-core` rather than the `expo` meta-package. Each adapter
+`expo-location`'s JS is hand-ported into this package's `core/`. That covers the functions, the
+watch-subscription machinery shared by position, heading and motion watches, and the geolocation
+polyfill. The native module resolves through `expo-modules-core`, not the `expo` meta-package. Each adapter
 re-exports `core` plus its own permission hooks, bound to a shared `createPermissionHook` factory.
 The native code is never vendored: `expo-modules-autolinking` resolves it from `node_modules` (see
 [the native setup guide](/docs/howtos/expo-native-module-setup/)).

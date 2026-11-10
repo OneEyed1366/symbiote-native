@@ -1,10 +1,7 @@
 // TouchableHighlight as an ENGINE-NODE behavior: RN's own version renders a container View plus
-// clones an opacity style onto its child (TouchableHighlight.js:281-320); this tag folds both
-// onto the ONE node instead (`foldTouchableHighlightUnderlay` in `SymbioteFabricProps.cpp`).
-
-// KNOWN GAP: composing `opacity` onto the SAME node as the underlay's `backgroundColor` fades the
-// underlay itself, so `underlayColor: 'black'` paints grey, not black. TODO: needs a
-// descendant-keyed rule plus `underlayShown` added to `IOwner`.
+// clones an opacity style onto its child (TouchableHighlight.js:281-320); here the underlay is a
+// rule on this node and the opacity a rule on its child (`foldTouchableHighlightUnderlay` and
+// `foldTouchableHighlightChild` in `SymbioteFabricProps.cpp`)
 
 // WHAT IS SHARED AND WHAT IS NEW. The underlay show/hide state machine
 // (createHighlightUnderlayHandlers/createHighlightUnderlayRuntime, `../state/touchable`) is already
@@ -64,13 +61,12 @@ const touchableHighlightDisabled: IDisabledResolver = props =>
     asAccessibilityState(props.accessibilityState),
   );
 
-interface IHighlightState {
+type IHighlightState = {
   shown: boolean;
   readonly runtime: IHighlightUnderlayRuntime;
-  // Tracked so `detach` can cancel an in-flight hold — a deferred hide outlives the tree that
-  // armed it otherwise, the same hazard `./touchable-opacity`'s `timers` set guards.
+  // Tracked so `detach` can cancel an in-flight hold, a deferred hide outlives the tree otherwise
   readonly timers: Set<ReturnType<typeof setTimeout>>;
-}
+};
 
 const states = new WeakMap<ISymbioteNode, IHighlightState>();
 

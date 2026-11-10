@@ -144,8 +144,10 @@ describe('the two aria folds agree, key for key', () => {
 
     expect(inJs.accessibilityLabel).toBe('Save');
     expect(inCpp.accessibilityLabel).toBe('Save');
-    expect(inJs.accessibilityRole).toBe('header');
-    expect(inCpp.accessibilityRole).toBe('header');
+    expect(inJs.accessibilityRole).toBe(undefined);
+    expect(inCpp.accessibilityRole).toBe(undefined);
+    expect(inJs.role).toBe('heading');
+    expect(inCpp.role).toBe('heading');
     // Consumed, not merely accompanied — on both sides. JS blanks the alias to `undefined` and C++
     // erases the key, which `sameValue` treats as one answer.
     expect(inJs['aria-label']).toBe(undefined);

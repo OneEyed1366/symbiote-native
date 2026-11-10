@@ -11,3 +11,4 @@ export { injectIsFocused } from './inject-is-focused';
 export { injectFocusEffect } from './inject-focus-effect';
 export type { IFocusEffectCallback } from './inject-focus-effect';
 export { injectNavigationState } from './inject-navigation-state';
+export { injectTransitionProgress } from './inject-transition-progress';

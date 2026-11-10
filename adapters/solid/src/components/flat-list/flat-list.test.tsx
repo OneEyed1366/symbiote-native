@@ -1,8 +1,5 @@
-// Solid twin of adapters/react's flat-list tests, adapters/vue's and adapters/svelte's. Drives REAL
-// compiled Solid JSX through the universal renderer into the fake Fabric slot. Every expectation
-// below comes from a PRODUCT rule — React Native's documented FlatList behaviour, or the surface
-// adapters/react already ships (the reference adapter for P0 parity) — never from reading this
-// adapter's own source back.
+// Solid twin of the React, Vue and Svelte FlatList tests, over compiled JSX and the fake Fabric
+// Expectations come from RN's documented FlatList behavior, never from this adapter's own source
 
 import { createSignal } from 'solid-js';
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
@@ -30,10 +27,13 @@ const ITEM_HEIGHT = 50;
 const ITEM_COUNT = 12;
 const VIEWPORT_HEIGHT = 150;
 
-interface IItem {
+type IItem = {
   id: number;
   label: string;
-}
+};
+
+const LIST_HEIGHT_STYLE = { height: 240 };
+const CONTENT_PADDING_STYLE = { paddingBottom: 24 };
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
@@ -64,16 +64,14 @@ const getItemLayout = (
   index,
 });
 
-// The total creation-log size — every node the engine has ever authored, whatever became of it
-// since. The direct replacement for the old mirror's `counts.createNode`: a claim that "nothing was
-// rebuilt" is a claim that this number held still across the update.
+// The total creation-log size, every node the engine has authored, a claim that "nothing was
+// rebuilt" is a claim that this number held still across the update
 function totalCreated(): number {
   return fabric.findAll(() => true).length;
 }
 
-// The auto-generated row Views only. Filtered to RCTView on purpose: a HORIZONTAL scroll host and
-// its content container both carry flexDirection 'row' of their own, and counting those would make
-// the packing assertions read differently per axis.
+// The auto-generated row Views only, filtered to `RCTView` because a horizontal scroll host and
+// its content container carry `flexDirection: 'row'` too and would skew the packing assertions
 function rowWrappers(): ILiveNode[] {
   return live.findAllLive(
     live.appRoot(),
@@ -95,9 +93,8 @@ function committedLabels(): Set<string> {
   return new Set(live.texts(live.appRoot()));
 }
 
-// Mount, then hand the list its viewport through the scroll host's onLayout — until that lands, RN
-// paints the bounded initialNumToRender prefix instead of a measured window, and viewability has no
-// viewport to test against.
+// Mount, then hand the list its viewport through the scroll host's `onLayout`, until that lands RN
+// paints the bounded `initialNumToRender` prefix and viewability has no viewport to test against
 async function settleViewport(): Promise<void> {
   await tick();
   fabric.fireEvent(committed(SCROLL_VIEW).instanceHandle, 'topLayout', {
@@ -116,8 +113,7 @@ function fireScroll(offsetY: number): void {
 
 const keyExtractor = (item: IItem): string => `k-${item.id}`;
 
-// RN's documented FlatList ref surface. `as const` (not a cast) so each name stays a literal key of
-// IFlatListHandle and the loop below needs no assertion to index with it.
+// RN's documented FlatList ref surface, `as const` keeps each name a literal key of the handle
 const HANDLE_METHODS = [
   'scrollToOffset',
   'scrollToIndex',
@@ -133,10 +129,8 @@ const HANDLE_METHODS = [
 
 describe('Solid FlatList on the engine', () => {
   describe('Positive', () => {
-    // why: FlatList's whole reason to exist is that it takes a PLAIN array and derives the
-    // VirtualizedList data-access protocol (getItem/getItemCount) itself, so the caller never
-    // writes them. The proof it really reached the shared list is that virtualization still
-    // happens: RN mounts only `initialNumToRender` cells and leaves the rest unmounted.
+    // FlatList takes a PLAIN array and derives `getItem` and `getItemCount` itself, virtualization
+    // still happening proves it reached the shared list
     it('derives the data protocol from a plain array and mounts only the initial batch', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -156,10 +150,8 @@ describe('Solid FlatList on the engine', () => {
       expect(labels.has('item-11')).toBe(false);
     });
 
-    // why: RN's numColumns regroups the virtualized stream into whole ROWS — the cell the list
-    // windows is a row, not an item — and lays each row out as a flex row of equally-weighted
-    // columns. Without that, windowing would count items and a two-column list would mount twice
-    // the cells it needs for one screen.
+    // `numColumns` regroups the stream into whole ROWS, the windowed cell is a row, laid out as a
+    // flex row of equally-weighted columns, or a two-column list would mount twice the cells
     it('packs items into flex-row rows of numColumns equally-weighted cells', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -187,10 +179,8 @@ describe('Solid FlatList on the engine', () => {
       expect(labels.has('item-6')).toBe(false);
     });
 
-    // why: columnWrapperStyle is typed `IStyleProp<IViewStyle> | string`, deliberately widened past
-    // a style object — a bare string is a registered class name and must resolve through the SAME
-    // shared style registry `class` uses, landing on the auto-generated row view. This is the
-    // contract adapters/react and adapters/vue already ship.
+    // `columnWrapperStyle` is widened past a style object, a bare string is a registered class
+    // name and resolves through the same registry as `class`, landing on the generated row view
     it('resolves a columnWrapperStyle class name onto every row wrapper', async () => {
       registerRules([
         {
@@ -217,9 +207,8 @@ describe('Solid FlatList on the engine', () => {
       for (const row of rows) expect(row.payload.columnGap).toBe(4);
     });
 
-    // why: widening the prop to accept a string must stay ADDITIVE — a caller already passing a
-    // plain style object must keep working, and the row's own flexDirection must survive the merge
-    // rather than be replaced by it.
+    // Accepting a string stays ADDITIVE, a plain style object keeps working and the row's own
+    // `flexDirection` survives the merge
     it('still accepts a plain columnWrapperStyle object over the row flexDirection', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -238,9 +227,8 @@ describe('Solid FlatList on the engine', () => {
       for (const row of rows) expect(row.payload.columnGap).toBe(8);
     });
 
-    // why: RN's multi-column FlatList draws its divider BETWEEN ROWS, but the caller's separator is
-    // typed on the item — so it must be handed the real flanking items (last of the row above,
-    // first of the row below), never the internal IRow wrapper the virtualized stream carries.
+    // The divider sits BETWEEN ROWS but the caller's separator is typed on the item, so it gets the
+    // real flanking items (last of the row above, first of the row below), never the row wrapper
     it('hands the row separator the real flanking items, not the IRow wrapper', async () => {
       const separator = (sep: ISeparatorProps<IItem>): JSX.Element => (
         <text>{`gap:${sep.leadingItem?.label}>${sep.trailingItem?.label}`}</text>
@@ -260,10 +248,8 @@ describe('Solid FlatList on the engine', () => {
       expect(committedLabels().has('gap:item-2>item-3')).toBe(true);
     });
 
-    // why: the list underneath windows ROWS, but RN types onViewableItemsChanged on the ITEM — a
-    // caller must see one token per real item, carrying that item's own extracted key and its
-    // absolute data index, or every viewability-driven feature (impression analytics, lazy image
-    // loading) counts rows and under-reports by a factor of numColumns.
+    // The list underneath windows ROWS but `onViewableItemsChanged` is typed on the ITEM, so a
+    // caller sees one token per item with its own key and absolute index, not rows
     it('expands row viewability back to one token per item', async () => {
       const reports: IViewableItemsChangedInfo<IItem>[] = [];
       mount(ROOT_TAG, () => (
@@ -293,9 +279,8 @@ describe('Solid FlatList on the engine', () => {
       expect(tokens[5]?.item.label).toBe('item-5');
     });
 
-    // why: viewabilityConfigCallbackPairs is RN's multi-threshold form of the same report (one
-    // config + callback per pair), so it must receive the identical item-level expansion. A pair
-    // left reporting IRow wrappers would hand the caller objects whose type says ItemT.
+    // `viewabilityConfigCallbackPairs` is the multi-threshold form of the same report and must get
+    // the identical item-level expansion
     it('expands row viewability for every viewabilityConfigCallbackPairs entry', async () => {
       const reports: IViewableItemsChangedInfo<IItem>[] = [];
       mount(ROOT_TAG, () => (
@@ -321,11 +306,8 @@ describe('Solid FlatList on the engine', () => {
       expect(tokens[0]?.key).toBe('k-0');
     });
 
-    // why: RN documents FlatList's ref as the VirtualizedList API — scrollToOffset / scrollToIndex /
-    // scrollToItem / scrollToEnd / flashScrollIndicators / recordInteraction / the scroll-node
-    // getters — and scrollToOffset rides the underlying ScrollView's NATIVE scrollTo command
-    // ([x, y, animated]), animated unless the caller says otherwise. A handle that stopped at the
-    // wrapper would move nothing on a device.
+    // The ref is the VirtualizedList API and `scrollToOffset` rides the ScrollView's native
+    // `scrollTo` command ([x, y, animated]), animated unless told otherwise
     it('exposes the RN imperative handle and drives a native scrollTo', async () => {
       let list: IFlatListHandle | undefined;
       mount(ROOT_TAG, () => (
@@ -359,10 +341,8 @@ describe('Solid FlatList on the engine', () => {
       expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
     });
 
-    // why: the handle is the same API in both branches — RN's numColumns changes what a cell holds,
-    // never what the ref does. The multi-column path is the one where the ITEM type underneath is
-    // IRow, so a scroll target has to resolve against ROWS: item 4 of a 3-column list sits in row 1,
-    // which starts at 50pt with 50pt rows.
+    // The handle is the same API in both branches, with columns a scroll target resolves against
+    // ROWS: item 4 of a 3-column list sits in row 1, which starts at 50pt
     it('keeps the handle working in the multi-column branch, resolving against rows', async () => {
       let list: IFlatListHandle | undefined;
       mount(ROOT_TAG, () => (
@@ -385,9 +365,8 @@ describe('Solid FlatList on the engine', () => {
       expect(fabric.commands[0]?.viewName).toBe(SCROLL_VIEW);
     });
 
-    // why: RN's FlatList forwards its accessibility surface to the underlying scroll view, so a
-    // screen reader announces the LIST rather than an unlabelled container. `aria-*` folds into the
-    // RN spelling on the way down, exactly as it does on every other component here.
+    // The accessibility surface goes to the scroll view so a screen reader announces the LIST,
+    // `aria-*` folds into the RN spelling on the way down
     it('rides its accessibility surface down onto the scroll host', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -406,10 +385,8 @@ describe('Solid FlatList on the engine', () => {
       expect(scrollProps.accessibilityLabel).toBe('Orders');
     });
 
-    // why: FlatList CONSUMES its data-shaping props. Leaking a function onto the native prop bag
-    // crashes Android's folly::dynamic serializer the moment it tries to stringify it, and leaking
-    // `data` ships the whole list payload across the bridge on every commit. numColumns and
-    // columnWrapperStyle are equally JS-only — RN has no native FlatList to receive them.
+    // FlatList CONSUMES its data-shaping props: a function on the native bag crashes Android's
+    // serializer, `data` would cross the bridge, `numColumns` and `columnWrapperStyle` are JS-only
     it('never forwards its own JS-only props onto the native bag', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -440,9 +417,8 @@ describe('Solid FlatList on the engine', () => {
       }
     });
 
-    // why: iOS decides the scroll axis from the native RCTScrollView's own `horizontal` prop, and a
-    // horizontal list must pin its content container to the full ROW width — sized to the frame
-    // instead, there is nothing to scroll.
+    // A horizontal list pins its content container to the full ROW width, sized to the frame
+    // there would be nothing to scroll
     it('forwards horizontal to the scroll host and pins the content to the row width', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -455,17 +431,15 @@ describe('Solid FlatList on the engine', () => {
       ));
       await tick();
 
-      // The axis FLAG is `foldScrollViewProps` in the engine and unreachable from this host
-      // (`core/engine/cpp/tests/js/scroll-view-payload.itest.ts`). Which TAG the list picked is this
-      // adapter's decision, and the row-pinned content node below is what proves it.
+      // The axis flag is `foldScrollViewProps` in the engine, which TAG the list picked is this
+      // adapter's decision and the row-pinned content node below proves it
       expect(committed(CONTENT_VIEW).payload.width).toBe(
         ITEM_HEIGHT * ITEM_COUNT,
       );
     });
 
-    // why: RN's `inverted` flips the scroll container along its axis and counter-flips each cell so
-    // the content inside stays upright. The content CONTAINER must be left alone — flipping it too
-    // cancels the outer flip and the list paints upside down.
+    // `inverted` flips the scroll container and counter-flips each cell, the content CONTAINER must
+    // stay alone or it cancels the outer flip
     it('flips the scroll host and each cell when inverted, never the content container', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -489,9 +463,8 @@ describe('Solid FlatList on the engine', () => {
       ).toBe(3);
     });
 
-    // why: RN gives a list pull-to-refresh by handing the inner ScrollView a RefreshControl whenever
-    // onRefresh is set, and `refreshing` is CONTROLLED — native raises its own spinner on the pull
-    // and only the pushed-down prop takes it back.
+    // `onRefresh` hands the ScrollView a RefreshControl and `refreshing` is CONTROLLED, native
+    // raises its own spinner on the pull and only the pushed-down prop takes it back
     it('wires a RefreshControl onto the scroll host when onRefresh is set', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -511,8 +484,8 @@ describe('Solid FlatList on the engine', () => {
       expect(committed(REFRESH_CONTROL).payload.refreshing).toBe(true);
     });
 
-    // why: RN omits the RefreshControl entirely when onRefresh is unset — a list that always
-    // mounted one would swallow the pull gesture on every plain, non-refreshable list.
+    // RN omits the RefreshControl when `onRefresh` is unset, an always-mounted one would swallow
+    // the pull gesture on every plain list
     it('commits no RefreshControl when onRefresh is absent', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -532,9 +505,8 @@ describe('Solid FlatList on the engine', () => {
       ).toHaveLength(0);
     });
 
-    // why: onEndReached is the infinite-scroll hook, and RN gates it on the list actually reaching
-    // within onEndReachedThreshold viewports of the bottom — firing it at mount would kick off a
-    // page fetch for a list the user has not scrolled.
+    // `onEndReached` is gated on reaching within `onEndReachedThreshold` viewports of the bottom,
+    // firing at mount would fetch a page for a list nobody scrolled
     it('fires onEndReached only once the list is scrolled to the bottom', async () => {
       const reached: number[] = [];
       mount(ROOT_TAG, () => (
@@ -557,9 +529,8 @@ describe('Solid FlatList on the engine', () => {
       expect(reached[0]).toBe(0);
     });
 
-    // why: the header, footer and empty slots are FlatList's documented chrome. They are not cells,
-    // so virtualization never recycles them, and the empty slot shows only while the list has no
-    // items — a placeholder left over an already-loaded list is the classic async-list bug.
+    // Header, footer and empty slots are chrome, not cells, so virtualization never recycles them
+    // and the empty slot shows only while the list has no items
     it('renders the header and footer chrome, and the empty slot only while data is empty', async () => {
       const [items, setItems] = createSignal<IItem[]>([]);
       mount(ROOT_TAG, () => (
@@ -587,9 +558,8 @@ describe('Solid FlatList on the engine', () => {
       expect(committedLabels().has('the-header')).toBe(true);
     });
 
-    // why: the list's own windowing runs on the scroll event, so a user onScroll must COMPOSE with
-    // it, never replace it. A wrapper that forwarded only the user handler would freeze the window
-    // at its first paint; one that dropped the user handler would break every scroll-driven header.
+    // The windowing runs on the scroll event, so a user `onScroll` must COMPOSE with it and never
+    // replace it, or the window freezes at its first paint
     it('composes a user onScroll with the internal windowing handler', async () => {
       const seen: number[] = [];
       mount(ROOT_TAG, () => (
@@ -615,38 +585,35 @@ describe('Solid FlatList on the engine', () => {
         committedLabels().has('item-8'),
         'and the internal windowing still moved',
       ).toBe(true);
-      expect(committedLabels().has('item-0')).toBe(false);
+      expect(committedLabels().has('item-0'), 'the initial region stays').toBe(
+        true,
+      );
+      expect(committedLabels().has('item-4')).toBe(false);
     });
 
-    // why: RN's FlatList treats a single column as the ordinary, unpacked list — and adapters/react,
-    // the reference surface, gates the row packing on `numColumns > 1` rather than on the prop being
-    // present. So an explicit 1 (and any degenerate value below it, which a computed
-    // `Math.floor(width / cardWidth)` can produce on a narrow screen) must render flat cells, never
-    // a row wrapper holding one column.
-    it('renders flat cells for numColumns at or below one', async () => {
-      for (const columns of [1, 0]) {
-        fabric.reset();
-        mount(ROOT_TAG, () => (
-          <FlatList<IItem>
-            data={DATA}
-            numColumns={columns}
-            getItemLayout={getItemLayout}
-            initialNumToRender={2}
-            renderItem={info => <text>{info().item.label}</text>}
-          />
-        ));
-        await tick();
+    // A single column is the ordinary unpacked list, packing is gated on `numColumns > 1`, so 1
+    // and any degenerate value below it (a narrow screen can compute 0) render flat cells
+    it.each([1, 0])('renders flat cells for numColumns %i', async columns => {
+      fabric.reset();
+      mount(ROOT_TAG, () => (
+        <FlatList<IItem>
+          data={DATA}
+          numColumns={columns}
+          getItemLayout={getItemLayout}
+          initialNumToRender={2}
+          renderItem={info => <text>{info().item.label}</text>}
+        />
+      ));
+      await tick();
 
-        expect(rowWrappers().length, `numColumns ${columns}`).toBe(0);
-        expect(committedLabels().has('item-0')).toBe(true);
-        expect(committedLabels().has('item-1')).toBe(true);
-        unmount(ROOT_TAG);
-      }
+      expect(rowWrappers().length, `numColumns ${columns}`).toBe(0);
+      expect(committedLabels().has('item-0')).toBe(true);
+      expect(committedLabels().has('item-1')).toBe(true);
+      unmount(ROOT_TAG);
     });
 
-    // why: the scroll-lifecycle callbacks are the drag/momentum half of RN's ScrollView API and a
-    // FlatList is documented to accept them. They have no JS wiring of their own, so the ONLY way to
-    // break them is to swallow them in the prop split on the way down.
+    // The scroll-lifecycle callbacks have no JS wiring of their own, the only way to break them is
+    // to swallow them in the prop split
     it('forwards the scroll-lifecycle callbacks to the native scroll host', async () => {
       const onScrollBeginDrag = vi.fn();
       const onScrollEndDrag = vi.fn();
@@ -678,11 +645,8 @@ describe('Solid FlatList on the engine', () => {
       expect(onMomentumScrollEnd).toHaveBeenCalledTimes(1);
     });
 
-    // why: keyboardDismissMode, keyboardShouldPersistTaps and scrollEventThrottle are read by NATIVE
-    // directly, and style / contentContainerStyle / class address two DIFFERENT hosts — the scroll
-    // view and the content container. A list that never dismisses the keyboard on drag, or that
-    // lands its padding on the wrong one of the two views, reads as a native bug rather than as a
-    // dropped prop.
+    // Native reads the keyboard props and `scrollEventThrottle` directly, and `style`,
+    // `contentContainerStyle` and `class` address two DIFFERENT hosts: the scroll view and content
     it('routes the native scroll-host props and both style targets to the right views', async () => {
       registerRules([
         {
@@ -700,9 +664,9 @@ describe('Solid FlatList on the engine', () => {
           keyboardDismissMode="on-drag"
           keyboardShouldPersistTaps="handled"
           scrollEventThrottle={16}
-          style={{ height: 240 }}
+          style={LIST_HEIGHT_STYLE}
           class="listSkin"
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={CONTENT_PADDING_STYLE}
           renderItem={info => <text>{info().item.label}</text>}
         />
       ));
@@ -719,10 +683,8 @@ describe('Solid FlatList on the engine', () => {
       expect(committed(CONTENT_VIEW).payload.paddingBottom).toBe(24);
     });
 
-    // why: onStartReached is onEndReached's top-edge twin, used for prepend-paging (a chat loading
-    // older messages upward). Same contract in reverse: it fires while the list sits within
-    // onStartReachedThreshold of the start, DEDUPS against the same content, and RE-ARMS once the
-    // list has scrolled away — without the re-arm, the second visit to the top loads nothing.
+    // `onStartReached` is the top-edge twin of `onEndReached`, it DEDUPS the same way and RE-ARMS
+    // once the list has scrolled away, or the second visit to the top loads nothing
     it('fires onStartReached at the top, dedups, and re-arms after scrolling away', async () => {
       const onStartReached = vi.fn();
       mount(ROOT_TAG, () => (
@@ -753,9 +715,8 @@ describe('Solid FlatList on the engine', () => {
       ).toHaveBeenCalledTimes(2);
     });
 
-    // why: initialScrollIndex opens the list already parked at an item (a "jump to unread" entry
-    // point), and RN applies it exactly ONCE, un-animated — re-applying it on a later layout would
-    // yank the list back under the user mid-scroll.
+    // `initialScrollIndex` opens the list parked at an item, applied ONCE and un-animated, a later
+    // layout must not yank the list back under the user
     it('jumps to initialScrollIndex once, instantly', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -781,10 +742,8 @@ describe('Solid FlatList on the engine', () => {
       expect(fabric.commands, 'applied exactly once').toHaveLength(1);
     });
 
-    // why: without getItemLayout the list only knows the size of cells it has MEASURED, so a
-    // scrollToIndex past the highest measured frame cannot be placed. RN reports that through
-    // onScrollToIndexFailed and scrolls nowhere, so the app can react instead of the list silently
-    // jumping to a wrong offset.
+    // Without `getItemLayout` a `scrollToIndex` past the highest measured frame cannot be placed,
+    // RN reports it through `onScrollToIndexFailed` and scrolls nowhere
     it('reports onScrollToIndexFailed for a target past the last measured cell', async () => {
       const onScrollToIndexFailed = vi.fn();
       let list: IFlatListHandle | undefined;
@@ -807,11 +766,8 @@ describe('Solid FlatList on the engine', () => {
       expect(fabric.commands, 'and it scrolled nowhere').toHaveLength(0);
     });
 
-    // why: maintainVisibleContentPosition keeps the anchored item still while content is prepended
-    // (a chat loading history). RN forwards it to native AND counts CHILDREN, not data indices — so
-    // a ListHeaderComponent occupying child 0 has to bump minIndexForVisible by one or native
-    // anchors against the wrong view. The cells must also stay un-flattened, or Android Fabric
-    // collapses them away and the helper has nothing to anchor to.
+    // `maintainVisibleContentPosition` counts CHILDREN, so a `ListHeaderComponent` at child 0 bumps
+    // `minIndexForVisible` by one or native anchors against the wrong view
     it('forwards maintainVisibleContentPosition and bumps it past the header', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -828,15 +784,12 @@ describe('Solid FlatList on the engine', () => {
       expect(
         committed(SCROLL_VIEW).payload.maintainVisibleContentPosition,
       ).toEqual({ minIndexForVisible: 1 });
-      // `collapsableChildren` is derived from the prop above by the ENGINE now, which reads it off
-      // the owner through `ownerProps` (`core/engine/cpp/tests/js/scroll-content-payload.itest.ts`).
-      // What this list owes is the FORWARDING asserted above it.
+      // `collapsableChildren` is derived from the prop above by the engine, this list owes the
+      // forwarding asserted above
     });
 
-    // why: RN implements sticky list headers purely in JS — the flagged CELL is wrapped in the
-    // sticky wrapper and the index array is never handed to native, where it would be a silent
-    // no-op. This is a prop adapters/react's FlatList does not even declare, so the surface here is
-    // a superset of the reference adapter's rather than a gap.
+    // Sticky list headers are JS-only, the flagged CELL is wrapped and the index array is never
+    // handed to native where it would be a silent no-op
     it('wraps a stickyHeaderIndices cell and never forwards the array to native', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -861,18 +814,11 @@ describe('Solid FlatList on the engine', () => {
     });
   });
 
-  // Solid runs a component body ONCE and has no reconciler between what it returns and the host
-  // nodes — `insert` REPLACES a subtree rather than diffing one — so "the screen updated" and "the
-  // screen was not torn down in order to update" are two independent, silently-breakable claims.
-  // The creation-log-length counter is the only headless line between them
-  // (.claude/rules/solid-descriptor-bridge.md §4).
+  // Solid has no reconciler between a component and the host nodes, so "the screen updated" and
+  // "the screen was not torn down to update" are independent claims, the creation counter pins them
   describe('Reactivity — updates must be re-props, not rebuilds', () => {
-    // why: RN's contract is that a row re-renders when its item changes. Inside a packed row that
-    // has to happen WITHOUT rebuilding the column, because a column is a fixed positional slot —
-    // column 1 of row 0 is always column 1 of row 0 — so replacing the data array with fresh item
-    // objects must move the item down to the leaf, not destroy the subtree that holds it. On device
-    // a rebuild landing mid-gesture eats the native responder grant; nothing about what the screen
-    // SAYS separates the two, so the counter is the whole test.
+    // A packed column is a fixed positional slot, replacing the data with fresh items must move
+    // the item down to the leaf and not destroy the subtree that holds it
     it('updates a packed column in place when the data changes, creating no nodes', async () => {
       const [items, setItems] = createSignal(DATA);
       mount(ROOT_TAG, () => (
@@ -908,10 +854,8 @@ describe('Solid FlatList on the engine', () => {
       ).toBe(createdAtMount);
     });
 
-    // why: FlatList DERIVES getItemCount/getItem from `data`, so both have to stay live — an RN list
-    // grows when the array it was handed grows (the whole point of an infinite-scroll feed). A
-    // protocol captured at mount would leave every appended page invisible while the array itself
-    // looked correct in the debugger.
+    // FlatList DERIVES `getItemCount` and `getItem` from `data`, both stay live so an appended page
+    // shows up, a protocol captured at mount would leave it invisible
     it('grows when items are appended to the data array', async () => {
       const [items, setItems] = createSignal(DATA.slice(0, 2));
       mount(ROOT_TAG, () => (
@@ -937,10 +881,8 @@ describe('Solid FlatList on the engine', () => {
       ).toBe(true);
     });
 
-    // why: columnWrapperStyle is an ordinary reactive prop — a theme switch or a measured gutter can
-    // change it after mount. RN re-styles the existing row views; a wrapper that captured the style
-    // at build time would freeze the gutter, and one that rebuilt on it would drop every row's
-    // measured layout on a theme change.
+    // `columnWrapperStyle` is an ordinary reactive prop, the existing row views are re-styled,
+    // capturing it at build time freezes the gutter and rebuilding drops every measured layout
     it('re-props the same row wrapper when columnWrapperStyle changes', async () => {
       const [gap, setGap] = createSignal(4);
       mount(ROOT_TAG, () => (
@@ -972,11 +914,8 @@ describe('Solid FlatList on the engine', () => {
   });
 
   describe('Negative', () => {
-    // why: Fabric has no bare-text host — RCTRawText is only ever valid as a child of a <Text> — so
-    // a renderItem that returns a raw string builds a tree native cannot mount. The packed-column
-    // path inserts that string into the column view it generates itself, so failing loudly at mount
-    // is the correct behaviour: the alternative surfaces far deeper in native with an error naming
-    // neither the list nor the row.
+    // Fabric has no bare-text host, `RCTRawText` is only valid inside a `<Text>`, so a raw string
+    // from `renderItem` must fail loudly at mount instead of deep in native
     it('throws when a packed column renders a bare string outside a Text', () => {
       expect(() =>
         mount(ROOT_TAG, () => (
@@ -992,14 +931,11 @@ describe('Solid FlatList on the engine', () => {
     });
   });
 
-  // Behaviours we could not justify from RN or the React adapter, captured as they are so a later
-  // change to them is at least visible. Each carries the open question in a `// QUESTION:` comment.
+  // Behaviors not justified by RN, captured so a later change is visible, each carries its open
+  // question in a `// QUESTION:` comment
   describe('Characterization', () => {
-    // QUESTION: RN documents numColumns as working only with horizontal={false} ("Multiple columns
-    // can only be rendered with horizontal={false}") but ships no runtime guard, and neither do
-    // adapters/react, vue or svelte — all four just chunk anyway, producing flex-ROW rows laid out
-    // along a horizontal scroll axis. Should the shared layer refuse the combination (a dev-mode
-    // invariant), or is silently honouring it the behaviour apps depend on?
+    // QUESTION: RN documents `numColumns` as vertical-only but ships no runtime guard, and no
+    // adapter has one, should the shared layer refuse the combination or is honoring it relied on
     it('packs rows even with horizontal, which RN documents as unsupported [characterization — behavior not confirmed]', async () => {
       mount(ROOT_TAG, () => (
         <FlatList<IItem>
@@ -1013,19 +949,14 @@ describe('Solid FlatList on the engine', () => {
       ));
       await tick();
 
-      // The axis flag is the engine's rule (`scroll-view-payload.itest.ts`); what this case is about
-      // is the PACKING below.
-      // All four rows, because an unmeasured horizontal viewport does not bound the first batch the
-      // way the vertical one does — a VirtualizedList property, not FlatList's; the point here is
-      // only that the packing happened at all.
-      expect(rowWrappers().length, 'chunked anyway, no guard').toBe(2);
+      // The axis flag is the engine's rule, this case is about the PACKING below
+      // A horizontal cell wrapper is a row too (RN), the packed rows are the ones holding 3 items
+      const packed = rowWrappers().filter(row => row.children.length === 3);
+      expect(packed.length, 'chunked anyway, no guard').toBe(2);
     });
 
-    // QUESTION: RN documents changing numColumns on the fly as unsupported — "change the key prop on
-    // the FlatList to force a fresh render". Here the <Show> boundary gives that fresh render for
-    // free (the two branches instantiate the list over different item types, so the flip disposes
-    // one and builds the other). That is strictly MORE than RN promises. Should it be advertised as
-    // supported, or kept undocumented so the shared layer stays free to cache across the flip?
+    // QUESTION: RN calls changing `numColumns` on the fly unsupported, here the `<Show>` boundary
+    // gives a fresh render for free, advertise it as supported or keep it undocumented
     it('rebuilds the list into packed rows when numColumns changes after mount [characterization — behavior not confirmed]', async () => {
       const [columns, setColumns] = createSignal(1);
       mount(ROOT_TAG, () => (

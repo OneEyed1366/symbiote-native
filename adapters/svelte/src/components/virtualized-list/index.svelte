@@ -1,104 +1,77 @@
-<script lang="ts" module>
-  // VirtualizedList: real windowing over a hand-authored minimal scroll host. Only cells whose
-  // computed offset falls inside the visible window (plus a leading/trailing buffer) render;
-  // the rest collapses into two spacer view nodes.
-  //
-  // The orchestration - window recompute, edge-reached, viewability, batch fill, MVCP, imperative
-  // scrolls - is the framework-agnostic `reduceList` state machine in @symbiote-native/components
-  // (state/virtualized-list-reducer), shared verbatim with React/Vue. This file supplies only
-  // Svelte's lifecycle: turns native events into ACTIONS, holds one plain (non-reactive) state cell
-  // (`listState`), runs the returned EFFECTS with Svelte primitives, and renders the windowed slice
-  // with `{#each plan.cells}` (Lists have no Descriptor render fn, per svelte-adapter-dom-shim §15).
-  //
-  // This file authors the raw `scroll-view` intrinsic directly, and needs to: it walks an indexable
-  // `plan.cells` list rather than taking an opaque children Snippet, so it can mark sticky cells
-  // itself. (There is no ScrollView component to render instead — an app writes the tag too.)
-  //
-  // It does NOT author the CONTENT node. `registerScrollViewBehavior()` puts a `buildStructure` on
-  // the scroll tags, and exactly one thing may build `RCTScrollContentView` — emitting one here as
-  // well nests a second one inside the engine's. Everything that used to live here because the
-  // content node did (`contentContainerStyle`, the axis base style, `nestedScrollEnabled`, the
-  // Android RefreshControl wrap style-split, the JS sticky-header wrapping and its collision map)
-  // is the behavior's now; `contentContainerStyle` travels as an OWNER prop and the behavior
-  // renames it onto the slot.
-  //
-  // RefreshControl is written as an ordinary child of the scroll tag on both platforms: the
-  // behavior CLAIMS it, keeping it beside the content view on iOS and wrapping the scroll view
-  // with it on Android.
-  //
-  // `<svelte:element>` is forbidden (svelte-adapter-dom-shim skill §4/§7 - its shim surface isn't
-  // implemented), so the horizontal/vertical choice is two static branches sharing one
-  // `{#snippet listBody()}`, not a dynamic tag.
-  import type {
-    IVirtualizedListProps,
-    IVirtualizedListHandle,
-  } from './virtualized-list-props';
-
-  export type { IVirtualizedListProps, IVirtualizedListHandle };
-</script>
-
 <script lang="ts" generics="ItemT">
+  // Windowed list over the shared `reduceList` machine, this file owns only Svelte's lifecycle
+  // The scroll tag is authored directly so the cell walk can mark sticky cells itself
+  // No content node: `registerScrollViewBehavior()` builds it and takes `contentContainerStyle`
   import {
-    DEFAULT_INITIAL_NUM_TO_RENDER,
-    DEFAULT_MAX_TO_RENDER_PER_BATCH,
-    DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
-    DEFAULT_WINDOW_SIZE,
     EMPTY_OFFSET,
     FIRST_INDEX,
-    INVERTED_X_STYLE,
-    INVERTED_Y_STYLE,
-    buildListPlan,
+    LIST_ACTION_KIND,
+    LIST_SEGMENT_KIND,
+    buildListHandle,
+    buildListReducerInputs,
+    buildListScrollProps,
     buildScrollViewHandle,
+    buildSeparatorHandles,
     buildViewabilityPairs,
+    buildSeparatorProps,
+    clearTimers,
+    cellStyleOf,
     createInitialListState,
+    createListHandlers,
+    createListNesting,
     isSeparatorGapInRange,
     listEffectSignature,
-    readLayoutLength,
-    readLayoutOffset,
-    readScrollOffset,
+    listHasMore,
+    listStyleOf,
+    planFromMetrics,
     reduceList,
     resolveItemKey,
+    runListEffects,
+    scrollTargetOf,
+    spacerStyleOf,
+    type IEffectHost,
     type IListAction,
-    type IListEffect,
-    type IListReducerInputs,
+    type IListHandlers,
+    type IListNesting,
     type IListState,
     type IScrollViewHandle,
     type ISeparatorProps,
     type ISeparators,
+    type ITimerSlot,
   } from '@symbiote-native/components';
-  import {
-    dlog,
-    type ISymbioteEvent,
-    type ISymbioteNode,
-  } from '@symbiote-native/engine';
+  import { dlog, type ISymbioteNode } from '@symbiote-native/engine';
   import type { ShimElement } from '../../dom-shim';
   import {
     pickAccessibilityProps,
+    type IVirtualizedListHandle,
     type IVirtualizedListProps as IProps,
   } from './virtualized-list-props';
+  import {
+    itemComponentOf,
+    refreshControlPropsOf,
+    resolveListProps,
+  } from './list-props';
+  import {
+    getVirtualizedListScope,
+    setVirtualizedListScope,
+  } from './nested-scope';
   import { createAttachmentsSync } from '../../runes/attachments';
 
   let props: IProps<ItemT> = $props();
 
-  // $state.raw, NOT $state: holds the shim element by IDENTITY (same concern as Switch's
-  // hostShim / Vue's shallowRef scrollHandle). dispatchViewCommand reads `.engineNode` off the RAW
-  // ShimElement the engine's WeakMap mirror actually knows about.
+  // Raw state keeps the shim element by identity, the engine's WeakMap mirror keys on it
   let hostShim = $state.raw<ShimElement | null>(null);
 
-  // See View.svelte's note on `{@attach}` - bound to the scroll host, the node a caller
-  // means by "the list" (the same node getScrollNode()/scrollTo drive).
   const syncAttachments = createAttachmentsSync();
   $effect(() => {
     syncAttachments(hostShim, props);
   });
 
-  // Offset we're imperatively driving native to before hostShim's engine node is live. Fresh
-  // object identity each push so the commit path re-applies it even when the value repeats.
+  // The offset commanded before the engine node is live, a fresh object re-applies a repeat
   let commandedOffset = $state.raw<{ x: number; y: number } | undefined>(
     undefined,
   );
-  // Bumped on a render-relevant change so `metrics` re-runs - listState is a PLAIN object
-  // (not $state), mutating it triggers nothing on its own.
+  // `listState` is a plain object, so a change bumps `version` to re-run `metrics`
   let version = $state(0);
   let separatorVersion = $state(0);
 
@@ -106,90 +79,35 @@
     () => hostShim?.engineNode ?? null,
   );
 
-  // The one folded state cell — the Svelte twin of Vue's plain listState / React's stateRef.
   const listState: IListState<ItemT> = createInitialListState<ItemT>();
-  // Plain Map by design, like listState above: separatorVersion (below) is the manual
-  // invalidation signal a read tracks — a SvelteMap would double-track and still miss nothing,
-  // but adds reactive overhead this hot path doesn't need.
+  // Plain Map, `separatorVersion` is the invalidation signal a read tracks
   // eslint-disable-next-line svelte/prefer-svelte-reactivity
   const separatorOverrides = new Map<number, Partial<ISeparatorProps<ItemT>>>();
-  let viewableTimer: ReturnType<typeof setTimeout> | null = null;
-  let batchTimer: ReturnType<typeof setTimeout> | null = null;
+  const viewableTimer: ITimerSlot = { current: null };
+  const batchTimer: ITimerSlot = { current: null };
 
   const narrowed = $derived.by(() => {
-    // extraData has no field of its own; reading it tracks it so a change forces this derived to
-    // re-run (RN's extraData contract).
+    // Reading `extraData` makes a change re-run this derived, RN's contract
     void props.extraData;
-    return {
-      data: props.data,
-      getItem: props.getItem,
-      getItemCount: props.getItemCount,
-      keyExtractor: props.keyExtractor,
-      getItemLayout: props.getItemLayout,
-      horizontal: props.horizontal === true,
-      inverted: props.inverted === true,
-      onEndReached: props.onEndReached,
-      onEndReachedThreshold: props.onEndReachedThreshold,
-      onStartReached: props.onStartReached,
-      onStartReachedThreshold: props.onStartReachedThreshold,
-      onRefresh: props.onRefresh,
-      refreshing: props.refreshing,
-      progressViewOffset: props.progressViewOffset,
-      onViewableItemsChanged: props.onViewableItemsChanged,
-      viewabilityConfig: props.viewabilityConfig,
-      viewabilityConfigCallbackPairs: props.viewabilityConfigCallbackPairs,
-      onScrollToIndexFailed: props.onScrollToIndexFailed,
-      initialNumToRender:
-        props.initialNumToRender ?? DEFAULT_INITIAL_NUM_TO_RENDER,
-      initialScrollIndex: props.initialScrollIndex,
-      maxToRenderPerBatch:
-        props.maxToRenderPerBatch ?? DEFAULT_MAX_TO_RENDER_PER_BATCH,
-      updateCellsBatchingPeriod:
-        props.updateCellsBatchingPeriod ?? DEFAULT_UPDATE_CELLS_BATCHING_PERIOD,
-      windowSize: props.windowSize ?? DEFAULT_WINDOW_SIZE,
-      stickyHeaderIndices: props.stickyHeaderIndices,
-      maintainVisibleContentPosition: props.maintainVisibleContentPosition,
-      userOnScroll: props.onScroll,
-      onScrollBeginDrag: props.onScrollBeginDrag,
-      onScrollEndDrag: props.onScrollEndDrag,
-      onMomentumScrollBegin: props.onMomentumScrollBegin,
-      onMomentumScrollEnd: props.onMomentumScrollEnd,
-      scrollEventThrottle: props.scrollEventThrottle,
-      keyboardShouldPersistTaps: props.keyboardShouldPersistTaps,
-      keyboardDismissMode: props.keyboardDismissMode,
-      removeClippedSubviews: props.removeClippedSubviews,
-      nestedScrollEnabled: props.nestedScrollEnabled,
-      style: props.style,
-      contentContainerStyle: props.contentContainerStyle,
-      class: props.class,
-    };
+    return resolveListProps(props);
   });
+  const viewabilityPairs = $derived(
+    buildViewabilityPairs(
+      narrowed.onViewableItemsChanged,
+      narrowed.viewabilityConfig,
+      narrowed.viewabilityConfigCallbackPairs,
+    ),
+  );
 
-  function buildInputs(): IListReducerInputs<ItemT> {
-    const p = narrowed;
-    return {
-      data: p.data,
-      getItem: p.getItem,
-      getItemCount: p.getItemCount,
-      keyExtractor: p.keyExtractor,
-      getItemLayout: p.getItemLayout,
-      horizontal: p.horizontal,
-      windowSize: p.windowSize,
-      initialNumToRender: p.initialNumToRender,
-      maxToRenderPerBatch: p.maxToRenderPerBatch,
-      updateCellsBatchingPeriod: p.updateCellsBatchingPeriod,
-      onEndReachedThreshold: p.onEndReachedThreshold,
-      onStartReachedThreshold: p.onStartReachedThreshold,
-      onEndReachedActive: p.onEndReached !== undefined,
-      onStartReachedActive: p.onStartReached !== undefined,
-      viewabilityPairs: buildViewabilityPairs(
-        p.onViewableItemsChanged,
-        p.viewabilityConfig,
-        p.viewabilityConfigCallbackPairs,
-      ),
-      maintainVisibleContentPosition: p.maintainVisibleContentPosition,
-      initialScrollIndex: p.initialScrollIndex,
-    };
+  function listInputs() {
+    return buildListReducerInputs(
+      {
+        ...narrowed,
+        findFirstChildWithMore: (first, last) =>
+          nesting.findFirstChildWithMore(first, last),
+      },
+      viewabilityPairs,
+    );
   }
 
   function keyFor(index: number): string {
@@ -201,96 +119,45 @@
   }
 
   function scrollToPixel(offset: number, animated: boolean): void {
-    const clamped = Math.max(EMPTY_OFFSET, offset);
-    const target = narrowed.horizontal
-      ? { x: clamped, y: EMPTY_OFFSET }
-      : { x: EMPTY_OFFSET, y: clamped };
+    const target = scrollTargetOf(offset, narrowed.horizontal);
     if (hostShim?.engineNode === undefined) {
-      dlog(`VirtualizedList scrollTo offset=${clamped} pending-ref`);
+      dlog(`VirtualizedList scrollTo offset=${offset} pending-ref`);
       commandedOffset = target;
       return;
     }
     commandedOffset = undefined;
-    dlog(
-      `VirtualizedList scrollTo offset=${clamped} animated=${animated} (horizontal=${narrowed.horizontal})`,
-    );
+    dlog(`VirtualizedList scrollTo offset=${offset} animated=${animated}`);
     scrollHandle.scrollTo({ x: target.x, y: target.y, animated });
   }
 
-  function runEffects(
-    effects: IListEffect<ItemT>[],
-    inputs: IListReducerInputs<ItemT>,
-  ): void {
-    const p = narrowed;
-    for (const effect of effects) {
-      switch (effect.kind) {
-        case 'scroll-to':
-          scrollToPixel(effect.offset, effect.animated);
-          break;
-        case 'fire-end-reached':
-          p.onEndReached?.({ distanceFromEnd: effect.distanceFromEnd });
-          break;
-        case 'fire-start-reached':
-          p.onStartReached?.({ distanceFromStart: effect.distanceFromStart });
-          break;
-        case 'fire-scroll-to-index-failed':
-          p.onScrollToIndexFailed?.({
-            index: effect.index,
-            highestMeasuredFrameIndex: effect.highestMeasuredFrameIndex,
-            averageItemLength: effect.averageItemLength,
-          });
-          break;
-        case 'schedule-refill': {
-          if (batchTimer !== null) clearTimeout(batchTimer);
-          batchTimer = setTimeout(() => {
-            batchTimer = null;
-            dispatch({ kind: 'batch-tick' });
-          }, effect.delay);
-          break;
-        }
-        case 'fire-viewable': {
-          const pairs = inputs.viewabilityPairs;
-          const info = effect.info;
-          const map = effect.map;
-          const fire = (): void => {
-            for (const pair of pairs) {
-              pair.onViewableItemsChanged({
-                ...info,
-                viewabilityConfig: pair.viewabilityConfig,
-              });
-            }
-            dispatch({ kind: 'viewable-fired', map });
-          };
-          if (viewableTimer !== null) {
-            clearTimeout(viewableTimer);
-            viewableTimer = null;
-          }
-          if (effect.delay > EMPTY_OFFSET) {
-            viewableTimer = setTimeout(() => {
-              viewableTimer = null;
-              fire();
-            }, effect.delay);
-          } else {
-            fire();
-          }
-          break;
-        }
-      }
-    }
-  }
+  const effectHost: IEffectHost<ItemT> = {
+    callbacks: () => ({
+      onEndReached: narrowed.onEndReached,
+      onStartReached: narrowed.onStartReached,
+      onScrollToIndexFailed: narrowed.onScrollToIndexFailed,
+      viewabilityPairs,
+    }),
+    scrollToPixel,
+    dispatch: () => dispatch,
+    viewableTimer,
+    batchTimer,
+  };
 
   function dispatch(action: IListAction<ItemT>): void {
-    const inputs = buildInputs();
+    const inputs = listInputs();
     const result = reduceList(listState, action, inputs);
-    runEffects(result.effects, inputs);
+    runListEffects(result.effects, effectHost);
     if (result.changed) version += 1;
   }
 
-  // The window is recomputed exactly once here (refresh-metrics), cached until `version` or
-  // `narrowed` change - the Svelte twin of Vue's `metrics` computed.
+  // The one window recompute, cached until `version` or `narrowed` change
   const metrics = $derived.by(() => {
     void version;
-    reduceList(listState, { kind: 'refresh-metrics' }, buildInputs());
+    reduceList(
+      listState,
+      { kind: LIST_ACTION_KIND.refreshMetrics },
+      listInputs(),
+    );
     return listState.metrics;
   });
 
@@ -299,32 +166,34 @@
     return listEffectSignature(listState);
   });
 
-  function handleScroll(event: ISymbioteEvent): void {
-    const offset = readScrollOffset(event, narrowed.horizontal);
-    if (offset === undefined) return;
-    dlog(`VirtualizedList onScroll offset=${offset}`);
-    commandedOffset = undefined;
-    dispatch({ kind: 'scroll', offset });
-    narrowed.userOnScroll?.(event);
-  }
+  // The list above hands its scope down, this list hands its own to the lists in its cells
+  const nesting: IListNesting<ItemT> = createListNesting<ItemT>({
+    parent: getVirtualizedListScope(),
+    horizontal: narrowed.horizontal,
+    getState: () => listState,
+    dispatch,
+    getContainerNode: () => hostShim?.engineNode ?? null,
+    getHasMore: () => listHasMore(listState),
+    keyFor,
+    handlers: () => handlers,
+  });
+  setVirtualizedListScope(nesting.scope);
 
-  function onViewportLayout(event: ISymbioteEvent): void {
-    const length = readLayoutLength(event, narrowed.horizontal);
-    if (length === undefined) return;
-    dlog(`VirtualizedList onLayout viewport=${length}`);
-    dispatch({ kind: 'layout', length });
-  }
+  const handlers: IListHandlers = createListHandlers<ItemT>({
+    isHorizontal: () => narrowed.horizontal,
+    user: () => narrowed,
+    nesting: () => nesting,
+    dispatch,
+    clearCommandedOffset: () => {
+      commandedOffset = undefined;
+    },
+    getNode: () => hostShim?.engineNode ?? null,
+    keyFor,
+  });
+  const makeCellMeasure = handlers.makeCellMeasure;
 
-  function makeCellMeasure(index: number): (event: ISymbioteEvent) => void {
-    return (event: ISymbioteEvent): void => {
-      const length = readLayoutLength(event, narrowed.horizontal);
-      if (length === undefined) return;
-      const offset = readLayoutOffset(event, narrowed.horizontal);
-      dlog(
-        `VirtualizedList cell ${index} measured length=${length} offset=${offset ?? 'none'}`,
-      );
-      dispatch({ kind: 'measure', index, length, offset });
-    };
+  function makeCellFocus(index: number): () => void {
+    return (): void => dispatch({ kind: LIST_ACTION_KIND.cellFocused, index });
   }
 
   function mergeSeparator(
@@ -339,357 +208,242 @@
     separatorVersion += 1;
   }
 
-  function makeSeparators(index: number): ISeparators {
-    return {
-      highlight: (): void => {
-        dlog(`VirtualizedList separator highlight cell=${index}`);
-        mergeSeparator(index - 1, { highlighted: true });
-        mergeSeparator(index, { highlighted: true });
-      },
-      unhighlight: (): void => {
-        dlog(`VirtualizedList separator unhighlight cell=${index}`);
-        mergeSeparator(index - 1, { highlighted: false });
-        mergeSeparator(index, { highlighted: false });
-      },
-      updateProps: (
-        select: 'leading' | 'trailing',
-        newProps: Record<string, unknown>,
-      ): void => {
-        mergeSeparator(select === 'leading' ? index - 1 : index, newProps);
-      },
-    };
+  // Instance exports for `bind:this`, the twin of React's `useImperativeHandle`
+  const handle = buildListHandle({
+    dispatch,
+    scrollHandle,
+    getNode: () => hostShim?.engineNode ?? null,
+  });
+  export function scrollToOffset(
+    ...args: Parameters<IVirtualizedListHandle['scrollToOffset']>
+  ): void {
+    handle.scrollToOffset(...args);
   }
-
-  // ---- imperative handle: component instance exports, the Svelte twin of Vue's expose() /
-  // React's useImperativeHandle. A parent does `<VirtualizedList bind:this={ref} .../>` and calls
-  // `ref.scrollToIndex(...)`. ----
-  export function scrollToOffset(params: {
-    offset: number;
-    animated?: boolean;
-  }): void {
-    dispatch({
-      kind: 'scroll-to-offset',
-      offset: params.offset,
-      animated: params.animated ?? true,
-    });
+  export function scrollToIndex(
+    ...args: Parameters<IVirtualizedListHandle['scrollToIndex']>
+  ): void {
+    handle.scrollToIndex(...args);
   }
-  export function scrollToIndex(params: {
-    index: number;
-    animated?: boolean;
-    viewOffset?: number;
-    viewPosition?: number;
-  }): void {
-    dispatch({
-      kind: 'scroll-to-index',
-      index: params.index,
-      animated: params.animated ?? true,
-      viewPosition: params.viewPosition ?? FIRST_INDEX,
-      viewOffset: params.viewOffset ?? EMPTY_OFFSET,
-    });
+  export function scrollToItem(
+    ...args: Parameters<IVirtualizedListHandle['scrollToItem']>
+  ): void {
+    handle.scrollToItem(...args);
   }
-  export function scrollToItem(params: {
-    item: unknown;
-    animated?: boolean;
-    viewPosition?: number;
-  }): void {
-    dispatch({
-      kind: 'scroll-to-item',
-      item: params.item,
-      animated: params.animated ?? true,
-      viewPosition: params.viewPosition ?? FIRST_INDEX,
-    });
-  }
-  export function scrollToEnd(params?: { animated?: boolean }): void {
-    dispatch({ kind: 'scroll-to-end', animated: params?.animated ?? true });
+  export function scrollToEnd(
+    ...args: Parameters<IVirtualizedListHandle['scrollToEnd']>
+  ): void {
+    handle.scrollToEnd(...args);
   }
   export function flashScrollIndicators(): void {
-    scrollHandle.flashScrollIndicators();
-  }
-  export function getNativeScrollRef(): IScrollViewHandle | null {
-    return scrollHandle;
-  }
-  export function getScrollableNode(): IScrollViewHandle | null {
-    return scrollHandle;
-  }
-  export function getScrollResponder(): IScrollViewHandle | null {
-    return scrollHandle;
-  }
-  export function getScrollNode(): ISymbioteNode | null {
-    return scrollHandle.getScrollNode();
+    handle.flashScrollIndicators();
   }
   export function recordInteraction(): void {
-    dispatch({ kind: 'record-interaction' });
+    handle.recordInteraction();
+  }
+  export function setNativeProps(props: Record<string, unknown>): void {
+    handle.setNativeProps(props);
+  }
+  export function getNativeScrollRef(): ISymbioteNode | null {
+    return handle.getNativeScrollRef();
+  }
+  export function getScrollableNode(): IScrollViewHandle | null {
+    return handle.getScrollableNode();
+  }
+  export function getScrollResponder(): IScrollViewHandle | null {
+    return handle.getScrollResponder();
+  }
+  export function getScrollNode(): ISymbioteNode | null {
+    return handle.getScrollNode();
+  }
+  export function getScrollRef(): ISymbioteNode | null {
+    return handle.getScrollRef();
   }
 
-  // ---- after-commit pass: runs the deferred effects (batch fill, edge-reached, viewability,
-  // initial-scroll, MVCP) whenever the windowing signature changes. $effect runs after the DOM
-  // update lands, the same after-commit timing Vue's `flush: 'post'` watcher and React's layout
-  // effect give the reducer. ----
+  // The after-commit pass, runs the deferred effects when the windowing signature changes
   $effect(() => {
     void commitSignature;
-    const inputs = buildInputs();
-    const result = reduceList(listState, { kind: 'commit' }, inputs);
-    runEffects(result.effects, inputs);
+    const result = reduceList(
+      listState,
+      { kind: LIST_ACTION_KIND.commit },
+      listInputs(),
+    );
+    runListEffects(result.effects, effectHost);
   });
 
-  // Clear pending timers on unmount (RN ViewabilityHelper.dispose + the fill timer). A bare
-  // `$effect` with no reactive reads runs once on mount; its returned cleanup runs on destroy -
-  // the Svelte twin of Vue's onBeforeUnmount.
+  // No reactive reads, so it runs once on mount and its cleanup runs on destroy
   $effect(() => {
     return () => {
-      if (viewableTimer !== null) clearTimeout(viewableTimer);
-      if (batchTimer !== null) clearTimeout(batchTimer);
+      clearTimers([viewableTimer, batchTimer]);
+      nesting.detach();
     };
   });
 
-  // VirtualizedList.js: `[inversionStyle, style]` — the app's style can override the flip.
-  const resolvedStyle = $derived(
-    narrowed.inverted
-      ? [
-          narrowed.horizontal ? INVERTED_X_STYLE : INVERTED_Y_STYLE,
-          narrowed.style,
-        ]
-      : narrowed.style,
+  // One prop (`p={bag}`) lands on the host tag, the bag is built field by field
+  const outerBag = $derived(
+    buildListScrollProps(
+      {
+        ...narrowed,
+        total: metrics.total,
+        hasHeader,
+        commandedOffset,
+        onScroll: handlers.onScroll,
+        onScrollBeginDrag: handlers.onScrollBeginDrag,
+        onScrollEndDrag: handlers.onScrollEndDrag,
+        onMomentumScrollBegin: handlers.onMomentumScrollBegin,
+        onMomentumScrollEnd: handlers.onMomentumScrollEnd,
+        onContentSizeChange: handlers.onContentSizeChange,
+        onLayout: handlers.onViewportLayout,
+      },
+      { ...pickAccessibilityProps(props), class: narrowed.class },
+    ),
   );
-  // Travels on the OWNER: `slotProps` renames it onto the content node the behavior built, so it
-  // goes through the slot's own routeProp and inherits class resolution and style merging. The
-  // horizontal `flexDirection: 'row'` is the behavior's constant and is composed OVER this, so
-  // only the measured total width is added here.
-  const resolvedContentContainerStyle = $derived(
-    narrowed.horizontal
-      ? [narrowed.contentContainerStyle, { width: metrics.total }]
-      : narrowed.contentContainerStyle,
-  );
-
-  const outerBag = $derived.by(() => {
-    const bag: Record<string, unknown> = {
-      style: resolvedStyle,
-      class: narrowed.class,
-      contentContainerStyle: resolvedContentContainerStyle,
-      onScroll: handleScroll,
-      onLayout: onViewportLayout,
-    };
-    if (commandedOffset !== undefined) bag.contentOffset = commandedOffset;
-    // The RAW prop. A sticky header raises the throttle from the behavior, once it has actually
-    // registered — folding a sticky default in here would hand the behavior a number it reads back
-    // as the app's and could never take away again.
-    if (narrowed.scrollEventThrottle !== undefined)
-      bag.scrollEventThrottle = narrowed.scrollEventThrottle;
-    if (narrowed.onScrollBeginDrag !== undefined)
-      bag.onScrollBeginDrag = narrowed.onScrollBeginDrag;
-    if (narrowed.onScrollEndDrag !== undefined)
-      bag.onScrollEndDrag = narrowed.onScrollEndDrag;
-    if (narrowed.onMomentumScrollBegin !== undefined)
-      bag.onMomentumScrollBegin = narrowed.onMomentumScrollBegin;
-    if (narrowed.onMomentumScrollEnd !== undefined)
-      bag.onMomentumScrollEnd = narrowed.onMomentumScrollEnd;
-    if (narrowed.keyboardShouldPersistTaps !== undefined) {
-      bag.keyboardShouldPersistTaps = narrowed.keyboardShouldPersistTaps;
-    }
-    if (narrowed.keyboardDismissMode !== undefined)
-      bag.keyboardDismissMode = narrowed.keyboardDismissMode;
-    // RN's VirtualizedList spreads its props onto the ScrollView, this one included.
-    if (narrowed.removeClippedSubviews !== undefined)
-      bag.removeClippedSubviews = narrowed.removeClippedSubviews;
-    if (narrowed.nestedScrollEnabled !== undefined)
-      bag.nestedScrollEnabled = narrowed.nestedScrollEnabled;
-    // VirtualizedList.js:1111 — Android moves the scrollbar back after the `scale: -1` flip.
-    if (narrowed.inverted === true) bag.isInvertedVirtualizedList = true;
-    // `stickyHeaderIndices` is deliberately NOT forwarded. The behavior honours it by numbering the
-    // owner's own PAINT children, and this list's indices are into the DATA stream — a windowed
-    // list paints a spacer, a header and a slice, so index 3 of the data is almost never paint
-    // child 3. The cells that should pin carry the `sticky-header` tag directly instead, which is
-    // the one form that survives windowing.
-    if (narrowed.maintainVisibleContentPosition !== undefined) {
-      bag.maintainVisibleContentPosition =
-        narrowed.maintainVisibleContentPosition;
-    }
-    // Object.assign merges a bag already built field-by-field (pickAccessibilityProps), not a raw
-    // spread of `props`, so this stays inside the object-bag convention (svelte-adapter-dom-shim
-    // skill §3g(c)) - only ONE prop (`p={bag}`) ever lands on the symbiote-* host tag.
-    Object.assign(bag, pickAccessibilityProps(props));
-    return bag;
+  // The list above scrolls, so RN renders a `View` with no content container
+  const nestedBag = $derived({
+    ...pickAccessibilityProps(props),
+    class: narrowed.class,
+    style: narrowed.style,
+    onLayout: handlers.onViewportLayout,
   });
 
-  // Build the real RefreshControl's own prop bag when onRefresh is set; refreshing defaults to
-  // false when nullish, same as RN/React.
-  const refreshControlProps = $derived.by(() => {
-    if (narrowed.onRefresh === undefined) return undefined;
-    return {
-      refreshing: narrowed.refreshing ?? false,
-      onRefresh: narrowed.onRefresh,
-      progressViewOffset: narrowed.progressViewOffset,
-    };
-  });
-  const stickySet = $derived(
-    narrowed.stickyHeaderIndices !== undefined
-      ? new Set(narrowed.stickyHeaderIndices)
-      : undefined,
-  );
-  $effect(() => {
-    dlog(
-      `VirtualizedList sticky stickyHeaderIndices=${JSON.stringify(narrowed.stickyHeaderIndices)} ` +
-        `first=${metrics.first} last=${metrics.last} windowedCells=${JSON.stringify(plan?.cells.map(c => c.index))} ` +
-        `forcedStickyCell=${plan?.forcedStickyCell?.index ?? 'none'} gapExtent=${plan?.gapExtent ?? 0} ` +
-        `allCells=${JSON.stringify(allCells.map(c => c.index))}`,
-    );
-  });
+  const refreshControlProps = $derived(refreshControlPropsOf(narrowed));
   const hasHeader = $derived(props.header !== undefined);
-  const plan = $derived.by(() => {
+  // One keyed walk over spacers and cells, a cell moving between regions keeps its instance
+  const windowPlan = $derived.by(() => {
     void separatorVersion;
     if (metrics.count === FIRST_INDEX) return null;
-    return buildListPlan({
-      count: metrics.count,
-      first: metrics.first,
-      last: metrics.last,
-      offsets: metrics.offsets,
-      lengths: metrics.lengths,
-      total: metrics.total,
-      keyFor,
-      stickyIndices: stickySet,
-      hasHeader,
-    });
+    return planFromMetrics(metrics, keyFor, narrowed.stickyHeaderIndices);
   });
-  // forcedStickyCell prepended to the window cells so BOTH walk through the SAME keyed {#each}.
-  // A Svelte {#if}/{#each} split is two different template positions with no shared component
-  // identity, so a header toggling between "forced ahead of the window" and "inside the window"
-  // would get destroyed and recreated (losing its measured layout, back to its default
-  // translateY) - one keyed list keeps the SAME instance across that transition, by cell.key.
-  const allCells = $derived(
-    plan?.forcedStickyCell !== undefined && plan !== null
-      ? [plan.forcedStickyCell, ...plan.cells]
-      : (plan?.cells ?? []),
+  const plan = $derived(windowPlan?.plan ?? null);
+  const stickySet = $derived(windowPlan?.stickySet);
+  const cellStyle = $derived(cellStyleOf(narrowed));
+  const headerStyle = $derived(
+    listStyleOf(narrowed, narrowed.listHeaderComponentStyle),
   );
-  const cellInvertedStyle = $derived(
-    narrowed.inverted
-      ? narrowed.horizontal
-        ? INVERTED_X_STYLE
-        : INVERTED_Y_STYLE
-      : undefined,
+  const footerStyle = $derived(
+    listStyleOf(narrowed, narrowed.listFooterComponentStyle),
   );
 
-  // Reads separatorVersion so a .highlight()/.unhighlight()/.updateProps() call (ISeparators, above)
-  // reactively refreshes this cell's separator props - a plain object literal inlined in the
-  // template would NOT re-track separatorOverrides (a non-reactive Map) on its own.
+  // Reads `separatorVersion`, a plain Map read alone would not re-track
   function separatorPropsFor(index: number): ISeparatorProps<ItemT> {
     void separatorVersion;
-    const overrides = separatorOverrides.get(index);
-    return {
-      highlighted: overrides?.highlighted === true,
-      leadingItem: narrowed.getItem(narrowed.data, index),
-      trailingItem: narrowed.getItem(narrowed.data, index + 1),
-      ...overrides,
-    };
+    return buildSeparatorProps(
+      narrowed.getItem(narrowed.data, index),
+      narrowed.getItem(narrowed.data, index + 1),
+      separatorOverrides.get(index),
+    );
+  }
+
+  function separatorsFor(index: number): ISeparators {
+    return buildSeparatorHandles(index, mergeSeparator);
   }
 </script>
 
-{#snippet listBody()}
-  <!--
-  Svelte keeps the whitespace between the sibling blocks below as ' ' text nodes; the shim drops
-  each one because this scroll content takes no raw text (dom-shim/text.ts, §16b). That is what
-  lets virtualized-list.smoke.test.ts still assert an exact windowed child count.
--->
-  {#if hasHeader}
+{#snippet cellContent(index: number)}
+  {@const info = {
+    item: narrowed.getItem(narrowed.data, index),
+    index,
+    separators: separatorsFor(index),
+  }}
+  {@const ListItem = itemComponentOf(props)}
+  {#if ListItem}
+    <ListItem {...info} />
+  {:else}
+    {@render props.item?.(info)}
+  {/if}
+  {#if props.separator && index < metrics.count - 1}
     <view p={{}}>
+      {@render props.separator(separatorPropsFor(index))}
+    </view>
+  {/if}
+{/snippet}
+
+{#snippet listBody()}
+  <!-- The shim drops the whitespace text nodes between these siblings (dom-shim/text.ts) -->
+  {#if hasHeader}
+    <view p={{ style: headerStyle }}>
       {@render props.header?.()}
     </view>
   {/if}
   {#if metrics.count === FIRST_INDEX}
     {#if props.empty}
-      <view p={{}}>
+      <view p={{ style: cellStyle }}>
         {@render props.empty()}
       </view>
     {/if}
   {:else if plan}
-    {#if plan.leadingExtent > EMPTY_OFFSET}
-      <view
-        p={{
-          style: narrowed.horizontal
-            ? { width: plan.leadingExtent }
-            : { height: plan.leadingExtent },
-        }}
-      />
-    {/if}
-    {#each allCells as cell (cell.key)}
-      {#if stickySet?.has(cell.index)}
-        <!-- The TAG, not a component: `registerScrollViewBehavior()` registers `sticky-header`
-             alongside the scroll tags, and its behavior finds this ScrollView by walking up. The
-             collision point comes from the owner's DOCUMENT order, so nothing here computes or
-             forwards an index. `onLayout` is forwarded by the behavior, not replaced. -->
-        <sticky-header p={{ onLayout: makeCellMeasure(cell.index) }}>
-          {@render props.item({
-            item: narrowed.getItem(narrowed.data, cell.index),
-            index: cell.index,
-            separators: makeSeparators(cell.index),
+    {#each plan.segments as segment (segment.kind + segment.key)}
+      {#if segment.kind === LIST_SEGMENT_KIND.spacer}
+        {#if segment.extent > EMPTY_OFFSET}
+          <view
+            p={{ style: spacerStyleOf(segment.extent, narrowed.horizontal) }}
+          />
+        {/if}
+      {:else if props.cellRenderer}
+        {#snippet customCell()}
+          {@render props.cellRenderer?.({
+            cellKey: segment.key,
+            index: segment.index,
+            item: props.getItem(props.data, segment.index),
+            style: cellStyle,
+            onLayout: makeCellMeasure(segment.index),
+            onFocus: makeCellFocus(segment.index),
+            children: cellChildren,
           })}
-          {#if props.separator && cell.index < metrics.count - 1}
-            <view p={{}}>
-              {@render props.separator(separatorPropsFor(cell.index))}
-            </view>
-          {/if}
+        {/snippet}
+        {#snippet cellChildren()}
+          {@render cellContent(segment.index)}
+        {/snippet}
+        {#if stickySet?.has(segment.index)}
+          <!-- RN pins the custom component itself, the sticky tag only holds it -->
+          <sticky-header>
+            {@render customCell()}
+          </sticky-header>
+        {:else}
+          {@render customCell()}
+        {/if}
+      {:else if stickySet?.has(segment.index)}
+        <!-- The tag, not a component, it pins by document order so it survives windowing -->
+        <sticky-header
+          p={{
+            onLayout: makeCellMeasure(segment.index),
+            onFocus: makeCellFocus(segment.index),
+          }}
+        >
+          {@render cellContent(segment.index)}
         </sticky-header>
       {:else}
         <view
           p={{
-            onLayout: makeCellMeasure(cell.index),
-            style: cellInvertedStyle,
+            onLayout: makeCellMeasure(segment.index),
+            onFocus: makeCellFocus(segment.index),
+            style: cellStyle,
           }}
         >
-          {@render props.item({
-            item: narrowed.getItem(narrowed.data, cell.index),
-            index: cell.index,
-            separators: makeSeparators(cell.index),
-          })}
-          {#if props.separator && cell.index < metrics.count - 1}
-            <view p={{}}>
-              {@render props.separator(separatorPropsFor(cell.index))}
-            </view>
-          {/if}
+          {@render cellContent(segment.index)}
         </view>
       {/if}
-      {#if plan.forcedStickyCell && cell.index === plan.forcedStickyCell.index && plan.gapExtent > EMPTY_OFFSET}
-        <view
-          p={{
-            style: narrowed.horizontal
-              ? { width: plan.gapExtent }
-              : { height: plan.gapExtent },
-          }}
-        />
-      {/if}
     {/each}
-    {#if plan.trailingExtent > EMPTY_OFFSET}
-      <view
-        p={{
-          style: narrowed.horizontal
-            ? { width: plan.trailingExtent }
-            : { height: plan.trailingExtent },
-        }}
-      />
-    {/if}
   {/if}
   {#if props.footer}
-    <view p={{}}>
+    <view p={{ style: footerStyle }}>
       {@render props.footer()}
     </view>
   {/if}
 {/snippet}
 
 {#snippet scrollBody()}
-  <!--
-  Same as listBody() above: the RefreshControl and the cells are siblings of one parent here, and
-  the whitespace between them is dropped before it reaches Fabric.
-
-  RefreshControl is written as an ordinary child on BOTH platforms — the behavior CLAIMS it, so
-  the engine keeps it beside the content view on iOS and inverts the tree on Android. Everything
-  after it lands in the content node the behavior built.
--->
+  <!-- RefreshControl is an ordinary child, the behavior claims it on both platforms -->
   {#if refreshControlProps !== undefined}
     <refresh-control p={refreshControlProps} />
   {/if}
   {@render listBody()}
 {/snippet}
 
-{#if narrowed.horizontal}
+{#if nesting.isNested}
+  <view p={nestedBag} bind:this={hostShim}>
+    {@render listBody()}
+  </view>
+{:else if narrowed.horizontal}
   <horizontal-scroll-view p={outerBag} bind:this={hostShim}>
     {@render scrollBody()}
   </horizontal-scroll-view>
