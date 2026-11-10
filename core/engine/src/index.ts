@@ -24,9 +24,8 @@ export {
   routeProp,
   censusRetainedTree,
   getExplicitStyle,
-  // Exported for the one adapter that has to build style objects rather than receive them:
-  // Angular's ɵɵstyleMap hands over keys, so its renderer allocates a fresh object per node and
-  // needs to recognise one it has already published.
+  // Exported for Angular, whose `ɵɵstyleMap` hands over keys and so builds a fresh object per node
+  // The renderer needs it to recognise an object it already published
   isSameShallowStyle,
   getPublishedStyle,
   setNodeHidden,
@@ -147,9 +146,8 @@ export type {
 // package and whatever implements the tree, audience a host author, not an app. They live on the
 // mutation-buffer subpath instead, since a name on this barrel is public API on all five adapters.
 
-// "A commit just reached completeRoot" — the one seam that means the same thing under every
-// adapter: React commits synchronously, Vue/Svelte/Angular schedule it on a microtask, so each
-// framework's after-render hook fires at a different point relative to the native commit.
+// The one seam that means "a commit reached `completeRoot`" under every adapter
+// React commits synchronously and the others on a microtask, so their after-render hooks differ
 export { registerPostCommit, unregisterPostCommit } from './post-commit';
 // The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a tag
 // has none: `fabricProps` runs it on the way to the payload, so every path gets it.
@@ -212,12 +210,17 @@ export type {
 export { StyleSheet, computeHairlineWidth } from './style-sheet';
 export {
   registerRules,
+  registerRootVariables,
   resolveClassName,
   styleOfProps,
   clearGlobalStyles,
   isClassNameValue,
 } from './style-registry';
-export type { IClassNameValue, IStyleRule } from './style-registry';
+export type {
+  IClassNameValue,
+  IRootVariable,
+  IStyleRule,
+} from './style-registry';
 export { renameClassTokens } from './style-registry/scope';
 export type {
   IClassNameRenames,
@@ -424,6 +427,17 @@ export { PixelRatio } from './pixel-ratio';
 export type { IPixelRatioStatic } from './pixel-ratio';
 export { Appearance } from './appearance';
 export type { IColorSchemeName, IColorSchemePreference } from './appearance';
+// `matchMedia` answers from the same environment as the `@media` rules of a class
+export { matchMedia, MediaQueryList, MediaQueryListEvent } from './match-media';
+// A custom property on one surface, the web's `documentElement.style.setProperty`
+export { getComputedVariable, setVariable } from './surface-variables';
+export {
+  clearRegisteredProperties,
+  registerProperties,
+  registerProperty,
+  type ICompiledProperty,
+  type IPropertyDescriptor,
+} from './registered-properties';
 export { AppState } from './app-state';
 export type { IAppStateStatus, IAppStateEvent } from './app-state';
 // AppRegistry core: registry bookkeeping + host-registrar bridge + headless tasks, shared by

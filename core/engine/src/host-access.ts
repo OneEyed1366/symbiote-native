@@ -1,6 +1,5 @@
-// Host access — the read half of a DOM, which Fabric does not ship. Mostly navigation, plus the
-// two value reads a seam needs (textOf, propOf) — named for the whole because this is the surface
-// an adapter may ask a node about, and keeping value reads out would push them back to raw fields.
+// Host access: the read half of a DOM, which Fabric does not ship, mostly navigation plus `textOf`
+// and `propOf`. Value reads stay here, since leaving them out would push adapters to raw fields
 
 // Four of five framework renderer seams navigate the host on their hot paths, and it's their
 // contract, not our choice: Solid, Vue and Angular all declare parent/sibling navigation
@@ -14,9 +13,8 @@
 // node's fields: every one reads into the tree host (tree-host.ts) — native on device, a
 // TypeScript applier headlessly — because JS holds no tree at all.
 
-// Each read flushes the mutation buffer first: a reconciler navigates the tree it is mid-way
-// through building, so the host must be told about ops recorded since the last commit before it
-// can answer — that's what flushOps is for.
+// Each read flushes the mutation buffer first, since a reconciler navigates a tree it is mid-way
+// through building. The host must hear the ops recorded since the last commit before it can answer
 
 // None of the three navigating adapters (Vue, Angular, Solid) can answer from state they already
 // hold on their own side — pushing this into the adapters would build three JS trees instead of
@@ -33,7 +31,6 @@ import {
   SURFACE_COMPONENT,
   type ISymbioteNode,
 } from './node';
-import type { SymbioteSurface } from './surface';
 
 // One frozen empty list rather than a fresh `[]`, because the fast path in `childrenOf` is the
 // common answer during a build: solid asks 2 000 times on a 1 000-row create and every answer is
@@ -44,9 +41,8 @@ const NO_CHILDREN: readonly ISymbioteNode[] = [];
 // answers undefined even though a surface IS a node in the host's tree — three adapters depend on
 // that exact miss, comparing the result against the SymbioteSurface object it is not.
 
-// Does not always drain, unlike its neighbours: a node's parent link changes only through an op
-// that names it as the child, so a node the pending batch hasn't placed already has its final
-// answer standing in the host (see hasPendingPlacement).
+// Does not always drain, unlike its neighbours. A parent link changes only through an op naming
+// the node as child, so a node the pending batch has not placed already has its final answer
 export function parentOf(node: ISymbioteNode): ISymbioteNode | undefined {
   // Asked first and outside the gate: an adapter holding a coalesced write has ops not in the
   // buffer yet, so the gate can't judge this node until they are. A listener re-placing this very
@@ -98,15 +94,13 @@ export function subtreesOf(
   roots: readonly ISymbioteNode[],
 ): readonly ISymbioteNode[] {
   flushOps();
-  // The .filter is type narrowing, not a defensive check, and it stays: removing it means either
-  // an `as` or declaring ITreeHost.subtreesOf to hand back our own type, and a pluggable host is
-  // exactly what that object boundary is for.
+  // The `.filter` is type narrowing, not a defensive check. Without it `ITreeHost.subtreesOf` would
+  // need an `as` or our own node type, which a pluggable host exists to avoid
   return treeHost()?.subtreesOf(roots).filter(isSymbioteNode) ?? [];
 }
 
-// The same walk narrowed to what a teardown must visit — see ITreeHost.teardownSubtreesOf. The
-// gate is the animated one, not a behavior one: a binding is per node and carries no tag, so an
-// app that animates needs every node back and gets the full walk.
+// Narrowed to the nodes a teardown visits, see `ITreeHost.teardownSubtreesOf`
+// An animated binding is per node with no tag, so an app that animates needs every node
 export function teardownSubtreesOf(
   roots: readonly ISymbioteNode[],
 ): readonly ISymbioteNode[] {
@@ -151,15 +145,14 @@ export function firstChildOf(node: ISymbioteNode): ISymbioteNode | undefined {
 // because three adapters still pass it, though it's no longer read (see below).
 export function nextSiblingOf(
   node: ISymbioteNode,
-  _surface?: SymbioteSurface,
+  _surface?: object,
 ): ISymbioteNode | undefined {
   // One host call, not parentOf plus a whole child list — the old spelling built every sibling to
   // read one of them, quadratic on a keyed patch calling this once per row. The host holds the
   // list and can scan it in place.
 
-  // `surface` is unread because a top-level node's parent IS the surface node in the host's tree,
-  // so the host answers without being told which surface — needed only because parentOf masks a
-  // surface parent to undefined, leaving nothing else to ask.
+  // `surface` is unread, since a top-level node's parent IS the surface node in the host's tree.
+  // The host answers without it, and `parentOf` masks a surface parent so there is nothing to ask
   flushOps();
   const sibling = treeHost()?.nextSiblingOf(node);
   return isSymbioteNode(sibling) ? sibling : undefined;
@@ -202,9 +195,8 @@ export function textOf(node: ISymbioteNode): string | undefined {
 // reads a value rather than the tree: Vue's v-model shim must read the standing onValueChange
 // handler before composing its own, without coupling to el.props's shape.
 
-// Deliberately not a general property bag escape hatch: it answers what is on the node, which for
-// style after a class merge is the [classStyle, explicitStyle] array, not the author's object —
-// getExplicitStyle exists for that question and this is not a substitute for it.
+// Not a general property bag: for `style` after a class merge it answers the array of class style
+// and explicit style. `getExplicitStyle` is the way to ask for the author's object
 const NO_PROPS: Readonly<Record<string, unknown>> = {};
 
 // Every prop standing on the node, function props included — the bag a payload fold reads. Two

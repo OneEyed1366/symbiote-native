@@ -4,9 +4,8 @@
 // All Fabric clone-on-write lives in the engine, shared cross-adapter. App code names only
 // @symbiote-native/svelte.
 //
-// Full component parity with React/Vue/Angular (svelte-adapter-dom-shim skill §15): every
-// `core/components` render function has a fixed tree shape, so no `descriptorToSvelte` bridge is
-// needed — each component below is hand-authored Svelte markup mirroring its render-*.ts.
+// Full component parity with React/Vue/Angular (svelte-adapter-dom-shim skill §15)
+// Each component is hand-written markup mirroring its `render-*.ts`, so no bridge is needed
 
 // Bare side-effect import, deliberately NOT a re-export and deliberately not beside one of the
 // same specifier: it registers the press behavior with the engine's host-behavior registry. Any
@@ -186,6 +185,12 @@ export {
   I18nManager,
   Dimensions,
   Appearance,
+  matchMedia,
+  MediaQueryList,
+  MediaQueryListEvent,
+  setVariable,
+  getComputedVariable,
+  registerProperty,
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
@@ -261,11 +266,8 @@ export type {
 // a ShimElement wrapper, so it needs its own typed unwrap).
 export { findNodeHandle, hostInstance } from './host-instance';
 export type { IHostInstance } from './host-instance';
-// ShimElement: the `bind:this` value type a raw `symbiote-*` host tag hands back (see
-// host-instance.ts's header) — public so app code can type its own `$state.raw<ShimElement |
-// null>` ref, the same escape hatch Switch/Pressable/ActivityIndicator use internally, for a
-// component (RefApiDemo-style measure/setNativeProps/AccessibilityInfo target) whose public
-// wrapper (View/Text) forwards no bind:this of its own.
+// `ShimElement` is the `bind:this` value type of a raw `symbiote-*` host tag, see host-instance.ts
+// Public so app code can type its own `$state.raw<ShimElement | null>` ref
 export type { ShimElement } from './dom-shim';
 
 // Type-only, and the re-export is the POINT rather than the `ISymbioteIntrinsicTag` name: it is
@@ -276,20 +278,11 @@ export type {
   ISymbioteHostAttributes,
 } from './intrinsic-elements';
 
-// The generic Descriptor -> shim-tree bridge (svelte-adapter-dom-shim skill §19) — the Svelte
-// twin of Vue's `descriptorToVue` / React's `descriptorToReact`, which a downstream package
-// wrapping a THIRD-PARTY native view (@symbiote-native/slider, packages/slider/src/svelte) needs
-// to mount a Descriptor whose `type` is a raw, non-`symbiote-`-prefixed Fabric name (e.g.
-// 'RNCSlider'). Deliberately NOT re-exported from THIS barrel: `./index.ts` also re-exports
-// `./components`, real `.svelte` sources, so importing even one unrelated name from here forces
-// the whole `.svelte` module graph to load — fatal under vitest's plain (svelte-plugin-free)
-// transform. Import `@symbiote-native/svelte/native-view-bridge` instead — see that file's
-// header for the full reasoning and native-view-bridge.ts for what else it carries
-// (mount/unmount, for a downstream package's own tests).
+// The Descriptor to shim-tree bridge is deliberately absent from this barrel (skill §19)
+// Import `@symbiote-native/svelte/native-view-bridge`, as this barrel loads every `.svelte` file
 
-// createTunnel: the Svelte twin of adapters/vue/src/create-tunnel (see create-tunnel/tunnel.ts's
-// header for why the API shape — an explicit `tunnel` prop on TunnelIn/TunnelOut, rather than
-// `tunnel.In`/`tunnel.Out` — deliberately differs from React/Vue).
+// `createTunnel` passes the tunnel as a prop of `TunnelIn` and `TunnelOut`, unlike React and Vue
+// See create-tunnel/tunnel.ts for the reason
 export {
   createTunnel,
   TunnelIn,

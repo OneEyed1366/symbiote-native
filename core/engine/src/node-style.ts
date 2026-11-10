@@ -71,37 +71,42 @@ function sharedStylePair(
   base: unknown,
   explicit: unknown,
 ): readonly unknown[] | undefined {
-  const baseIsKeyable = typeof base === 'object' && base !== null;
-  const explicitIsKeyable = typeof explicit === 'object' && explicit !== null;
+  if (base === undefined && isKeyable(explicit)) return pairOfExplicit(explicit);
+  if (!isKeyable(base)) return undefined;
+  if (explicit === undefined) return pairOfBase(base);
+  return isKeyable(explicit) ? pairOfBoth(base, explicit) : undefined;
+}
 
-  if (base === undefined && explicitIsKeyable) {
-    const cached = sharedPairByExplicit.get(explicit);
-    if (cached !== undefined) return cached;
-    const made: readonly unknown[] = [base, explicit];
-    sharedPairByExplicit.set(explicit, made);
-    return made;
-  }
-  if (!baseIsKeyable) return undefined;
+function isKeyable(value: unknown): value is object {
+  return typeof value === 'object' && value !== null;
+}
 
-  if (explicit === undefined) {
-    const cached = sharedPairByBase.get(base);
-    if (Array.isArray(cached)) return cached;
-    if (cached === undefined) {
-      const made: readonly unknown[] = [base, explicit];
-      sharedPairByBase.set(base, made);
-      return made;
-    }
-    // A base already seen WITH an explicit half holds the second-level map here, and the base-only
-    // array has nowhere to live beside it. Rare enough not to earn a third map
-    return undefined;
-  }
-  if (!explicitIsKeyable) return undefined;
+// The three pair shapes are kept apart so `sharedStylePair` reads as one dispatch
+function pairOfExplicit(explicit: object): readonly unknown[] {
+  const cached = sharedPairByExplicit.get(explicit);
+  if (cached !== undefined) return cached;
+  const made: readonly unknown[] = [undefined, explicit];
+  sharedPairByExplicit.set(explicit, made);
+  return made;
+}
 
+function pairOfBase(base: object): readonly unknown[] | undefined {
+  const cached = sharedPairByBase.get(base);
+  if (Array.isArray(cached)) return cached;
+  // A base already seen WITH an explicit half holds the second-level map here, and the base-only
+  // array has nowhere to live beside it. Rare enough not to earn a third map
+  if (cached !== undefined) return undefined;
+  const made: readonly unknown[] = [base, undefined];
+  sharedPairByBase.set(base, made);
+  return made;
+}
+
+function pairOfBoth(base: object, explicit: object): readonly unknown[] | undefined {
   const existing = sharedPairByBase.get(base);
-  const byExplicit = existing instanceof WeakMap ? existing : new WeakMap();
-  if (existing === undefined) sharedPairByBase.set(base, byExplicit);
   // The same clash the other way round: this base is holding its base-only array, so leave it
   if (Array.isArray(existing)) return undefined;
+  const byExplicit = existing instanceof WeakMap ? existing : new WeakMap();
+  if (existing === undefined) sharedPairByBase.set(base, byExplicit);
 
   const cached = byExplicit.get(explicit);
   if (cached !== undefined) return cached;

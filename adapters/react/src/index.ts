@@ -160,14 +160,11 @@ export type {
   IFlexJustify,
 } from './utils/styles';
 export { mount, unmount } from './render';
-// createPortal: react-reconciler's Fiber-level portal, working here because @symbiote-native/react is
-// mutation-mode (unlike stock RN's persistent-mode Fabric renderer, which doesn't support it —
-// see create-portal.ts). v1 scope: target must be an already-mounted node in the SAME surface.
+// `createPortal` is the reconciler's portal, available since this renderer is mutation-mode
+// The target must be an already-mounted node of the same surface, see `create-portal.ts`
 export { createPortal, type IPortalContainer } from './create-portal';
-// createTunnel: cross-surface content sharing. createPortal/Teleport stay same-surface-only
-// by design — a real React portal can't reach across two separate reconciler roots either
-// (see github.com/facebook/react/issues/17147), so reaching a different surface means letting
-// that surface commit its own content by reading from a shared store instead.
+// `createTunnel` shares content across surfaces, which a portal cannot do between two roots
+// The other surface commits its own content from a shared store, see react issue 17147
 export { createTunnel, type ITunnel } from './create-tunnel';
 // descriptorToReact: the @symbiote-native/components Descriptor → React.createElement bridge. Exported so
 // an external wrapper package (e.g. @symbiote-native/slider/react over a third-party native view) can map
@@ -251,6 +248,12 @@ export {
   I18nManager,
   Dimensions,
   Appearance,
+  matchMedia,
+  MediaQueryList,
+  MediaQueryListEvent,
+  setVariable,
+  getComputedVariable,
+  registerProperty,
   AppState,
   Keyboard,
   KEYBOARD_EVENT,

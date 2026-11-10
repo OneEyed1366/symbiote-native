@@ -75,23 +75,8 @@ jsi::Value allocInt32Array(
 }
 
 /**
- * How many shadow trees the real `UIManager` is holding — or -1 when we could not reach one.
- *
- * This is item 8c-1's bring-up probe and it is deliberately NOT a commit hook. What it retires is
- * the whole reach chain in one device run: that our pod compiles against ReactCommon's renderer
- * headers, that it LINKS against the prebuilt `React.xcframework`, and that a plain JSI runtime
- * handed to a third-party TurboModule can resolve the UIManager with no app-side wiring. Every one
- * of those is a hard blocker for the native applier and none of them is visible from JS.
- *
- * -1 and 0 are different answers and that is the point. `getBinding` reads
- * `global.nativeFabricUIManager` and returns null when it is absent, so -1 means the ORDERING is
- * wrong — we were created before Fabric installed its binding. 0 means we reached a real UIManager
- * that happens to hold no surface. A boolean would collapse the two and cost a second build.
- *
- * The ordering is in fact safe by construction, and this probe is what confirms it rather than
- * assumes it: `getSlot()` (fabric.ts) reads `globalThis.nativeFabricUIManager` and throws when it is
- * absent, and only THEN resolves our module — so by the time this file's install hook runs, the
- * binding `getBinding` looks for is guaranteed to be there. That was luck when 8c-0 chose the seam.
+ * Counts the shadow trees of the real `UIManager`, or -1 when `getBinding` finds none
+ * -1 means Fabric installed its binding after us, 0 means a real UIManager that holds no surface
  */
 jsi::Value probeUIManager(
     jsi::Runtime &runtime,
@@ -213,9 +198,8 @@ void installBindings(jsi::Runtime &runtime) {
   install("teardownSubtreesOf", 1, &Tree::teardownSubtreesOf);
   install("ancestorsOf", 1, &Tree::ancestorsOf);
   install("committedRecordOf", 1, &Tree::committedRecordOf);
-  // A TEST read, and it is on this list rather than behind a build flag because the bag it returns
-  // is already retained per node for diffing — see `Tree::committedPayloadOf` for why the complete
-  // props read-back cannot come from React Native's own `getDebugProps` or `rawProps`.
+  // A test read kept on this list, since the bag it returns is retained per node for diffing
+  // `Tree::committedPayloadOf` says why `getDebugProps` and `rawProps` cannot replace it
   install("committedPayloadOf", 1, &Tree::committedPayloadOf);
 
   install("dispatchCommand", 3, &Tree::dispatchCommand);
@@ -228,6 +212,11 @@ void installBindings(jsi::Runtime &runtime) {
 
   // Diagnostic, read on demand rather than per op. See `Tree::readSurfaceTelemetry`.
   install("readSurfaceTelemetry", 1, &Tree::readSurfaceTelemetry);
+  install("readGlobalVariable", 1, &Tree::readGlobalVariable);
+  install("readVariable", 2, &Tree::readVariable);
+  install("registerProperty", 4, &Tree::registerProperty);
+  install("unregisterProperty", 1, &Tree::unregisterProperty);
+  install("clearRegisteredProperties", 0, &Tree::clearRegisteredProperties);
 
   runtime.global().setProperty(runtime, "__symbioteEngineNative", std::move(bindings));
 }

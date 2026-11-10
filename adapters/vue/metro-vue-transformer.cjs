@@ -1,14 +1,6 @@
-// Metro babel transformer that teaches the bundler to read Vue SFCs (.vue). Metro has no Vue
-// plugin (unplugin-vue only ships vite/webpack/esbuild/rollup adapters), so we do the
-// single-pass compile here: parse the SFC, compile <script setup> + <template> into one
-// component module, then hand the JS to RN's own babel transformer - the Metro twin of
-// @vitejs/plugin-vue. Imports get retargeted from 'vue' to @symbiote-native/vue/runtime-helpers
-// (not bare @vue/runtime-core) because that shim also supplies our own `vShow` - compiled
-// v-show imports it by name, and only @vue/runtime-dom's DOM-based version exists otherwise.
-//
-// Ships as a package-level export (`@symbiote-native/vue/metro-vue-transformer`) rather than
-// living in each consuming app: a consumer's own metro.config.js just points
-// babelTransformerPath at it.
+// Metro babel transformer for Vue SFCs (.vue), the Metro twin of @vitejs/plugin-vue
+// It compiles <script setup> and <template> into one module, then hands the JS to RN's babel
+// Imports go to @symbiote-native/vue/runtime-helpers, which also supplies our own `vShow`
 
 const nodeFs = require('fs');
 const {
@@ -37,9 +29,12 @@ const {
   compileCssModule,
   compileCssToRules,
   compileScopedCss,
+  conditionsArgument,
   hashFilePath,
   isStyleFile,
+  propertiesCall,
   resolveUpstreamTransformer,
+  serializeRules,
 } = require('@symbiote-native/css-parser');
 
 const upstreamTransformer = resolveUpstreamTransformer();
@@ -60,29 +55,9 @@ const compileScriptFs = {
   },
 };
 
-// Rewrites a Vue template AST so every `class`/`:class` binding names a class by the name
-// lightningcss RENAMED it to. AST-level, not a raw-text regex: Vue merges a static class= and a
-// dynamic :class= on the same element into ONE codegen entry, and text substitution can't
-// reproduce that merge safely - letting Vue's own transformElement do the merge on our rewritten
-// nodes reuses that logic.
-//
-// `renames` is compileScopedCss's own name map (authored name -> renamed name), NOT a set of
-// names this file re-suffixes. That is the point of the migration: the rewriter and the style
-// compiler used to derive the scoped name independently, so any disagreement between them was
-// silent. Now there is one source and this half only reads it. One entry per class, keyed as
-// AUTHORED — `class="section-label"` is the lookup, `sectionLabel` is not a second spelling of it.
-//
-// A static class="foo bar" (AttributeNode, prop.type === 6) resolves to its final string here
-// at compile time - no runtime call needed. A token the map does not carry belongs to another
-// file (App.css, a `:global()` escape hatch, a parent's class) and passes through untouched.
-//
-// A dynamic :class="expr" (bind DirectiveNode, prop.type === 7) targeting `class`: by the time
-// our transform runs, Vue's own transformExpression has already turned prop.exp into either a
-// COMPOUND_EXPRESSION (type 8) or, for a bare identifier binding, a SIMPLE_EXPRESSION (type 4).
-// createCompoundExpression wraps the original exp node as-is inside
-// renameClassTokens(<original>, __scopedClassNames), so codegen reproduces the original
-// expression unchanged - no per-shape branching needed, and a fully opaque runtime value
-// (`:class="dynamicClass"`) still resolves against the same map at runtime.
+// Rewrites each `class`/`:class` binding in the template AST to the renamed class
+// Done on the AST because Vue merges a static `class` and a `:class` into one codegen entry
+// `renames` is the `compileScopedCss` name map, one source shared with the style compiler
 function createScopeClassNodeTransform(renames) {
   return function scopeClassNodeTransform(node) {
     if (node.type !== 1 /* NodeTypes.ELEMENT */) return;
@@ -93,6 +68,7 @@ function createScopeClassNodeTransform(renames) {
         prop.name === 'class' &&
         prop.value
       ) {
+        // A token the map lacks is another file's (`:global()`, a parent's class), left as is
         prop.value.content = prop.value.content
           .split(/\s+/)
           .filter(Boolean)
@@ -101,14 +77,12 @@ function createScopeClassNodeTransform(renames) {
         continue;
       }
 
-      if (
-        prop.type === 7 /* NodeTypes.DIRECTIVE */ &&
-        prop.name === 'bind' &&
-        prop.arg &&
-        prop.arg.type === 4 /* NodeTypes.SIMPLE_EXPRESSION */ &&
-        prop.arg.content === 'class' &&
-        prop.exp
-      ) {
+      const isBind = prop.type === 7 /* NodeTypes.DIRECTIVE */ && prop.name === 'bind';
+      const isClassArg =
+        prop.arg?.type === 4 /* NodeTypes.SIMPLE_EXPRESSION */ &&
+        prop.arg.content === 'class';
+      if (isBind && isClassArg && prop.exp) {
+        // Wrapping the original expression as-is keeps codegen unchanged for any expression shape
         prop.exp = createCompoundExpression(
           ['__scopeClass(', prop.exp, ', __scopedClassNames)'],
           prop.exp.loc,
@@ -118,14 +92,9 @@ function createScopeClassNodeTransform(renames) {
   };
 }
 
-// The parser's own condense() collapses a text node's multi-line whitespace to a single boundary
-// space but never trims it: `<text>\n  plain\n</text>` compiles to " plain " instead of "plain" -
-// a real leading/trailing space on the rendered RN Text. Babel's JSX whitespace cleaner
-// (cleanJSXElementLiteralChild, used by every other adapter) DOES trim this; Vue's does not, so we
-// do it here, once, for every template. Matches Babel's own rule: only a text node whose SOURCE
-// crosses a line break is touched, so a genuinely single-line `<text>Score: {{ x }}</text>` keeps
-// its intentional trailing space untouched (see examples/vue-sfc's CompoundClassDemo.vue for the
-// device-measured bug this closes).
+// Vue's `condense()` leaves one boundary space on a multi-line text node, and RN Text renders it
+// Babel's JSX cleaner trims it for the other adapters, so this does the same
+// Only a node whose source has a line break is touched, so a one-line `<text>` keeps its space
 function trimReflowedTextNodeTransform(node) {
   if (node.type !== 1 /* NodeTypes.ELEMENT */ || node.children.length === 0)
     return;
@@ -196,9 +165,8 @@ function createBareBooleanNodeTransform(symbioteLocals) {
 }
 
 
-// A short, stable id per file, used as the SFC scope id regardless of whether the file has
-// scoped styles - built on css-parser's shared hashFilePath so the algorithm isn't duplicated
-// against the standalone .module.css compiler's identical need.
+// A short, stable id per file used as the SFC scope id, scoped styles or not
+// Built on css-parser's `hashFilePath`, which the standalone .module.css compiler shares
 function scopeIdFor(filename) {
   return 'data-v-' + hashFilePath(filename);
 }
@@ -207,29 +175,28 @@ function scopeIdFor(filename) {
 // off it (compileScript's genDefaultAs). Same role as @vitejs/plugin-vue's own `_sfc_main`.
 const SFC_COMPONENT_VAR = '__sfc__';
 
-// Blocks CONCATENATE - each is compiled on its own, so every block's rules restart at order 0 and
-// a later block would tie with an earlier one on the cascade's source-order tie-break, silently
-// reordering equally-specific rules. Renumbering on append gives the file one monotonic sequence,
-// which is what a single stylesheet holding the concatenated blocks would have produced.
-function appendRules(target, rules) {
-  for (const rule of rules) {
-    target.push({ ...rule, order: target.length });
+// Blocks concatenate and each compiles alone, so `order` restarts at zero and `cond` points into
+// that block's own table: both are renumbered on append, as one stylesheet would have numbered them
+function appendRules(sink, compiled) {
+  const offset = sink.conditions.length;
+  sink.conditions.push(...compiled.conditions);
+  for (const rule of compiled.rules) {
+    sink.rules.push({
+      ...withOffsetCond(rule, offset),
+      order: sink.rules.length,
+    });
+  }
+  // A `:root` block cascades in append order, the way one stylesheet would
+  for (const variable of compiled.rootVariables) {
+    sink.rootVariables.push(withOffsetCond(variable, offset));
+  }
+  for (const property of compiled.properties) {
+    sink.properties.push(withOffsetCond(property, offset));
   }
 }
 
-// `combinators` is compile-time-only - the registry matches a rule by token SUBSET and never reads
-// it - so it is stripped rather than shipped in every app bundle. Twin of css-parser's own
-// serializeRules (core/css-parser/src/metro-css-module/index.ts), which does this for a standalone
-// style file.
-function serializeRules(rules) {
-  return JSON.stringify(
-    rules.map(({ tokens, specificity, order, style }) => ({
-      tokens,
-      specificity,
-      order,
-      style,
-    })),
-  );
+function withOffsetCond(item, offset) {
+  return item.cond === undefined ? item : { ...item, cond: item.cond + offset };
 }
 
 // An SFC style block's `lang` attribute names a preprocessor language directly (`lang="scss"`),
@@ -242,8 +209,8 @@ const SFC_STYLE_LANG_TO_PREPROCESSOR = new Map([
   ['stylus', 'stylus'],
 ]);
 
-// Reduces one <style> block down to plain CSS text. A lang-less or lang="css" block passes
-// through unchanged. Anything outside the four recognized preprocessor langs throws.
+// Reduces one `<style>` block to plain CSS text, a lang-less or `lang="css"` block passes through
+// A lang outside the four preprocessors throws
 async function compileStyleBlockContent(style, filename) {
   if (style.lang == null || style.lang === 'css') return style.content;
 
@@ -254,35 +221,18 @@ async function compileStyleBlockContent(style, filename) {
     );
   }
 
-  // Sass' `.sass` indented syntax and `.scss` syntax share one compiler entry point that picks
-  // between them off the file extension (see preprocessors.ts's compileScss) — an inline SFC
-  // style block has no file of its own, so a synthetic `.sass`-suffixed path is the only way to
-  // select the indented syntax. Every other preprocessor only uses the path for relative-import
-  // resolution (dirname), where the real .vue file's own path is correct as-is.
+  // The Sass entry point picks the indented or `.scss` syntax off the file extension
+  // An inline block has no file of its own, so a synthetic `.sass` path selects the indented one
+  // Other preprocessors read the path only for relative imports, where the real path is right
   const syntheticPath = style.lang === 'sass' ? `${filename}.sass` : filename;
   return compilePreprocessor(style.content, preprocessorLang, syntheticPath);
 }
 
-async function compileSfc(src, filename) {
-  // `parse` memoizes its descriptor on (source, filename) in a module-global LRU, and the node
-  // scope-class transform below MUTATES that descriptor's template AST in place, replacing
-  // `prop.exp`. Handing the same object to a second compile therefore walks a half-transformed
-  // tree and generation dies with `Codegen node is missing for element/if/for node`.
-  //
-  // Metro compiles each file once per build, so the cache buys this caller nothing; the only place
-  // it was ever exercised is css-parser's golden-corpus determinism check, which compiles one
-  // source twice on purpose. That is the ONLY test anywhere that can see this, which is why a
-  // transform bug surfaced as a failure in another package's corpus.
-  //
-  // `clear()` rather than deleting our one key: the key is `source + JSON.stringify(options)`
-  // (`@vue/shared`'s genCacheKey), so reproducing it here would couple this file to an internal
-  // format across every Vue bump. Clearing a pure memo is always safe — the only cost is a
-  // re-parse, which is what we need anyway.
-
+// Cleared first: the scope-class transform mutates the cached template AST in place
+// A whole `clear()` because one key would couple this file to Vue's internal cache key format
+function parseDescriptor(src, filename) {
   parseCache.clear();
-  // element-vs-component is decided by the PARSER, not the later `isCustomElement` in
-  // templateOptions — `compileScript` reuses this descriptor's already-parsed AST, where `tagType`
-  // is fixed. Without the answer here, `<pressable>` stays a component: `resolveComponent(...)`.
+  // Intrinsics are named here since `compileScript` reuses this parse and its fixed `tagType`
   const { descriptor, errors } = parse(src, {
     filename,
     templateParseOptions: { isCustomElement: tag => INTRINSIC_TAGS.has(tag) },
@@ -297,93 +247,131 @@ async function compileSfc(src, filename) {
       `Vue SFC ${filename} has no <script> / <script setup> block`,
     );
   }
+  return descriptor;
+}
 
-  const scopeId = scopeIdFor(filename);
-
-  // descriptor.styles is already parsed by @vue/compiler-sfc (one entry per <style> block,
-  // content pre-trimmed, scoped as a plain boolean) - no need to re-extract with a regex.
-  //
-  // Both scoped forms are ONE mechanism, lightningcss's CSS-Modules renaming, differing only in
-  // the pattern string (core/css-parser/src/scoped-classes.ts):
-  //
-  //   <style scoped>   [local]__data-v-<hash>    compileScopedCss - `.card` -> `card__data-v-h`
-  //   <style module>   [local]__module__<hash>   compileCssModule - the same call a standalone
-  //                                              .module.css takes, so the two cannot diverge
-  //   <style>          not renamed at all        compileCssToRules, classes register globally
-  //
-  // Renaming is our equivalent of Vue's `data-v-hash` ATTRIBUTE (we have no DOM and no
-  // attribute-selector matching, so a scope can only be expressed in the name), and `:global(...)`
-  // needs no handling here at all: a name lightningcss did not rename is global by definition.
-  //
-  // Multiple blocks cascade last-block-wins, same as CSS, after each block is scoped
-  // independently — carried by the rules' `order`, which appendRules renumbers across blocks.
-  //
-  // A module block's classes are NEVER auto-applied to a literal class="..." (opt-in via $style.x
-  // only), so they stay out of the template rewriter's name map; its output is the name->scopedName
-  // map instead, emitted as a preamble const AND attached to the component as __cssModules.
-  const rules = [];
-  const scopedClassNames = new Map();
-  const cssModuleBindings = new Map();
-
-  for (const style of descriptor.styles) {
-    // Reduces a preprocessor block to plain CSS BEFORE the renaming below runs - the renaming is
-    // language-agnostic, it only ever sees plain CSS.
-    const content = await compileStyleBlockContent(style, filename);
-
-    if (style.module) {
-      const bindingName =
-        typeof style.module === 'string' ? style.module : '$style';
-      const compiled = compileCssModule(content, filename);
-      appendRules(rules, compiled.rules);
-      cssModuleBindings.set(bindingName, {
-        ...cssModuleBindings.get(bindingName),
-        ...compiled.classMap,
-      });
-    } else if (style.scoped) {
-      const compiled = compileScopedCss(content, {
-        filename,
-        pattern: `[local]__${scopeId}`,
-      });
-      appendRules(rules, compiled.rules);
-      for (const [name, renamed] of compiled.names)
-        scopedClassNames.set(name, renamed);
-    } else {
-      appendRules(rules, compileCssToRules(content, { filename }).rules);
-    }
+// Adds one style block's rules and names to `sink`, scoped the way its attributes ask
+// `<style module>` and `<style scoped>` both rename through lightningcss, only the pattern differs
+function addStyleBlock(sink, style, content, scope) {
+  const { filename, scopeId } = scope;
+  if (style.module) {
+    const bindingName =
+      typeof style.module === 'string' ? style.module : '$style';
+    const compiled = compileCssModule(content, filename);
+    appendRules(sink, compiled);
+    sink.cssModuleBindings.set(bindingName, {
+      ...sink.cssModuleBindings.get(bindingName),
+      ...compiled.classMap,
+    });
+    return;
   }
+  if (style.scoped) {
+    const compiled = compileScopedCss(content, {
+      filename,
+      pattern: `[local]__${scopeId}`,
+    });
+    appendRules(sink, compiled);
+    for (const [name, renamed] of compiled.names)
+      sink.scopedClassNames.set(name, renamed);
+    return;
+  }
+  appendRules(sink, compileCssToRules(content, { filename }));
+}
 
-  // Scoped-class rewriting is skipped entirely (not even passed to the compiler) when nothing in
-  // this file is scoped, so a .vue with only unscoped/no styles adds no runtime cost.
+// Kept apart so `compileSfc` reads as parse, styles, template, emit
+// Blocks cascade last-wins through `order`, which `appendRules` renumbers across blocks
+async function compileStyleBlocks(descriptor, filename) {
+  // Preprocessors run first and in parallel, the renaming only ever sees plain CSS
+  const contents = await Promise.all(
+    descriptor.styles.map(style => compileStyleBlockContent(style, filename)),
+  );
+  const sink = {
+    rules: [],
+    conditions: [],
+    rootVariables: [],
+    properties: [],
+    scopedClassNames: new Map(),
+    cssModuleBindings: new Map(),
+  };
+  const scope = { filename, scopeId: scopeIdFor(filename) };
+  for (const [index, style] of descriptor.styles.entries())
+    addStyleBlock(sink, style, contents[index], scope);
+  return sink;
+}
+
+// Scoped rewriting is skipped when no style is scoped, so other files add no runtime cost
+function templateOptionsFor(descriptor, scopedClassNames) {
   const nodeTransforms = [
     trimReflowedTextNodeTransform,
     createBareBooleanNodeTransform(symbioteImportsOf(descriptor)),
   ];
   if (scopedClassNames.size > 0)
     nodeTransforms.push(createScopeClassNodeTransform(scopedClassNames));
-  // UNCONDITIONAL, and covering EVERY intrinsic rather than the ones this file happens to import:
-  // a narrower `isCustomElement` leaves `<pressable>` compiling to `resolveComponent(...)` (blank
-  // subtree, no error), and `<switch v-model>` a hard compile error (non-custom, non-form element).
-  const templateOptions = {
+  // Covers every intrinsic, not just imported ones, or `<pressable>` turns into a component
+  return {
     compilerOptions: {
-      ...(nodeTransforms.length > 0 ? { nodeTransforms } : {}),
+      nodeTransforms,
       isCustomElement: tag => INTRINSIC_TAGS.has(tag),
     },
   };
+}
 
-  // inlineTemplate folds the <template> render fn into setup(): one module, one `export
-  // default`. Only valid with <script setup>, which the canary uses.
-  //
-  // genDefaultAs turns that `export default {...}` into `const __sfc__ = {...}`, so a <style
-  // module> block can hang __cssModules off the component OPTIONS object before the module
-  // exports it (the same thing @vitejs/plugin-vue does). Vue resolves a template's `$style` /
-  // `classes` off `instance.type.__cssModules`, NOT off module scope, so without this the
-  // emitted const is unreachable from the template and `$style.card` throws at render. Only
-  // requested when a module block exists, so every other .vue file keeps identical output.
+// The module text ahead of the component: the registration, the scope map and the module maps
+// Only a scoped file imports the rename helper, so other files leave it out
+function buildPreamble(styles) {
+  const {
+    rules,
+    conditions,
+    rootVariables,
+    properties,
+    scopedClassNames,
+    cssModuleBindings,
+  } = styles;
+  const isScoped = scopedClassNames.size > 0;
+  const hasRoot = rootVariables.length > 0;
+  const hasProperties = properties.length > 0;
+  const engineImports = [
+    'registerRules',
+    ...(hasRoot ? ['registerRootVariables'] : []),
+    ...(hasProperties ? ['registerProperties'] : []),
+    ...(isScoped ? ['renameClassTokens as __scopeClass'] : []),
+  ].join(', ');
+  const table = conditionsArgument(conditions);
+  const preamble = [
+    `import { ${engineImports} } from '@symbiote-native/engine';`,
+    `registerRules(${serializeRules(rules)}${table});`,
+  ];
+  if (hasRoot) {
+    preamble.push(
+      `registerRootVariables(${JSON.stringify(rootVariables)}${table});`,
+    );
+  }
+  if (hasProperties) preamble.push(propertiesCall(properties, conditions));
+  if (isScoped) {
+    preamble.push(
+      `const __scopedClassNames = ${JSON.stringify(Object.fromEntries(scopedClassNames))};`,
+    );
+  }
+  // Module scope so `<script setup>` can use a map, the template gets it via `__cssModules`
+  for (const [bindingName, classMap] of cssModuleBindings) {
+    preamble.push(`const ${bindingName} = ${JSON.stringify(classMap)};`);
+  }
+  return preamble.join('\n');
+}
+
+async function compileSfc(src, filename) {
+  const descriptor = parseDescriptor(src, filename);
+  const styles = await compileStyleBlocks(descriptor, filename);
+  const { cssModuleBindings } = styles;
+
+  // `genDefaultAs` lets a `<style module>` block hang `__cssModules` on the component options
+  // Vue reads `$style` from `instance.type.__cssModules`, so module scope alone is unreachable
+  // Only set when a module block exists, so other files keep identical output
   const hasCssModules = cssModuleBindings.size > 0;
   const compiled = compileScript(descriptor, {
-    id: scopeId,
+    id: scopeIdFor(filename),
     inlineTemplate: true,
-    templateOptions,
+    templateOptions: templateOptionsFor(descriptor, styles.scopedClassNames),
     fs: compileScriptFs,
     ...(hasCssModules ? { genDefaultAs: SFC_COMPONENT_VAR } : {}),
   });
@@ -394,32 +382,13 @@ async function compileSfc(src, filename) {
     'from "@symbiote-native/vue/runtime-helpers"',
   );
 
-  if (rules.length === 0 && !hasCssModules) return code;
+  const hasRegistrations =
+    styles.rules.length > 0 ||
+    styles.rootVariables.length > 0 ||
+    styles.properties.length > 0;
+  if (!hasRegistrations && !hasCssModules) return code;
 
-  // Only a scoped file needs the runtime rename helper and its per-file map, so these stay
-  // unimported for every non-scoped .vue file.
-  const engineImports =
-    scopedClassNames.size > 0
-      ? 'registerRules, renameClassTokens as __scopeClass'
-      : 'registerRules';
-
-  const preamble = [
-    `import { ${engineImports} } from '@symbiote-native/engine';`,
-    `registerRules(${serializeRules(rules)});`,
-  ];
-  if (scopedClassNames.size > 0) {
-    preamble.push(
-      `const __scopedClassNames = ${JSON.stringify(Object.fromEntries(scopedClassNames))};`,
-    );
-  }
-  // Each <style module> binding becomes a top-level const holding its name->scopedName map,
-  // placed before the component so it's a closed-over module-scope variable usable from
-  // <script setup> code itself; the __cssModules tail below is what makes the TEMPLATE see it.
-  for (const [bindingName, classMap] of cssModuleBindings) {
-    preamble.push(`const ${bindingName} = ${JSON.stringify(classMap)};`);
-  }
-
-  const parts = [preamble.join('\n'), code];
+  const parts = [buildPreamble(styles), code];
   if (hasCssModules) {
     const bindings = [...cssModuleBindings.keys()]
       .map(name => `${JSON.stringify(name)}: ${name}`)
@@ -437,11 +406,8 @@ async function compileSfc(src, filename) {
 // (imports, injected `registerRules` call) without driving the full upstream RN Babel preset.
 module.exports.compileSfc = compileSfc;
 
-// Async uniformly, including branches that never touch a preprocessor: compileSfc() itself is
-// async now (a scss/sass/less/stylus block awaits preprocessors.ts's compile()), and Metro's own
-// metro-transform-worker already awaits transformer.transform(...), so this is a supported
-// shape - not worth forking a sync fast-path to save one microtask on a build-time,
-// content-hash-cached call.
+// Async for every branch because `compileSfc` awaits the style preprocessors
+// Metro's transform worker already awaits `transform`, so a sync fast path saves nothing
 module.exports.transform = async function transform(params) {
   if (params.filename.endsWith('.vue')) {
     const code = await compileSfc(params.src, params.filename);

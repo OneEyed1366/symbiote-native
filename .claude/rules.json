@@ -1,0 +1,14 @@
+{
+  "allow": [
+    {
+      "path": "core/engine/cpp/tests/js/primitive-suite.ts",
+      "id": "js-await-in-loop",
+      "why": "Timed benchmark steps run one after another by design, a parallel run would measure the contention"
+    },
+    {
+      "path": "core/engine/src/match-media/**",
+      "id": "ts-remove-listener",
+      "why": "MediaQueryList implements the DOM removeEventListener and counts its listeners through it"
+    }
+  ]
+}

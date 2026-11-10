@@ -1,15 +1,13 @@
 // The ten style keys RN parses in JS before native, and the one place they are resolved.
 
-// They run at write time, not payload-build time: SymbioteFabricProps.cpp doesn't carry these
-// processors, so resolving only in fabric-props.ts leaves the device its raw CSS string, silently
-// dropped (C++ parses a style string only under enableNativeCSSParsing, default false).
+// They run at write time since `SymbioteFabricProps.cpp` has no processors for them
+// Left raw, the device gets a CSS string and drops it (`enableNativeCSSParsing` is off by default)
 
-// Same move `configPayloadFold` makes for a third-party view's own processors: anything the C++
-// half can't do has to happen before the C++ half sees the value.
+// Same move `configPayloadFold` makes for a third-party view's own processors
+// What the C++ half can't do has to happen before it sees the value
 
-// Identity is part of the contract: an object/array needing no resolution comes back by identity,
-// since OP_SET_PROP skips a same-identity write and pushClassStyle diffs by reference — a fresh
-// object per call would turn an unchanged style into a write and a dirty node every render.
+// A value needing no resolution comes back by identity, `OP_SET_PROP` skips a same-identity write
+// A fresh object per call would make every render a write and a dirty node
 
 import { processAspectRatio } from './process-aspect-ratio';
 import { processBackgroundImage } from './process-background-image';
@@ -132,6 +130,13 @@ function asBackgroundLonghandInput(value: unknown): IBackgroundLonghandInput {
   return undefined;
 }
 
+const VAR_CALL = 'var(';
+
+// A text holding a `var()` stays raw, the engine parses it after substituting the variable
+function holdsVarCall(value: unknown): boolean {
+  return typeof value === 'string' && value.includes(VAR_CALL);
+}
+
 // Keyed on the style object, so a class-resolved style shared by a thousand rows is resolved once.
 // The value is the object to USE — which is the input itself whenever nothing needed resolving, so
 // a hit costs one lookup and returns the same reference the caller already had.
@@ -146,7 +151,7 @@ function resolveRecord(
   for (const [key, process] of STYLE_PROCESSORS) {
     if (!(key in style)) continue;
     const value = style[key];
-    if (value === undefined) continue;
+    if (value === undefined || holdsVarCall(value)) continue;
     const next = process(value);
     if (Object.is(next, value)) continue;
     const claimed = out ?? { ...style };

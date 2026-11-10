@@ -1,7 +1,9 @@
 // The structural ops. Each is one op and nothing else: the host detaches a child from whatever
 // parent it currently has before linking it, so JS never tracks the old parent
 
+import { noteMoved } from './container-tracking';
 import {
+  isPendingCreate,
   recordAppendChild,
   recordInsertBefore,
   recordRemoveChild,
@@ -20,6 +22,8 @@ import {
   hasAnimatedBindings,
   reattachAnimatedProps,
 } from './animated/host-binding';
+import { hasContainerConditions } from './style-registry/media-conditions';
+import { hasMediaSubscribers } from './style-registry/media-subscriptions';
 import { EMPTY_CENSUS, flushOps, treeHost } from './tree-host';
 import { isSymbioteNode, type ISymbioteNode } from './node-types';
 import type { ITreeCensus } from './tree-host';
@@ -89,7 +93,7 @@ function placedNode(node: ISymbioteNode): ISymbioteNode {
 function wrapsOwner(owner: ISymbioteNode, child: ISymbioteNode): boolean {
   if (owner.childHost === undefined) return false;
   if (claimModeFor(owner, child.component) !== 'wrap') return false;
-  if (hasHostBehaviors()) reattachHostBehaviors(child);
+  if (hasHostBehaviors() || hasMediaSubscribers()) reattachHostBehaviors(child);
   if (hasAnimatedBindings()) reattachAnimatedProps(child);
   const holder = holderOf(owner);
   // Wrapper takes the owner's place first, then the owner moves under it: the host's own detach on
@@ -128,9 +132,11 @@ function place(
   const parent = hostFor(requestedParent, child);
   // A node the sweep tore down can be put back, т.к. Svelte parks live subtrees offscreen across
   // commits. A `WeakSet` miss for anything freshly built, so the create path pays nothing
-  if (hasHostBehaviors()) reattachHostBehaviors(child);
+  if (hasHostBehaviors() || hasMediaSubscribers()) reattachHostBehaviors(child);
   if (hasAnimatedBindings()) reattachAnimatedProps(child);
   const placed = placedNode(child);
+  // A node the host already knew answers to the containers above its new place, found at commit
+  if (hasContainerConditions() && !isPendingCreate(placed)) noteMoved(placed);
   const anchor =
     slotAnchorOf(parent) ??
     (beforeChild === null || beforeChild === undefined
@@ -165,7 +171,11 @@ export function removeChild(
   // A wrap claim leaving: the owner takes its own place back and stays in the tree, nominated for
   // teardown like any other removed node т.к. the wrapper IS leaving
   if (unwrapsOwner(requestedParent, child)) {
-    if (hasAttachedBehaviors() || hasAnimatedBindings())
+    if (
+      hasAttachedBehaviors() ||
+      hasAnimatedBindings() ||
+      hasMediaSubscribers()
+    )
       markDetachCandidate(child);
     return;
   }
@@ -176,7 +186,11 @@ export function removeChild(
   const parent = hostFor(requestedParent, child);
   // `hasAttachedBehaviors`, not `hasHostBehaviors`: the latter is on from module load in every app
   // just from registering Pressable as a type
-  if (hasAttachedBehaviors() || hasAnimatedBindings())
+  if (
+    hasAttachedBehaviors() ||
+    hasAnimatedBindings() ||
+    hasMediaSubscribers()
+  )
     markDetachCandidate(child);
   // BOTH, and the owner is the one that matters: a composed primitive's behavior lives on the node
   // the adapter named, while `hostFor` redirects the mutation into its internal slot

@@ -1,45 +1,33 @@
-// The glue of the lightningcss-typed pipeline: CSS text in, engine style RULES out. One
-// `transform()` call feeds both halves — `./selectors.ts` for the selector, `./declarations.ts`
-// for the values — and nothing in between re-derives a name from text.
-//
-// WHY a rule instead of a key. The retired text pipeline COLLAPSED a selector into one string
-// key (`.a.b` -> `aB`, camelCased) and the runtime registry reversed that guess by
-// permuting the element's class tokens. Every lossy step in the collapse mapped two different
-// selectors onto one key and the later rule silently overwrote the earlier — the seventh trap in
-// `.claude/rules/style-registry-collisions.md`. A rule carries the TOKEN SET the selector was
-// written with, so the registry matches by subset and there is nothing to guess or reverse.
-//
-// Class names are emitted AS AUTHORED (`card-title` stays `card-title`, plus whatever the scoping
-// rename appended). No camelCase anywhere in this file: normalization is what the trap was made of.
-//
-// The reason this is ONE pass, not two: with `cssModules` on, the visitor still sees the
-// ORIGINAL class names — lightningcss renames AFTER the visitor walk. So the AST
-// gives authored tokens and `exports` gives their renamed spelling, and the renamed CSS text never
-// has to be parsed a second time (which is exactly what `../metro-css-module/index.ts` had to do,
-// and what mangled a scope tail whose base36 hash began with a letter).
-//
-// `:global()` is the one thing the mode DOES change, and it changes shape rather than presence:
-// with `cssModules` off it is a `custom-function` pseudo-class holding a raw token stream, with it
-// on a `kind:'global'` pseudo-class holding a real parsed selector. `./selectors.ts` handles both;
-// either way the tokens come out and `exports` not naming them is what marks them global.
+// CSS text in, engine style rules out: one `transform()` feeds selectors and declarations
+// A rule keeps its token set, not a collapsed key (trap 7 in `style-registry-collisions.md`)
+// Class names stay as authored, and a name `exports` does not rename is a `:global()` one
+import type { ICompiledProperty } from '@symbiote-native/engine';
 import { transform } from 'lightningcss';
-import type { CSSModuleExports, Declaration } from 'lightningcss';
+import type {
+  CSSModuleExports,
+  Declaration,
+  StyleRule,
+  TransformResult,
+} from 'lightningcss';
+import { cssWithoutBrokenDeclarations } from './broken-declarations.ts';
 import {
   declarationToStyle,
-  variablesIn,
+  type IDeclarationContext,
   type IStyleObject,
 } from './declarations.ts';
+import {
+  createMediaTracker,
+  type IMediaCondition,
+  type IMediaTracker,
+} from './media.ts';
+import { propertyRuleOf } from './property-rule.ts';
+import { isCustomDeclaration, variableOf } from './raw-var.ts';
 import { selectorsToMatches, type ISelectorCombinator } from './selectors.ts';
-import { warnOnce } from '../values.ts';
+import { REM_TO_PX, warnOnce } from '../values.ts';
 
-// A conditional at-rule is DROPPED WHOLE, its nested rules with it. There is no media-query engine
-// in React Native, so applying `.responsive` from `@media (min-width: 900px)` would paint it on
-// every phone — worse than not supporting the rule, because it looks supported. Returning `[]`
-// from the at-rule visitor removes it BEFORE the walk descends, so a nested style rule never
-// reaches the collector; without it lightningcss hoists it out.
-//
-// `@keyframes` and `@font-face` need no entry here — neither emits a style rule to begin with.
-const CONDITIONAL_AT_RULES = ['media', 'supports', 'container'] as const;
+// Dropped whole with the rules inside, as RN answers none of these conditions
+// Returning `[]` before the walk descends stops lightningcss hoisting a nested rule out
+const CONDITIONAL_AT_RULES = ['supports'] as const;
 
 // The wrappers `./selectors.ts` unwraps itself. lightningcss implements neither, so it reports both
 // as an unsupported pseudo-class even though the rule survives.
@@ -55,185 +43,174 @@ function isHandledPseudoClass(value: unknown): boolean {
   );
 }
 
-export interface IStyleRule {
-  /** Class names as authored, then through {@link ICompiledCss.exports} when a pattern renamed them. */
+export type IStyleRule = {
+  /** Class names as authored, renamed through `exports` when a pattern applied */
   readonly tokens: readonly string[];
   readonly specificity: readonly [number, number, number];
-  /** Source order across the whole file, 0-based. Breaks a specificity tie, as the cascade does. */
+  /** Source order across the file, 0-based, so it breaks a specificity tie */
   readonly order: number;
   readonly style: IStyleObject;
-  /**
-   * One per gap between tokens. Carried but NOT yet consumed: the registry matches a rule by token
-   * SUBSET, so `.a .b` still fires like `.a.b` today (trap 6). Stage 4 is where this starts to
-   * mean something — it needs parent pointers, which only exist after the engine's commit walk.
-   */
+  /** Index into `ICompiledCss.conditions`, absent for a rule outside any `@media` */
+  readonly cond?: number;
+  /** One per gap between tokens, carried but not read yet: the registry matches by token subset */
   readonly combinators: readonly ISelectorCombinator[];
-}
+};
 
-export interface ICompileRulesOptions {
+export type ICompileRulesOptions = {
   readonly filename: string;
-  /** Root font size for `rem`. */
+  /** Root font size for `rem` */
   readonly remToPx?: number;
-  /**
-   * A lightningcss CSS-Modules pattern, `[local]` first — `[local]__module__<hash>` for a
-   * `.module.*` file or a Vue `<style module>`, `[local]__data-v-<hash>` for a Vue `<style
-   * scoped>`, `[local]__svelte-<hash>` for a Svelte `<style>`. Omitted for a plain global `.css`.
-   */
+  /** CSS-Modules pattern with `[local]` first, such as `[local]__module__<hash>`, none if global */
   readonly pattern?: string;
-}
+};
 
-export interface ICompiledCss {
+/** A custom property declared on `:root`, which feeds the one table shared by all surfaces */
+export type IRootVariable = {
+  readonly name: string;
+  readonly value: string;
+  /** Index into `ICompiledCss.conditions`, absent outside any `@media` */
+  readonly cond?: number;
+};
+
+export type ICompiledCss = {
   readonly rules: readonly IStyleRule[];
-  /**
-   * Authored class name -> the name it registers under, straight out of lightningcss. Empty
-   * without a `pattern`. The markup rewriter reads THIS — never its own recomputation of the
-   * name, which is the bug class the single-renamer design exists to close.
-   */
+  /** `:root` custom properties in source order, so a later one wins as in the cascade */
+  readonly rootVariables: readonly IRootVariable[];
+  /** `@property` rules in source order, `cond` indexing `conditions` like a `:root` variable */
+  readonly properties: readonly ICompiledProperty[];
+  /** Each distinct `@media` condition once, indexed by `IStyleRule.cond` */
+  readonly conditions: readonly IMediaCondition[];
+  /** Authored class name -> the name it registers under, empty without a `pattern` */
   readonly exports: Readonly<Record<string, string>>;
-  /**
-   * The same map unflattened, kept because CSS Modules needs more than the new name: `composes`
-   * lives on the entry, and resolving a chain (`.a composes .b composes .c`) walks it. Empty
-   * without a `pattern`.
-   */
+  /** The same map unflattened, since CSS Modules reads `composes` off the entry */
   readonly moduleExports: CSSModuleExports;
-  /**
-   * Class tokens the rules use that lightningcss did NOT rename. Under a `pattern` that means
-   * exactly one thing — the name came out of a `:global()` — so the escape hatch is DERIVED here
-   * rather than re-detected by walking selectors a second time (which is all
-   * a retired second selector walk ever was). Without a pattern nothing is renamed, so this is
-   * simply every token in the file, and no caller has a use for it.
-   */
+  /** Tokens lightningcss did not rename, which under a `pattern` are the `:global()` names */
   readonly globals: ReadonlySet<string>;
-}
+};
 
-interface ICollectedRule {
+type ICollectedRule = {
   readonly tokens: readonly string[];
   readonly specificity: readonly [number, number, number];
   readonly combinators: readonly ISelectorCombinator[];
   readonly declarations: readonly Declaration[];
-}
+  readonly cond?: number;
+};
 
-export function compileCssToRules(
-  css: string,
-  options: ICompileRulesOptions,
-): ICompiledCss {
-  const { filename, pattern, remToPx } = options;
-  const collected: ICollectedRule[] = [];
-  const exports: Record<string, string> = {};
-  const warned = new Set<string>();
+type ICompileState = {
+  readonly filename: string;
+  readonly warned: Set<string>;
+  readonly collected: ICollectedRule[];
+  readonly rootVariables: IRootVariable[];
+  readonly properties: ICompiledProperty[];
+  readonly media: IMediaTracker;
+};
 
-  const dropAtRule = (name: string) => (): [] => {
+// Split out of `compileCssToRules` so each visitor step reads on its own
+function dropAtRule(state: ICompileState, name: string): () => [] {
+  return () => {
     warnOnce(
-      warned,
+      state.warned,
       `at-rule:${name}`,
-      `[@symbiote-native/css-parser] ${filename}: \`@${name}\` is not supported — the rules ` +
-        'inside it are dropped. React Native evaluates no CSS condition at all; branch in JS ' +
-        '(useWindowDimensions, Platform) instead.',
+      `[@symbiote-native/css-parser] ${state.filename}: \`@${name}\` is not supported - the ` +
+        'rules inside it are dropped. Branch in JS (useWindowDimensions, Platform) instead.',
     );
     return [];
   };
+}
 
-  const result = transform({
-    filename,
-    code: Buffer.from(css),
-    // A rule lightningcss cannot use must not take the whole file down: the retired text pass
-    // never threw either, and a stylesheet is authored content, not our code.
-    errorRecovery: true,
-    // Without this `>>>` / `/deep/` die at parse as a dangling combinator, so the selector half
-    // never gets the chance to fold them. Inert until stage 4 consumes a combinator.
-    nonStandard: { deepSelectorCombinator: true },
-    ...(pattern === undefined ? {} : { cssModules: { pattern } }),
-    visitor: {
-      Rule: {
-        ...Object.fromEntries(
-          CONDITIONAL_AT_RULES.map(name => [name, dropAtRule(name)]),
-        ),
-        style(rule) {
-          // Every reason but `root` is announced by `selectorsToMatches` itself, with the
-          // explanation spelled out for the author — warning again from this level printed the
-          // same drop twice. `root` is the exception it hands back silently, because only here
-          // are the declarations in scope, and a `:root` block is worth a word ONLY when it
-          // carries something that would have painted. Custom properties are its whole purpose
-          // and are already collected by `collectCustomProperties`.
-          const { matches, dropped } = selectorsToMatches(
-            rule.value.selectors,
-            filename,
-          );
-          // `importantDeclarations` last: `!important` wins inside its own rule, and a later
-          // entry overwrites an earlier one when both name the same RN property.
-          const declarations = [
-            ...rule.value.declarations.declarations,
-            ...rule.value.declarations.importantDeclarations,
-          ];
-          if (
-            dropped.some(entry => entry.reason === 'root') &&
-            declarations.some(declaration => declaration.property !== 'custom')
-          ) {
-            warnOnce(
-              warned,
-              `root-paints:${filename}`,
-              `[@symbiote-native/css-parser] ${filename}: a \`:root\` rule declares more than ` +
-                'custom properties — everything else in it is dropped, because `:root` matches no ' +
-                'node in React Native. Move those declarations onto a class.',
-            );
-          }
-          for (const match of matches) {
-            collected.push({ ...match, declarations });
-          }
-        },
-      },
-    },
-  });
+function collectRootVariables(
+  state: ICompileState,
+  declarations: readonly Declaration[],
+  cond: number | undefined,
+): void {
+  for (const declaration of declarations) {
+    const variable = variableOf(declaration);
+    if (variable === null) continue;
+    state.rootVariables.push({
+      ...variable,
+      ...(cond === undefined ? {} : { cond }),
+    });
+  }
+}
 
-  // `errorRecovery` keeps a malformed rule from taking the file down, but silence is how a whole
-  // rule disappears unnoticed: `examples/angular/**/ApiPlaygroundScreen.css` had a comment closed
-  // early by a `.hero-*/` inside it, which swept the real class after it into a garbage selector.
-  // The retired text pass "recovered" by registering the garbage; this one drops it — either way
-  // the author has to be told.
-  //
-  // Two things this loop must NOT do. It must not claim an outcome — a SelectorError drops the
-  // rule but a value-level one drops only the declaration, and asserting the wrong one is worse
-  // than staying quiet about it. And it must not repeat a complaint we deliberately answer:
-  // lightningcss does not implement `:global()` or `:deep()`, so it warns "not recognized as a
-  // valid pseudo-class" for both while `./selectors.ts` unwraps them and keeps the rule. Passing
-  // that through told the author their working rule was thrown away.
-  for (const warning of result.warnings) {
+function collectStyleRule(
+  state: ICompileState,
+  { value: rule }: { value: StyleRule },
+): void {
+  // `selectorsToMatches` announces every drop reason but `root`, which only this level can judge
+  const { matches, dropped } = selectorsToMatches(rule.selectors, state.filename);
+  // `importantDeclarations` last, so a later entry wins when both name the same RN property
+  const declarations = [
+    ...(rule.declarations?.declarations ?? []),
+    ...(rule.declarations?.importantDeclarations ?? []),
+  ];
+  const cond = state.media.idAt(rule.loc);
+  const isRoot = dropped.some(entry => entry.reason === 'root');
+  if (isRoot) collectRootVariables(state, declarations, cond);
+  const paintsFromRoot =
+    isRoot &&
+    declarations.some(declaration => !isCustomDeclaration(declaration));
+  if (paintsFromRoot) {
+    warnOnce(
+      state.warned,
+      `root-paints:${state.filename}`,
+      `[@symbiote-native/css-parser] ${state.filename}: a \`:root\` rule declares more than ` +
+        'custom properties - everything else in it is dropped, because `:root` matches no ' +
+        'node in React Native. Move those declarations onto a class.',
+    );
+  }
+  for (const match of matches) {
+    state.collected.push({
+      ...match,
+      declarations,
+      ...(cond === undefined ? {} : { cond }),
+    });
+  }
+}
+
+// `errorRecovery` keeps one malformed rule from taking the file down, so the author is told here
+// The outcome is not claimed: a selector error drops the rule, a value error one declaration
+function reportWarnings(
+  warnings: TransformResult['warnings'],
+  state: ICompileState,
+): void {
+  for (const warning of warnings) {
     if (isHandledPseudoClass(warning.value)) continue;
     const where = `${warning.loc.line}:${warning.loc.column}`;
     warnOnce(
-      warned,
+      state.warned,
       `lightningcss:${warning.type}:${warning.message}`,
-      `[@symbiote-native/css-parser] ${filename}:${where}: ${warning.message}`,
+      `[@symbiote-native/css-parser] ${state.filename}:${where}: ${warning.message}`,
     );
   }
+}
 
-  // Sorted: `exports` is a Rust HashMap whose iteration order is randomized PER PROCESS, and this
-  // map is emitted into a generated module — an unsorted one churns Metro's content cache.
-  for (const [local, entry] of Object.entries(result.exports ?? {}).sort(
-    ([left], [right]) => (left < right ? -1 : 1),
-  )) {
-    exports[local] = entry.name;
-  }
+// Sorted, since the Rust HashMap order is random per process and this lands in a generated module
+function exportedNames(result: TransformResult): Record<string, string> {
+  const names: Record<string, string> = {};
+  const entries = Object.entries(result.exports ?? {}).sort(([left], [right]) =>
+    left < right ? -1 : 1,
+  );
+  for (const [local, entry] of entries) names[local] = entry.name;
+  return names;
+}
 
-  // Custom properties come from their own pass because nothing guarantees `:root` is declared
-  // before the rule that reads it — the retired text pass had the same two-phase shape.
-  const variables = variablesIn(css, filename);
-  const context = {
-    filename,
-    variables,
-    ...(remToPx === undefined ? {} : { remToPx }),
-  };
-
+function toRules(
+  collected: readonly ICollectedRule[],
+  names: Readonly<Record<string, string>>,
+  context: IDeclarationContext,
+): { rules: IStyleRule[]; globals: Set<string> } {
   const globals = new Set<string>();
   const rules = collected.map((rule, order) => ({
     tokens: rule.tokens.map(token => {
-      const renamed = exports[token];
+      const renamed = names[token];
       if (renamed === undefined) globals.add(token);
       return renamed ?? token;
     }),
     specificity: rule.specificity,
     combinators: rule.combinators,
     order,
+    ...(rule.cond === undefined ? {} : { cond: rule.cond }),
     style: rule.declarations.reduce<IStyleObject>(
       (style, declaration) => ({
         ...style,
@@ -242,16 +219,102 @@ export function compileCssToRules(
       {},
     ),
   }));
+  // A rule with no declaration left only adds a candidate for the registry to weigh per lookup
+  return { rules: rules.filter(rule => Object.keys(rule.style).length > 0), globals };
+}
 
-  // A rule whose every declaration was dropped — all unsupported, or all `var()`s declared in
-  // another file — has nothing to contribute, and keeping it only adds a candidate the registry
-  // must consider on every lookup of those tokens.
-  const painting = rules.filter(rule => Object.keys(rule.style).length > 0);
+// Kept apart from `compileCssToRules` so the transform call reads on its own
+function createState(
+  filename: string,
+  remToPx: number | undefined,
+  warned: Set<string>,
+): ICompileState {
+  const media = createMediaTracker({
+    remToPx: remToPx ?? REM_TO_PX,
+    onUnsupported: (what, atRule) =>
+      warnOnce(
+        warned,
+        `${atRule}:${what}`,
+        `[@symbiote-native/css-parser] ${filename}: ${what} cannot be answered here, so the ` +
+          `\`@${atRule}\` rule that uses it is dropped.`,
+      ),
+  });
+  return { filename, warned, collected: [], rootVariables: [], properties: [], media };
+}
 
-  return {
-    rules: painting,
-    exports,
+type ICompilePass = {
+  readonly compiled: ICompiledCss;
+  readonly warnings: TransformResult['warnings'];
+};
+
+function compilePass(
+  css: string,
+  options: ICompileRulesOptions,
+  warned: Set<string>,
+): ICompilePass {
+  const { filename, pattern, remToPx } = options;
+  const state = createState(filename, remToPx, warned);
+
+  const result = transform({
+    filename,
+    code: Buffer.from(css),
+    errorRecovery: true,
+    // Without this `>>>` and `/deep/` die at parse as a dangling combinator
+    nonStandard: { deepSelectorCombinator: true },
+    ...(pattern === undefined ? {} : { cssModules: { pattern } }),
+    visitor: {
+      Rule: {
+        ...Object.fromEntries(
+          CONDITIONAL_AT_RULES.map(name => [name, dropAtRule(state, name)]),
+        ),
+        media: state.media.onMedia,
+        container: state.media.onContainer,
+        property: ({ value: rule }) => {
+          const descriptor = propertyRuleOf(css, rule);
+          if (descriptor === null) return;
+          const cond = state.media.idAt(rule.loc);
+          state.properties.push(
+            cond === undefined ? descriptor : { ...descriptor, cond },
+          );
+        },
+        style: rule => collectStyleRule(state, rule),
+      },
+    },
+  });
+  reportWarnings(result.warnings, state);
+
+  const names = exportedNames(result);
+  const context = { filename, ...(remToPx === undefined ? {} : { remToPx }) };
+  const { rules, globals } = toRules(state.collected, names, context);
+
+  const compiled = {
+    rules,
+    rootVariables: state.rootVariables,
+    properties: state.properties,
+    conditions: state.media.conditions(),
+    exports: names,
     moduleExports: result.exports ?? {},
     globals,
   };
+  return { compiled, warnings: result.warnings };
+}
+
+export function compileCssToRules(
+  css: string,
+  options: ICompileRulesOptions,
+): ICompiledCss {
+  const warned = new Set<string>();
+  try {
+    const first = compilePass(css, options, warned);
+    // A second pass over the source, since lightningcss loses the declarations before a broken one
+    const repaired = cssWithoutBrokenDeclarations(css, first.warnings);
+    return repaired === null ? first.compiled : compilePass(repaired, options, warned).compiled;
+  } catch (error) {
+    // `lightningcss` overflows its stack on absurd nesting and throws a bare error
+    if (!(error instanceof RangeError)) throw error;
+    throw new Error(
+      `[@symbiote-native/css-parser] ${options.filename}: rules nest too deeply to compile`,
+      { cause: error },
+    );
+  }
 }

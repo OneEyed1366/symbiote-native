@@ -12,10 +12,9 @@ namespace symbiote {
  *
  * ── WHAT THIS REPLACES, AND WHY IT IS SMALLER THAN WHAT IT REPLACES ──────────────────────────────
  *
- * `SymbioteApplier` sat beside this file until 2026-09-08 and is deleted. It replayed FABRIC
- * operations that a 2 041-line JS walk worked out — and that walk existed to re-derive a diff the
- * framework had already computed and thrown away: a reconciler's whole job is knowing what changed,
- * and every adapter tells us call by call.
+ * `SymbioteApplier` sat beside this file until 2026-09-08 and is deleted.
+ * It replayed FABRIC operations that a 2 041-line JS walk worked out, re-deriving a diff the
+ * framework had already computed, and every adapter tells us what changed call by call
  *
  * So this takes the ADAPTER's alphabet instead, and the derivation does not move here — it stops
  * existing. What was 2 041 lines of JS diffing is, on this side, a child vector and a dirty flag.
@@ -38,13 +37,9 @@ namespace symbiote {
  * object and Hermes' collector is what frees it. A node also stays alive while a PARENT holds it,
  * which is the browser's rule exactly: alive while in the tree or referenced from script.
  *
- * That is not a preference. The previous applier kept an `unordered_map<int32_t, shared_ptr>` and
- * addressed nodes by a monotonic id — correct, and a second owner with nothing to tell it when the
- * first one let go. One benchmark suite took it from 792 MB to 1492 MB. A `weak_ptr` table was
- * tried and died on device on the first commit (`node 1 is gone`): Fabric's state reconciliation
- * clones a stateful node AND THE PATH TO THE ROOT, so any `ScrollView` re-creates the root every
- * commit while the JS side legitimately still names it. The repair is not a better table. It is
- * having one owner.
+ * The previous applier kept nodes in an `unordered_map<int32_t, shared_ptr>` by a monotonic id,
+ * a second owner nothing told to let go (792 MB to 1492 MB on one suite), and a `weak_ptr` table
+ * died on device as Fabric re-creates the root on every `ScrollView` commit. One owner is the fix
  *
  * Hence: no members. `Tree` exists to give the host functions a `this`, and a per-call instance
  * would behave identically.
@@ -147,10 +142,8 @@ class Tree {
    * `parentsOf(handles)` / `subtreesOf(roots)` — the batched twins of the two reads above, each
    * answering for a whole list in ONE crossing.
    *
-   * They are members rather than a JS loop because the teardown sweep is the one structural read
-   * whose size is the TREE's rather than one node's: it asks for every removed node's parent and
-   * then walks everything the removal took with it, which at a thousand rows was eleven thousand
-   * crossings inside the timed step.
+   * They are members because the teardown sweep is the one structural read sized by the TREE.
+   * It asks each removed node's parent, then walks its subtree
    *
    * `subtreesOf` answers PRE-ORDER, each root followed by its descendants, concatenated in root
    * order. Anchors included, exactly as `childrenOf` includes them.
@@ -164,16 +157,9 @@ class Tree {
       const facebook::jsi::Value *arguments,
       size_t count);
   /**
-   * `teardownSubtreesOf(roots)` — `subtreesOf` narrowed to the nodes a teardown has work for.
-   *
-   * The sweep's cost IS this walk's width: it crosses a handle per node to release the few that
-   * carry a machine, and on the benchmark row that is one node in ten. What comes back is each
-   * root, every node carrying an intrinsic TAG (which `kOpSetTag` sets from `attachHostBehavior`
-   * and nowhere else), and every node BETWEEN the two — an ancestor has to be marked or the
-   * framework bringing it back alone would never re-arm what hangs beneath it.
-   *
-   * NOT a substitute when an app animates: `detachAnimatedProps` is per node and knows nothing
-   * about tags, so `host-access.ts` asks for the full walk whenever a binding exists.
+   * `teardownSubtreesOf(roots)`: `subtreesOf` narrowed to roots, nodes with a TAG (`kOpSetTag`)
+   * or a release mark (`kOpSetReleaseMark`) and the path between them
+   * An app that animates needs the full walk, `host-access.ts` asks for it
    */
   facebook::jsi::Value teardownSubtreesOf(
       facebook::jsi::Runtime &runtime,
@@ -182,11 +168,9 @@ class Tree {
   /**
    * `ancestorsOf(handle)` — the node and every ancestor above it, DEEPEST FIRST, in one crossing.
    *
-   * The upward twin of `subtreesOf`, and it exists for the same reason the batched pair above does:
-   * a walk that asks per LEVEL pays a crossing per level. Event dispatch needs this chain for every
-   * event (capture reads it reversed, bubble forward) and the responder negotiation needs it again
-   * on every frame of every drag — measured at 18 crossings per event on a depth-8 chain before the
-   * two phases shared a walk, and 9 after.
+   * The upward twin of `subtreesOf`, for the same reason: a walk asking per LEVEL pays a crossing
+   * per level. Event dispatch and the responder negotiation need this chain on every event and
+   * drag frame, measured at 18 crossings per event at depth 8 before the two phases shared a walk
    *
    * A SURFACE is included, exactly as `parentOf`'s answer includes one: stopping at a surface is
    * `host-access.ts`'s job, and it reads the answer's `component` to do it.
@@ -213,11 +197,6 @@ class Tree {
    * zeroes, four zeroes, `onFail`, and a no-op for the two that go straight to `UIManager`. It is
    * the ordinary state under an async-batched commit, and an app that only asked where something is
    * must not be thrown into.
-   *
-   *   dispatchCommand(handle, name, args)   sendAccessibilityEvent(handle, eventType)
-   *   measure(handle, cb)                   measureInWindow(handle, cb)
-   *   measureLayout(handle, relativeTo, onFail, onSuccess)
-   *   setIsJSResponder(handle, isResponder, blockNativeResponder)
    */
   facebook::jsi::Value dispatchCommand(
       facebook::jsi::Runtime &runtime,
@@ -258,6 +237,45 @@ class Tree {
    * whether a tree-wide text re-measure is ours or something a Fabric commit costs.
    */
   facebook::jsi::Value readSurfaceTelemetry(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  /**
+   * One `:root` custom property as native holds it, `undefined` when none is declared
+   * A diagnostic read, so a test can prove what `OP_SET_GLOBAL_VARIABLE` carried
+   */
+  facebook::jsi::Value readGlobalVariable(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  /**
+   * What a `var()` on the node reads now, `undefined` when nothing declares the name
+   * Asked as `readVariable(handle, name)`, after the pending ops were applied
+   */
+  facebook::jsi::Value readVariable(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  /**
+   * Types a custom property for every surface
+   * Answers a `RegisterOutcome` number, 0 being registered
+   */
+  facebook::jsi::Value registerProperty(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  // Drops one registration and answers whether the name had one
+  facebook::jsi::Value unregisterProperty(
+      facebook::jsi::Runtime &runtime,
+      const facebook::jsi::Value *arguments,
+      size_t count);
+
+  // Forgets every registration, for tests
+  facebook::jsi::Value clearRegisteredProperties(
       facebook::jsi::Runtime &runtime,
       const facebook::jsi::Value *arguments,
       size_t count);

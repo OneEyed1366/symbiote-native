@@ -9,9 +9,9 @@
 // byte-identical either way, one implementation two allocators — nothing here can drift. The
 // applier (replayChildOps vs. cloneMultiple) IS two implementations of one fold.
 
-// So undefined below is correct for the store and transitional for the applier: when the applier
-// moves, the JS one is deleted, and a missing or mismatched module must fail loud rather than
-// quietly run a second implementation — a silent fallback then would be a measurement that lies.
+// So undefined below is correct for the store and transitional for the applier
+// When the applier moves, the JS one is deleted, and a missing or mismatched module must fail loud
+// because a silent fallback would be a measurement that lies
 
 // Fantom (RN's own headless C++ test runner) is not a usable oracle for this: not published to
 // npm, vendored from RN main against a repo pinned to 0.86, needing a from-scratch Hermes/folly/
@@ -26,14 +26,13 @@ import { getNativeModule } from './native-modules';
 import type { ICommittedRecord } from './tree-host';
 import { isRecord } from './type-guards';
 
-// The ABI this file knows how to talk to. A binary reporting anything else is refused outright
-// rather than probed method by method — the two artefacts ship separately (a pod and an npm
-// package), so disagreement is routine and a partial match corrupts memory quietly.
+// The ABI this file knows how to talk to, and a binary reporting anything else is refused outright
+// The two artefacts ship separately (a pod and an npm package), so disagreement is routine
+// and a partial match corrupts memory quietly
 
-// Exported for the tests, which must derive their supported/unsupported arms from it rather than
-// restate the number: a bump that leaves a fixture behind reads as "the binary is stale", which is
-// exactly the message this constant exists to produce.
-export const SUPPORTED_NATIVE_VERSION = 4;
+// Exported for the tests, which derive their supported/unsupported arms from it
+// A bump that leaves a fixture behind reads as "the binary is stale", the message it exists for
+export const SUPPORTED_NATIVE_VERSION = 9;
 
 // What installJSIBindingsWithRuntime: puts on the global. allocInt32Array hands back a view over
 // memory native owns, not a copy — the only reason any of this exists, since every other route
@@ -135,6 +134,18 @@ export type INativeEngineBindings = {
     handle: object,
     includeTransform: boolean,
   ) => { x: number; y: number; width: number; height: number } | undefined;
+  // What a `var()` on the node would read. Optional like the read above: an older binary lacks it
+  readVariable?: (handle: object, name: string) => string | undefined;
+  // Types a custom property, answering the `RegisterOutcome` number: 0 when it was registered
+  registerProperty?: (
+    name: string,
+    syntax: string,
+    inherits: boolean,
+    initialValue: string | undefined,
+  ) => number;
+  // Drops one registration and answers whether the name had one
+  unregisterProperty?: (name: string) => boolean;
+  clearRegisteredProperties?: () => void;
   // RN's own commit telemetry for any surface, including one this host never drove. Optional: read
   // with ?., so a pod predating it degrades instead of throwing. Treat an absent member as "no
   // answer", never as zeroes — a zero reads as "React's commit measures no text".
@@ -234,13 +245,13 @@ function isBindings(value: unknown): value is INativeEngineBindings {
   return REQUIRED_METHOD_NAMES.every(name => typeof value[name] === 'function');
 }
 
-// SUPPORTED_NATIVE_VERSION guards a memory layout, not a member list: the shape guard above
-// already refuses an older pod lacking a new function's name, so bumping for that alone would
-// cost every app on an older pod its native store for nothing.
+// `SUPPORTED_NATIVE_VERSION` guards a memory layout, not a member list
+// The shape guard above already refuses an older pod lacking a new function's name, so bumping
+// for that alone would cost every app on an older pod its native store for nothing
 
-// Bump only when the meaning of existing bytes or arguments changes: a calling-convention change
-// the shape guard can't see, since names stay the same while what they mean does not — every read
-// still resolves to a value, just the wrong one, committing a wrong tree rather than throwing.
+// Bump when the meaning of existing bytes or arguments changes, or an op is added that an older
+// binary would drop unread. The shape guard cannot see either: every read still resolves, just
+// to a wrong tree that commits instead of throwing
 
 // `undefined` means "resolved, and there is none" — distinct from `resolved === false`, which means
 // nobody has looked. Collapsing the two would re-run the lookup on every miss, and the miss is the

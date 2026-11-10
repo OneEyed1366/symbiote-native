@@ -1,6 +1,7 @@
 // The listener channel: which `on*` prop becomes a listener, who owns the slot, and the handful of
 // events Fabric gates behind a boolean prop
 
+import { isContainer } from './container-tracking';
 import { recordSetOwnedListener } from './mutation-buffer';
 import {
   appListenerFor,
@@ -21,14 +22,16 @@ import type {
   ISymbioteNode,
 } from './node-types';
 
+const LAYOUT_EVENT = 'layout';
+
 // Fabric gates a handful of events behind a BOOLEAN prop: unlike scroll/touch/change these fire
-// only when the shadow node carries the flag, and a gated handler would otherwise attach on our
-// side while the native event silently never arrives
+// only when the shadow node carries the flag. A gated handler would otherwise attach on our side
+// while the native event silently never arrives
 
 // `magicTap` maps to `onMagicTap`, not the C++ member name `onAccessibilityMagicTap`: RN's own
 // `BaseViewConfig.ios.js` disagrees with its C++ prop name, and matching stock is the only choice
 const GATED_EVENT_PROPS: ReadonlyMap<string, string> = new Map([
-  ['layout', 'onLayout'],
+  [LAYOUT_EVENT, 'onLayout'],
   ['textLayout', 'onTextLayout'],
   ['accessibilityTap', 'onAccessibilityTap'],
   ['magicTap', 'onMagicTap'],
@@ -47,13 +50,23 @@ export function setBehaviorListener(
   listener: IListener | undefined,
 ): void {
   if (listener === undefined) node.listeners?.delete(name);
-  else (node.listeners ??= new Map()).set(name, listener);
+  else listenersOf(node).set(name, listener);
   // The flag is written UNCONDITIONALLY. Writing it only on the FLIP was measured and rejected: it
   // saves 1 KB per item on the two anchor-backed touchables and costs 10 ms on their teardown
   // (`gated-listener-writes.test.ts`, symbiote-perf-measurement §24)
   const flagProp = GATED_EVENT_PROPS.get(name);
   if (flagProp !== undefined)
-    setProp(node, flagProp, listener === undefined ? undefined : true);
+    setProp(node, flagProp, gateValue(node, name, listener !== undefined));
+}
+
+function listenersOf(node: ISymbioteNode): Map<string, IListener> {
+  node.listeners ??= new Map();
+  return node.listeners;
+}
+
+// A container keeps its `layout` gate for its own size reading, whatever the app listens for
+function gateValue(node: ISymbioteNode, name: string, isHandler: boolean): true | undefined {
+  return isHandler || (name === LAYOUT_EVENT && isContainer(node)) ? true : undefined;
 }
 
 // Arm (or release, with `undefined`) the shared handler a behavior dispatches through, instead of
@@ -113,7 +126,7 @@ function stashOwnedListener(
   }
   const flagged = GATED_EVENT_PROPS.get(name);
   if (flagged !== undefined)
-    setProp(node, flagged, isHandler ? true : undefined);
+    setProp(node, flagged, gateValue(node, name, isHandler));
 }
 
 // The explicit event channel. Structural adapters (Svelte `addEventListener`, Angular
@@ -137,14 +150,13 @@ export function setEventListener(
   }
   if (isHandler) {
     const handler = value;
-    const listeners = (node.listeners ??= new Map());
-    listeners.set(name, (event: ISymbioteEvent) => handler(event));
+    listenersOf(node).set(name, (event: ISymbioteEvent) => handler(event));
   } else {
     node.listeners?.delete(name);
   }
   const flagProp = GATED_EVENT_PROPS.get(name);
   if (flagProp !== undefined)
-    setProp(node, flagProp, isHandler ? true : undefined);
+    setProp(node, flagProp, gateValue(node, name, isHandler));
   // `onLoad` and friends are real Fabric events on `RCTImageView`, so they land here rather than in
   // `writeProp`. See `image-source-write.ts` for Android's synthesized `shouldNotifyLoadEvents`
   if (node.resolvesImageSources && IMAGE_LOAD_EVENT_NAMES.has(name)) {

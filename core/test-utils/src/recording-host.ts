@@ -5,9 +5,9 @@
  * assert on state machines, prop resolution, listeners, styles. Attaching them to a second
  * implementation of Fabric's tree rules buys them nothing and costs the project a mirror.
  *
- * **Why this is not one.** It keeps the AUTHORED tree — who was appended to whom, what props were
- * set — because that is what the ops literally say and what an adapter's own seam asks back
- * (Solid's `getParentNode`, Vue's `nextSibling`, Svelte's `firstChild`). It does not decide what
+ * **Why this is not one:** it keeps the AUTHORED tree (who was appended to whom, what was set),
+ * since the ops say so and an adapter's seam asks it back (Solid's `getParentNode`, Vue's
+ * `nextSibling`). It does not decide what
  * COMMITS: no flattening, no stacking contexts, no virtual nodes, no clone protocol, no view-name
  * rewriting. There is no derived answer here to be wrong, which is the whole difference between
  * recording a statement and re-deriving a conclusion.
@@ -38,26 +38,18 @@ export type IRecorded = {
   instanceHandle: unknown;
   viewName: string;
   tagName: string;
+  // Set by `OP_SET_RELEASE_MARK`, which keeps the node in the narrowed teardown walk
+  isReleaseMarked: boolean;
   ownedListeners: Record<string, boolean>;
   underlayShown: boolean;
+  // The envelope `OP_SET_CONTAINER_VARIANTS` last set, recorded and not evaluated: the host does
+  containerVariants: string | undefined;
   props: Record<string, unknown>;
   parent: IRecorded | undefined;
   children: IRecorded[];
-  // Set once, at the commit that first lands this node, and never cleared by a later removal — the
-  // real engine's own `node->committed` (a landed `ShadowNode` pointer) works the same way, which is
-  // what lets a behavior's PARTING write during the teardown sweep still reach a node `removeChild`
-  // just detached but a commit hasn't finished disposing of yet. Walking the live parent chain here
-  // instead answered `undefined` the moment the sweep ran, because `OP_REMOVE_CHILD` had already cut
-  // the link a few lines above it in the same `flushOps()`.
-  //
-  // The NUMERIC rootTag `createSurface(rootTag)` was called with — `OP_COMMIT`'s own slot `a`
-  // (`recordCommit(rootTag, surface)`, mutation-buffer.ts), carried straight through rather than
-  // invented. This is NOT the same unknown as the native Fabric `tag`: a rootTag is a JS-level
-  // surface identifier the app chose, present on the op stream from the start, while a Fabric tag is
-  // minted by the native differ this host never talks to. Conflating the two into one `NO_TAG`
-  // sentinel was a real past bug — `requestCommitForRoot`'s targeted-commit path reads exactly this
-  // field to know which surface to re-commit, and every root reading the SAME sentinel made every
-  // targeted commit silently name the wrong surface.
+  // Set once at the commit that first lands the node, never cleared by a later removal
+  // The numeric `rootTag` that `createSurface` got, not a Fabric tag, which
+  // `requestCommitForRoot` reads to pick the surface to re-commit
   committedRootTag: number | undefined;
 };
 
@@ -205,9 +197,9 @@ export function installRecordingFabric(): IRecordingHost {
  * The Fabric payload for a node — what the engine WOULD hand the renderer for it, built by the
  * engine's own builder rather than read off anything.
  *
- * This exists because the two are easy to confuse and the difference bites: a node's PROPS are the
- * author's bag (`style` is still an object), while the PAYLOAD is what `fabricProps` makes of it —
- * style flattened into top-level keys, the aria fold run, the ten RN processors applied. A test
+ * The two are easy to confuse: a node's PROPS are the author's bag (`style` is still an object),
+ * while the PAYLOAD is what `fabricProps` makes of it, with style flattened, the aria fold run
+ * and the ten RN processors applied. A test
  * asking about `padding` or `accessibilityRole` or a parsed `backgroundSize` means the payload, and
  * reading the bag instead comes back `undefined` with nothing to explain why.
  */
@@ -225,6 +217,19 @@ export function createRecordingHost(): IRecordingHost {
   const tree: IRecordedTree = createRecordedTree();
   const { nodeOf } = tree;
   let eventHandler: IEventHandler | undefined;
+  const registerEventHandler = (handler: IEventHandler): void => {
+    eventHandler = handler;
+  };
+  const fireEvent = (
+    handle: object,
+    topLevelType: string,
+    nativeEvent: Record<string, unknown> = {},
+  ): void => {
+    if (eventHandler === undefined) {
+      throw new Error('no event handler registered by the renderer');
+    }
+    eventHandler(handle, topLevelType, nativeEvent);
+  };
   const commands: IRecordingHost['commands'] = [];
   const responderHandovers: IRecordingHost['responderHandovers'] = [];
   const accessibilityEvents: IRecordingHost['accessibilityEvents'] = [];
@@ -309,7 +314,7 @@ export function createRecordingHost(): IRecordingHost {
       const walk = (node: IRecorded, isRoot: boolean): boolean => {
         const reserved = out.length;
         out.push(node.handle);
-        let isWanted = isRoot || node.tagName !== '';
+        let isWanted = isRoot || node.tagName !== '' || node.isReleaseMarked;
         for (const child of node.children) {
           if (walk(child, false)) isWanted = true;
         }
@@ -391,9 +396,7 @@ export function createRecordingHost(): IRecordingHost {
       responderHandovers.push({ handle, isResponder, blockNativeResponder });
     },
 
-    registerEventHandler(handler: IEventHandler): void {
-      eventHandler = handler;
-    },
+    registerEventHandler,
 
     find(
       predicate: (node: IAuthoredNode) => boolean,
@@ -405,16 +408,7 @@ export function createRecordingHost(): IRecordingHost {
       return tree.authored.filter(predicate);
     },
 
-    fireEvent(
-      handle: object,
-      topLevelType: string,
-      nativeEvent: Record<string, unknown> = {},
-    ): void {
-      if (eventHandler === undefined) {
-        throw new Error('no event handler registered by the renderer');
-      }
-      eventHandler(handle, topLevelType, nativeEvent);
-    },
+    fireEvent,
 
     reset: clearRecords,
 

@@ -280,6 +280,25 @@ add_executable(symbiote_tree_tests
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteTree.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteDebug.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFabricProps.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteGlobalVariables.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteSurfaceVariables.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteVarSubstitute.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteCalc.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteMath.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteMathOps.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteShorthand.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteStyleText.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteShadow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFilter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteTransform.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteStructuredStyle.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteSyntax.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteSyntaxNumber.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteSyntaxValue.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteComputedValue.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteRegisteredProperties.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteVarReaders.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteContainerQuery.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteEngineBindings.cpp)
 target_include_directories(symbiote_tree_tests PRIVATE
   ${REACT_COMMON_DIR} ${REACT_COMMON_DIR}/jsi ${REACT_COMMON_DIR}/jsc
@@ -355,6 +374,25 @@ add_executable(symbiote_tester
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteTree.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteDebug.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFabricProps.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteGlobalVariables.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteSurfaceVariables.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteVarSubstitute.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteCalc.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteMath.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteMathOps.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteShorthand.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteStyleText.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteShadow.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteFilter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteTransform.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteStructuredStyle.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteSyntax.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteSyntaxNumber.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteSyntaxValue.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteComputedValue.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteRegisteredProperties.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteVarReaders.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteContainerQuery.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../SymbioteEngineBindings.cpp)
 target_include_directories(symbiote_tester PRIVATE
   ${REACT_COMMON_DIR} ${REACT_COMMON_DIR}/jsi ${REACT_COMMON_DIR}/jsc
