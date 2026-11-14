@@ -29,7 +29,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./bootstrap": "./src/bootstrap/index.ts",
+    "./bootstrap": "./src/bootstrap-entry.ts",
     "./host-primitives": "./host-primitives.cjs",
     "./resolve-intrinsic": "./src/resolve-intrinsic.ts",
     "./register": "./src/register.ts"
@@ -50,8 +50,8 @@
         "default": "./build/index.js"
       },
       "./bootstrap": {
-        "types": "./build/bootstrap/index.d.ts",
-        "default": "./build/bootstrap/index.js"
+        "types": "./build/bootstrap-entry.d.ts",
+        "default": "./build/bootstrap-entry.js"
       },
       "./host-primitives": {
         "types": "./host-primitives.d.cts",
@@ -76,10 +76,17 @@
   },
   "peerDependencies": {
     "@symbiote-native/engine": "workspace:^",
+    "@symbiote-native/web": "workspace:^",
     "react-native": ">=0.86"
+  },
+  "peerDependenciesMeta": {
+    "@symbiote-native/web": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@symbiote-native/engine": "workspace:*",
+    "@symbiote-native/web": "workspace:*",
     "@types/node": "catalog:"
   }
 }

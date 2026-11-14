@@ -29,7 +29,12 @@
   ],
   "exports": {
     ".": "./src/index.ts",
-    "./mutation-buffer": "./src/mutation-buffer.ts"
+    "./mutation-buffer": "./src/mutation-buffer.ts",
+    "./mutation-walk": "./src/mutation-walk.ts",
+    "./retained-tree": "./src/retained-tree.ts",
+    "./retained-visitor": "./src/retained-visitor.ts",
+    "./inert-fabric-slot": "./src/inert-fabric-slot.ts",
+    "./event-names": "./src/events/names.ts"
   },
   "files": [
     "build",
@@ -67,6 +72,26 @@
       "./mutation-buffer": {
         "types": "./build/mutation-buffer.d.ts",
         "default": "./build/mutation-buffer.js"
+      },
+      "./mutation-walk": {
+        "types": "./build/mutation-walk.d.ts",
+        "default": "./build/mutation-walk.js"
+      },
+      "./retained-tree": {
+        "types": "./build/retained-tree.d.ts",
+        "default": "./build/retained-tree.js"
+      },
+      "./retained-visitor": {
+        "types": "./build/retained-visitor.d.ts",
+        "default": "./build/retained-visitor.js"
+      },
+      "./inert-fabric-slot": {
+        "types": "./build/inert-fabric-slot.d.ts",
+        "default": "./build/inert-fabric-slot.js"
+      },
+      "./event-names": {
+        "types": "./build/events/names.d.ts",
+        "default": "./build/events/names.js"
       }
     }
   },

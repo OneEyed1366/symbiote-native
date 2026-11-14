@@ -143,6 +143,8 @@ catalog:
   eslint-plugin-svelte: ^3.23.0
   typescript-eslint: ^8.62.0
   globals: ^17.7.0
+  # DOM for `core/web` tests, opted into per file
+  happy-dom: 20.14.5
   husky: ^9.1.7
   lint-staged: ^17.0.8
   syncpack: ^15.3.2

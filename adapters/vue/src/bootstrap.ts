@@ -1,12 +1,9 @@
-// Zero-config app entry, the Vue twin of adapters/react/src/bootstrap.ts. createApp(App) stays
-// inert (matching real Vue's own semantics); mount(appName) is where the RN host seams and
-// AppRegistry actually get wired. Lives OUTSIDE the package's main barrel — see that file's
-// header for why anything importing react-native must stay there.
+// Zero-config app entry, outside the package barrel as it reaches `react-native` through
+// `@symbiote-native/components/bootstrap`, which Vitest's transform cannot parse
 
-import { AppRegistry as RNAppRegistry } from 'react-native';
 import type { Component } from '@vue/runtime-core';
 import {
-  bootstrapHost,
+  startApp,
   type IBootstrapHostOptions,
 } from '@symbiote-native/components/bootstrap';
 import { AppRegistry, setHostRegistrar } from './modules/app-registry';
@@ -17,16 +14,14 @@ export type ISymbioteVueApp = {
   mount(appName: string): void;
 };
 
-// Mirrors real Vue's createApp(App).mount(selector) two-step idiom.
+// Mirrors real Vue's `createApp(App).mount(selector)`, where `createApp` stays inert
 export function createApp(
   App: Component,
   options: IBootstrapHostOptions = {},
 ): ISymbioteVueApp {
   return {
     mount(appName: string): void {
-      bootstrapHost(options);
-      setHostRegistrar(RNAppRegistry);
-      AppRegistry.registerComponent(appName, () => App);
+      startApp({ AppRegistry, setHostRegistrar }, appName, () => App, options);
     },
   };
 }

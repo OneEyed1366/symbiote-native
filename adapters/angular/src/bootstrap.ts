@@ -1,13 +1,10 @@
-// Zero-config app entry, the Angular twin of adapters/react/src/bootstrap.ts. Lives OUTSIDE the
-// package's main barrel — see that file's header for why anything importing react-native must
-// stay there. No @Component/@Directive decorators here, so unlike the package's main "." entry
-// this needs no ngc/AOT build step and can stay a plain source reference.
+// Zero-config app entry, outside the package barrel as it reaches `react-native` through
+// `@symbiote-native/components/bootstrap`. It has no decorators, so no ngc/AOT step is needed
 
 import './finalization-registry';
-import { AppRegistry as RNAppRegistry } from 'react-native';
 import type { EnvironmentProviders, Provider, Type } from '@angular/core';
 import {
-  bootstrapHost,
+  startApp,
   type IBootstrapHostOptions,
 } from '@symbiote-native/components/bootstrap';
 import { AppRegistry, setHostRegistrar } from './modules/app-registry';
@@ -20,14 +17,17 @@ export type IBootstrapApplicationOptions = IBootstrapHostOptions & {
   providers?: (Provider | EnvironmentProviders)[];
 };
 
-// Mirrors real Angular's bootstrapApplication(RootComponent, config) idiom.
+// Mirrors real Angular's `bootstrapApplication(RootComponent, config)`
 export function bootstrapApplication(
   AppComponent: Type<unknown>,
   options: IBootstrapApplicationOptions,
 ): void {
-  const { appName, providers = [], ...bootstrapOptions } = options;
+  const { appName, providers = [], ...hostOptions } = options;
   setRootProviders(providers);
-  bootstrapHost(bootstrapOptions);
-  setHostRegistrar(RNAppRegistry);
-  AppRegistry.registerComponent(appName, () => AppComponent);
+  startApp(
+    { AppRegistry, setHostRegistrar },
+    appName,
+    () => AppComponent,
+    hostOptions,
+  );
 }

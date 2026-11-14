@@ -18,6 +18,8 @@
 //             are measured AGAINST, and its value is that it carries zero @symbiote-native deps.
 //             Every parity audit is told to exclude it explicitly.
 //   expo-*    outside the pnpm workspace and outside every CI example list.
+//   web-*     web canaries (Expo CLI). The packed-bundle matrix is native only, so they have no arm
+//             in it, and a web matrix joins once the DOM host exists
 
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -34,6 +36,6 @@ export function canaryExampleNames() {
   return readdirSync(join(REPO_ROOT, 'examples'), { withFileTypes: true })
     .filter(entry => entry.isDirectory())
     .map(entry => entry.name)
-    .filter(name => name !== 'bare-rn' && !name.startsWith('expo-'))
+    .filter(name => name !== 'bare-rn' && !name.startsWith('expo-') && !name.startsWith('web-'))
     .sort();
 }
