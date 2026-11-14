@@ -1,6 +1,7 @@
 // Getting an event to the listeners that want it: the ancestor path, the two-phase bubble, direct
 // delivery, and the single-node call the responder negotiation reads a boolean back from
 
+import { noteContainerLayout } from '../container-tracking';
 import { dlog, isDebug } from '../debug';
 import { ancestorsOf, parentOf } from '../host-access';
 import {
@@ -11,6 +12,8 @@ import {
   type ISymbioteEvent,
   type ISymbioteNode,
 } from '../node';
+
+const LAYOUT_EVENT = 'layout';
 
 // A press is honest only if the touch ends on the node it started on, or a descendant of it. The
 // start node may have been unmounted mid-touch, so the walk runs out and answers false, no throw
@@ -47,25 +50,25 @@ function depthOf(node: ISymbioteNode): number {
 // RN's `getLowestCommonAncestor` over our parent pointers: lift the deeper node to the shallower
 // one's depth, then climb both in lockstep until they meet. Scopes the move re-negotiation
 export function lowestCommonAncestor(
-  a: ISymbioteNode,
-  b: ISymbioteNode,
+  first: ISymbioteNode,
+  second: ISymbioteNode,
 ): ISymbioteNode | undefined {
-  let da = depthOf(a);
-  let db = depthOf(b);
-  let na: ISymbioteNode | undefined = a;
-  let nb: ISymbioteNode | undefined = b;
-  while (na && da > db) {
-    na = parentOf(na);
-    da--;
+  let firstDepth = depthOf(first);
+  let secondDepth = depthOf(second);
+  let firstNode: ISymbioteNode | undefined = first;
+  let secondNode: ISymbioteNode | undefined = second;
+  while (firstNode && firstDepth > secondDepth) {
+    firstNode = parentOf(firstNode);
+    firstDepth--;
   }
-  while (nb && db > da) {
-    nb = parentOf(nb);
-    db--;
+  while (secondNode && secondDepth > firstDepth) {
+    secondNode = parentOf(secondNode);
+    secondDepth--;
   }
-  while (na && nb) {
-    if (na === nb) return na;
-    na = parentOf(na);
-    nb = parentOf(nb);
+  while (firstNode && secondNode) {
+    if (firstNode === secondNode) return firstNode;
+    firstNode = parentOf(firstNode);
+    secondNode = parentOf(secondNode);
   }
   return undefined;
 }
@@ -126,42 +129,37 @@ export function bubble(
   const stopPropagation = (): void => {
     stopped = true;
   };
+  const eventAt = (node: ISymbioteNode): ISymbioteEvent => ({
+    type: listenerName,
+    target,
+    currentTarget: node,
+    nativeEvent,
+    stopPropagation,
+  });
 
   // Built target -> root once, then read in reverse for capture and forward for bubble. Re-walking
   // `parentOf` for the second pass crossed the host boundary per level and was the expensive half
   const captureName = `${listenerName}Capture`;
   const path = pathToRoot(target);
-  for (let i = path.length - 1; i >= 0; i--) {
-    const node = path[i];
+  // Kept as two small steps so the walk below reads as capture, then bubble
+  const captureAt = (node: ISymbioteNode): void => {
     const listener = capturedBy(node, captureName);
-    if (listener) {
-      if (isDebug()) dlog(`event ${listenerName} capture on ${node.component}`);
-      listener({
-        type: listenerName,
-        target,
-        currentTarget: node,
-        nativeEvent,
-        stopPropagation,
-      });
-      if (stopped) return;
-    }
-  }
+    if (!listener) return;
+    if (isDebug()) dlog(`event ${listenerName} capture on ${node.component}`);
+    listener(eventAt(node));
+  };
+  const bubbleAt = (node: ISymbioteNode): void => {
+    const listener = isAnchor(node) ? undefined : listenerFor(node, listenerName);
+    listener?.(eventAt(node));
+  };
 
+  for (let i = path.length - 1; i >= 0; i--) {
+    captureAt(path[i]);
+    if (stopped) return;
+  }
   for (const node of path) {
-    const listener = isAnchor(node)
-      ? undefined
-      : listenerFor(node, listenerName);
-    if (listener) {
-      const event: ISymbioteEvent = {
-        type: listenerName,
-        target,
-        currentTarget: node,
-        nativeEvent,
-        stopPropagation,
-      };
-      listener(event);
-      if (stopped) return;
-    }
+    bubbleAt(node);
+    if (stopped) return;
   }
 }
 
@@ -171,6 +169,7 @@ export function deliverDirect(
   listenerName: string,
   nativeEvent: Record<string, unknown>,
 ): void {
+  if (listenerName === LAYOUT_EVENT) noteContainerLayout(target, nativeEvent);
   const listener = listenerFor(target, listenerName);
   if (!listener) return;
   listener({

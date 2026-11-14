@@ -1,5 +1,15 @@
 # @symbiote-native/react
 
+## 3.4.1
+
+### Patch Changes
+
+- [#104](https://github.com/OneEyed1366/symbiote-native/pull/104) [`9bff70c`](https://github.com/OneEyed1366/symbiote-native/commit/9bff70c94ca9e0a26ae9c236492d592f6e46459d) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `bootstrap` now imports `./register` itself. An app written in intrinsic tags never imports the barrel, so on Android its `ScrollView` mounted without a content view.
+
+- Updated dependencies []:
+  - @symbiote-native/components@3.3.0
+  - @symbiote-native/css-parser@0.6.0
+
 ## 3.4.0
 
 ### Minor Changes

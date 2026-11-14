@@ -13,9 +13,9 @@ import { StyleSheet } from '@symbiote-native/svelte';
 ```
 
 Svelte drives the same engine as React/Vue/Angular/Solid, but through a different
-seam: Svelte has no official custom-renderer API yet (`createRenderer` from
+seam. Svelte has no official custom-renderer API yet (`createRenderer` from
 `svelte/renderer` is still an unmerged proposal), so this adapter patches a
-handful of `globalThis` DOM classes instead — stock compiled Svelte output
+handful of `globalThis` DOM classes instead. Stock compiled Svelte output
 believes it's talking to the real DOM, while every call actually routes into
 `@symbiote-native/engine`'s mutation API. Components are ordinary `.svelte`
 files; nothing about authoring one is adapter-specific beyond the prop/event
@@ -152,9 +152,11 @@ path shares:
 
 `:global(.name)` escapes scoping the same way it does in real Svelte. Svelte's
 own scoping deliberately doesn't reach into a child component's own markup —
-scope a class where it's declared, not where it's used. `@media`/`@keyframes`/
-pseudo-class selectors are dropped with a diagnostic; React Native has no such
-concept. See the [Styling guide](/docs/learn/styling/) for the full compiler
+scope a class where it's declared, not where it's used. `@keyframes` and
+pseudo-class selectors are dropped with a diagnostic, since React Native has no
+such concept. `@media`, `@container` and `var()` are kept and resolved on the
+device, see [Media queries and variables](/docs/learn/media-queries-and-vars/).
+See the [Styling guide](/docs/learn/styling/) for the full compiler
 pipeline shared by every adapter.
 
 ## Runtime modules
@@ -165,7 +167,10 @@ adapters, so app code keeps one import root: `Platform`, `StyleSheet`,
 `Keyboard`, `Vibration`, `ActionSheetIOS`, `BackHandler`, `ToastAndroid`,
 `PermissionsAndroid`, `AccessibilityInfo`, `I18nManager`, `Settings`,
 `LayoutAnimation`, `InteractionManager`, `StatusBar`, `AppState`,
-`findNodeHandle`, and `dlog`/`isDebug` for diagnostic logging.
+`findNodeHandle`, and `dlog`/`isDebug` for diagnostic logging. The CSS runtime
+is there too: `matchMedia`, `setVariable`, `getComputedVariable` and
+`registerProperty`, with the `useRootTag` rune that gives `setVariable` its
+surface, see [Media queries and variables](/docs/learn/media-queries-and-vars/).
 
 Two reactive reads are **runes** instead of hooks/composables — Svelte's own
 term, and this adapter's lifecycle-helper bucket is named `runes/` to match:
@@ -188,11 +193,30 @@ Each returns a **boxed getter** (`{ get current() { ... } }`), not a bare
 declares it, so a raw `$state` returned from a function loses its reactivity
 for the caller; read `.current` the same way you'd unwrap a Vue `Ref.value`.
 
+Two more runes cover the common media features without a query string:
+
+| Export                         | Value                                                                 |
+| ------------------------------ | --------------------------------------------------------------------- |
+| `orientation`                  | `.current` is `'portrait'` or `'landscape'`. A square window is portrait, as in CSS. |
+| `createWidthQuery(bounds)`     | `.current` is `true` while the window width is inside `{ minWidth?, maxWidth? }`. Both bounds are inclusive, in points. |
+
+```svelte
+<script lang="ts">
+  import { orientation, createWidthQuery } from '@symbiote-native/svelte';
+
+  const wide = createWidthQuery({ minWidth: 600 });
+</script>
+
+<text>{orientation.current} · {wide.current ? 'wide' : 'narrow'}</text>
+```
+
+For any other feature (`prefers-reduced-motion`, `aspect-ratio`, `platform`), use `matchMedia`.
+
 On Android, `Keyboard` and `Settings` do nothing until you also install
-[`@symbiote-native/android`](/docs/packages/android/):
+[`@symbiote-native/android`](/docs/packages/android/).
 `keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
-keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
-surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+keyboard-event source is `ReactRootView`'s layout listener. The bridgeless
+surface SymbioteNative mounts never triggers it. `Settings` reads back `null`,
 because RN's `Settings` has no stock Android implementation at all.
 
 ## Animations and gestures
@@ -225,14 +249,14 @@ wrapper component needed. `Animated` (both the JS and native driver) and
 {/if}
 ```
 
-React's `createPortal` (and Vue's `Teleport`) have no Svelte twin at all —
-`createPortal` is react-reconciler's own Fiber-level `HostPortal` primitive
-with no equivalent in a framework with no reconciler, and Svelte has no
-built-in `Teleport`-shaped relocation either — so `createTunnel` is the only
+React's `createPortal` (and Vue's `Teleport`) have no Svelte twin at all.
+`createPortal` is react-reconciler's own Fiber-level `HostPortal` primitive,
+with no equivalent in a framework with no reconciler. Svelte has no built-in
+`Teleport`-shaped relocation either. So `createTunnel` is the only
 cross-surface primitive here, for two independently `mount()`-ed surfaces
 that share no Fabric tree at all. `TunnelIn`/`TunnelOut` take an explicit
 `tunnel` prop rather than `tunnel.In`/`tunnel.Out` member access like
-React/Vue: a `.svelte` file compiles to one fixed, top-level component, so
+React/Vue. A `.svelte` file compiles to one fixed, top-level component, so
 there's no runtime factory to construct a fresh pair per `createTunnel()`
 call the way Vue's `defineComponent` can.
 
@@ -250,10 +274,10 @@ Mirrors React/Vue's `createApp(App).mount(appName)` two-step idiom. The
 lower-level `AppRegistry`/`setHostRegistrar` entry point described in the
 [Core API](/docs/api/core/#app-entry-point-appregistry) is also re-exported
 directly, for app code that wants it. `AppRegistry.setWrapperComponentProvider`
-is re-exported but currently **ignored** on this adapter: Vue composes a
-wrapper via `h(wrapper, ...)` at call time, but a compiled `.svelte` file has
-no equivalent runtime composition of two independently-authored components —
-there's no working wrapper-component example to show here yet.
+is re-exported but currently **ignored** on this adapter. Vue composes a
+wrapper via `h(wrapper, ...)` at call time. A compiled `.svelte` file has
+no equivalent runtime composition of two independently-authored components,
+so there's no working wrapper-component example to show here yet.
 
 ## Error boundaries (`<svelte:boundary>`)
 

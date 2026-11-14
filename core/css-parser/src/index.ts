@@ -10,7 +10,10 @@ export type { IScopedCss, IScopedCssOptions } from './scoped-classes.ts';
 export {
   compileCssFile,
   compileCssModule,
+  conditionsArgument,
   isCssModuleFile,
+  propertiesCall,
+  serializeRules,
 } from './metro-css-module/index.ts';
 export type {
   ICompiledCssFile,

@@ -17,3 +17,29 @@ declare const process: {
 declare const performance: {
   now(): number;
 };
+
+// Installed by RN's `setUpDOM`, and the base of `MediaQueryList`
+declare class Event {
+  constructor(type: string, init?: { bubbles?: boolean; cancelable?: boolean });
+  readonly type: string;
+}
+declare class AbortSignal extends EventTarget {
+  readonly aborted: boolean;
+}
+declare class AbortController {
+  readonly signal: AbortSignal;
+  abort(): void;
+}
+declare class EventTarget {
+  addEventListener(
+    type: string,
+    listener: ((event: Event) => void) | null,
+    options?: { once?: boolean; signal?: AbortSignal } | boolean,
+  ): void;
+  removeEventListener(
+    type: string,
+    listener: ((event: Event) => void) | null,
+    options?: boolean,
+  ): void;
+  dispatchEvent(event: Event): boolean;
+}

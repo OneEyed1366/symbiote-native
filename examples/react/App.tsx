@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { BackHandler } from '@symbiote-native/react';
 import {
   Stack,
   useLinkingIntegration,
@@ -49,6 +50,20 @@ function LinkingRunner({
   config: ILinkingConfig;
 }): null {
   useLinkingIntegration(config, handle);
+  return null;
+}
+
+// Without a handler the Android Back key on the lab screen took the app to the launcher
+// At the root `canGoBack` is false and the system leaves the app as usual
+function BackRunner({ handle }: { handle: INavigatorHandle }): null {
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!handle.canGoBack()) return false;
+      handle.pop();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [handle]);
   return null;
 }
 
@@ -207,7 +222,10 @@ function App() {
         />
       </Stack>
       {stackHandle !== null && (
-        <LinkingRunner handle={stackHandle} config={APP_LINKING_CONFIG} />
+        <>
+          <LinkingRunner handle={stackHandle} config={APP_LINKING_CONFIG} />
+          <BackRunner handle={stackHandle} />
+        </>
       )}
     </>
   );

@@ -10,11 +10,7 @@ const TRACK = { false: TRACK_OFF, true: ACCENT };
   standalone: true,
   imports: [SYMBIOTE_ELEMENTS],
   template: `
-    <pressable
-      testID="angular-counter-card"
-      class="counter-card"
-      (press)="tap.emit()"
-    >
+    <pressable testID="counter-card" class="counter-card" (press)="tap.emit()">
       <text testID="angular-counter-value" class="counter-text"
         >tapped {{ count() }}×</text
       >
@@ -33,27 +29,25 @@ export class CanaryCounter {
   imports: [Slider, SYMBIOTE_ELEMENTS],
   template: `
     <text-input
-      testID="angular-greeting-input"
+      testID="greeting-input"
       [(value)]="name"
       placeholder="type your name…"
       [placeholderTextColor]="inputHint"
       class="text-input"
     ></text-input>
-    <text testID="angular-greeting-output" class="greeting">{{
-      greeting()
-    }}</text>
+    <text testID="greeting-output" class="greeting">{{ greeting() }}</text>
 
     <view testID="angular-switch-row" class="switch-row">
       <text class="switch-label">spinner</text>
       <switch
-        testID="angular-spinner-switch"
+        testID="spinner-switch"
         [(value)]="isSpinning"
         [trackColor]="track"
         thumbColor="#ffffff"
       ></switch>
     </view>
     <activity-indicator
-      testID="angular-spinner-indicator"
+      testID="spinner-indicator"
       [animating]="isSpinning()"
       [color]="accent"
       size="large"

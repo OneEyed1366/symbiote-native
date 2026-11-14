@@ -17,6 +17,7 @@ import type {
   ComponentPublicInstance,
 } from '@vue/runtime-core';
 import { createSymbioteRenderer } from './renderer';
+import { ROOT_TAG_KEY } from './composables/use-root-tag';
 
 // One Vue app per surface, so a surface can be torn down (unmount) or cleanly
 // re-mounted on the same rootTag: the bridgeless host stops and restarts a surface on
@@ -55,25 +56,9 @@ function componentStack(
   return frames.length === 0 ? null : frames.join('');
 }
 
-// The app-level error seam. Without it, an unclaimed error fell through to Vue's own `logError`
-// (runtime-core errorHandling.ts), which does neither useful thing: in a dev bundle it RE-THROWS
-// out of `app.mount()`, so it escapes this function, aborts the AppRegistry runnable and leaves
-// the surface half-brought-up; in a release bundle it console.errors a bare error with no origin
-// and no component context, never touching `global.ErrorUtils`, so nothing reaches the host.
-// Setting a handler suppresses both branches and routes to the engine's shared channel instead —
-// the native redbox on a device, console.error off one.
-//
-// CAUGHT vs UNCAUGHT — the asymmetry is Vue's own, and it costs us no code. `handleError` walks
-// the `onErrorCaptured` chain BEFORE consulting `config.errorHandler`, and a hook returning
-// `false` stops propagation and returns early (runtime-core 3.5 errorHandling.ts), so a boundary
-// that claims the error never reaches this function at all. That is the behaviour we want and
-// the same split the React adapter makes by hand: writing a boundary IS the developer saying
-// "I am handling this", and answering it with a full-screen redbox over the fallback the app
-// just rendered contradicts what the app asked for.
-//
-// So do NOT "fix" this to report from inside an `onErrorCaptured` of our own — that would
-// re-report exactly the errors a boundary claimed. A hook that returns undefined instead of
-// `false` still lands here, and correctly: Vue treats that error as still propagating.
+// Without it Vue's `logError` re-throws from `app.mount()` in dev and hides the error in release
+// A boundary that claims an error never gets here: `onErrorCaptured` runs before `errorHandler`
+// Do not report from `onErrorCaptured`, it would re-report the errors a boundary claimed
 function reportToHost(
   error: unknown,
   instance: ComponentPublicInstance | null,
@@ -123,6 +108,7 @@ export function mount(
   const renderer = createSymbioteRenderer(surface);
   const app = renderer.createApp(rootComponent);
   app.config.errorHandler = reportToHost;
+  app.provide(ROOT_TAG_KEY, rootTag);
   configurator?.(app);
   apps.set(rootTag, app);
 

@@ -1,10 +1,19 @@
 #include "SymbioteTree.h"
 
+#include "SymbioteContainerQuery.h"
+#include "SymbioteDebug.h"
+#include "SymbioteDeferredConsumers.h"
 #include "SymbioteFabricProps.h"
+#include "SymbioteGlobalVariables.h"
+#include "SymbioteRegisteredProperties.h"
+#include "SymbioteSurfaceVariables.h"
+#include "SymbioteVarReaders.h"
 
 #include <folly/dynamic.h>
+#include <folly/json.h>
 #include <jsi/JSIDynamic.h>
 #include <react/featureflags/ReactNativeFeatureFlags.h>
+#include <react/renderer/components/root/RootShadowNode.h>
 #include <react/renderer/core/InstanceHandle.h>
 #include <react/renderer/core/RawProps.h>
 #include <react/renderer/core/ShadowNode.h>
@@ -15,6 +24,7 @@
 #include <react/renderer/telemetry/TransactionTelemetry.h>
 #include <react/renderer/uimanager/UIManager.h>
 #include <react/renderer/uimanager/UIManagerBinding.h>
+#include <react/renderer/uimanager/UIManagerCommitHook.h>
 #include <react/renderer/uimanager/primitives.h>
 
 // `react/renderer/dom/` is NOT among the header folders ReactAndroid copies into its prefab
@@ -34,11 +44,13 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -70,6 +82,10 @@ constexpr int32_t kOpSetTag = 10;
 constexpr int32_t kOpSetOwnedListener = 11;
 constexpr int32_t kOpSetUnderlayShown = 12;
 constexpr int32_t kOpCreateVoid = 13;
+constexpr int32_t kOpSetReleaseMark = 14;
+constexpr int32_t kOpSetGlobalVariable = 15;
+constexpr int32_t kOpSetVariable = 16;
+constexpr int32_t kOpSetContainerVariants = 17;
 
 // The owned listener names any platform rule reads, one bit each — see `Node::pressListeners`.
 // `press` is deliberately bit 0 so the `focusable` question is the cheapest of the two.
@@ -151,6 +167,7 @@ folly::dynamic boundedDynamicFrom(
 }
 
 struct Node;
+void refreshVarScope(Node &node);
 using NodePtr = std::shared_ptr<Node>;
 using ChildSet = std::vector<std::shared_ptr<const react::ShadowNode>>;
 
@@ -191,6 +208,14 @@ struct Node : jsi::NativeState {
   // from `viewName`: a pressable commits as `RCTView` like any other view. Arrives once, at
   // `attachHostBehavior`, and never changes — a tag is what the node IS.
   std::string tagName;
+  // Raised once by `kOpSetReleaseMark`: JS holds per-node state here without a tag (a media
+  // subscription), so the narrowed teardown walk must keep the node
+  bool releaseMarked = false;
+  // What `kOpSetContainerVariants` last shipped: the conditions this node's class reads against a
+  // container, and the style for each way they hold. The commit hook picks one in the first commit
+  std::shared_ptr<const ContainerVariants> containerVariants;
+  // Whether the last payload build read any custom property, so `~Node` knows to unregister
+  bool readsVars = false;
   react::Tag tag = 0;
   folly::dynamic props = folly::dynamic::object();
   std::shared_ptr<const react::InstanceHandle> instanceHandle;
@@ -268,6 +293,11 @@ struct Node : jsi::NativeState {
   // being walked at all, which is the whole reason a commit is cheap.
   bool selfDirty = true;
   bool pathDirty = true;
+  // The custom properties this node's own style declares, empty for nearly every node
+  VarDeclarations varDecls;
+  // This node when it declares any, else the nearest declaring ancestor: a `var()` lookup walks
+  // declaring nodes only, never the whole chain. Kept up by `refreshVarScope`
+  Node *varScope = nullptr;
   // Whether the JS handle carries a `payloadFold`. See `foldFor` for why one probe settles it.
   FoldProbe foldProbe = FoldProbe::unknown;
 
@@ -286,12 +316,14 @@ struct Node : jsi::NativeState {
 
   ~Node() {
     live -= 1;
+    if (readsVars) VarReaders::instance().forget(this);
     for (const NodePtr &child : children) {
       // A HOLE, from a detach nothing has read past yet. The destructor is the one reader that does
       // not compact first: compaction renumbers, and renumbering a vector whose owner is being
       // destroyed buys nothing.
       if (child == nullptr) continue;
       child->parent = nullptr;
+      refreshVarScope(*child);
       // Its parent is gone, so nothing pins its placeholder any more. Dropping the strong edge here
       // is what makes the release CASCADE: a child JS no longer names becomes unreachable from both
       // sides, and the collection that frees it runs this same loop one level down.
@@ -339,9 +371,25 @@ jsi::Value handleOf(jsi::Runtime &runtime, const Node &node) {
   return node.handle->lock(runtime);
 }
 
-/** Pin the placeholder for as long as a parent holds this node. Idempotent, O(1), no recursion:
- * every node is attached to its own parent at some point and is pinned there. */
+// Re-points `varScope` after the parent or the node's own declarations changed
+// A node whose scope did not move leaves its subtree alone, so a bottom-up build stays flat
+void refreshVarScope(Node &node) {
+  Node *scope = !node.varDecls.empty()
+      ? &node
+      : (node.parent != nullptr ? node.parent->varScope : nullptr);
+  if (scope == node.varScope) return;
+  node.varScope = scope;
+  for (const NodePtr &child : node.children) {
+    if (child != nullptr) refreshVarScope(*child);
+  }
+}
+
+/**
+ * Pin the placeholder for as long as a parent holds this node, and re-point its `varScope`
+ * Idempotent, no recursion: every node is attached to its own parent at some point
+ */
 void holdHandle(jsi::Runtime &runtime, Node &node) {
+  refreshVarScope(node);
   if (node.attachedHandle.has_value() || !node.handle.has_value()) return;
   auto live = node.handle->lock(runtime);
   if (live.isObject()) node.attachedHandle.emplace(live.getObject(runtime));
@@ -399,6 +447,255 @@ void markDirty(Node &node) {
   }
 }
 
+// Remembers which custom properties the node's payload read, replacing the previous build's list
+void trackVarReads(Node &node, const std::vector<std::string> &names) {
+  if (names.empty() && !node.readsVars) return;
+  VarReaders::instance().set(&node, names);
+  node.readsVars = !names.empty();
+}
+
+// A changed `:root` value reaches only the nodes that read that name
+void markVarReaders(std::string_view name) {
+  for (void *reader : VarReaders::instance().readersOf(name)) {
+    markDirty(*static_cast<Node *>(reader));
+  }
+}
+
+// A changed surface variable reaches only the nodes of that surface that read the name
+void markSurfaceVarReaders(react::SurfaceId surface, std::string_view name) {
+  for (void *reader : VarReaders::instance().readersOf(name)) {
+    Node &node = *static_cast<Node *>(reader);
+    if (node.committedSurfaceId == surface) markDirty(node);
+  }
+}
+
+std::optional<std::string> declaredIn(const VarDeclarations &declarations, std::string_view name) {
+  for (const auto &[declared, value] : declarations) {
+    if (declared == name) return value;
+  }
+  return std::nullopt;
+}
+
+// Whether the node sits under the app's top node, the surface root being the one element above it
+// Anchors count for nothing
+bool isBelowTopNode(const Node &node) {
+  size_t elements = 0;
+  for (const Node *at = node.parent; at != nullptr; at = at->parent) {
+    if (at->kind != kKindAnchor) elements += 1;
+  }
+  return elements > 1;
+}
+
+// What one declaration of a custom property means to a lookup, a CSS-wide keyword included
+// `revert` and `revert-layer` act as `unset`, since no origin or layer sets the name
+enum class Declared { kValue, kSkip, kInitial, kInherit };
+
+Declared declaredAs(const std::optional<std::string> &text, bool inherits) {
+  if (!text.has_value()) return Declared::kSkip;
+  std::string word(trimmed(*text));
+  std::transform(word.begin(), word.end(), word.begin(),
+                 [](unsigned char at) { return static_cast<char>(std::tolower(at)); });
+  if (word == "initial") return Declared::kInitial;
+  if (word == "inherit") return Declared::kInherit;
+  if (word != "unset" && word != "revert" && word != "revert-layer") return Declared::kValue;
+  return inherits ? Declared::kInherit : Declared::kInitial;
+}
+
+// The nearest element above the node, anchors counting for nothing
+const Node *parentElement(const Node &node) {
+  const Node *at = node.parent;
+  while (at != nullptr && at->kind == kKindAnchor) at = at->parent;
+  return at;
+}
+
+// Starting places besides a declaring node: the surface table, `:root`, and no declaration at all
+const char kSurfaceMark = 1;
+const char kRootMark = 2;
+const char kInitialMark = 3;
+
+enum class VarStart { kNodes, kSurface, kRoot, kInitial };
+
+struct IVarOrigin {
+  VarStart start;
+  const Node *node;
+};
+
+// One name asked on behalf of the reader, whose surface holds the surface table
+struct IVarQuery {
+  const Node &reader;
+  react::SurfaceId surface;
+  std::string_view name;
+};
+
+// What a walk over the node chain found, or nothing settled yet so the tables are asked next
+struct IVarStep {
+  bool isSettled = false;
+  std::optional<VarDeclared> declared;
+};
+
+// A null `from` starts at the reader, any other is a declaring node or one of the marks
+IVarOrigin originOf(const Node &reader, VarScope from) {
+  if (from == nullptr) return {VarStart::kNodes, &reader};
+  if (from == &kSurfaceMark) return {VarStart::kSurface, nullptr};
+  if (from == &kRootMark) return {VarStart::kRoot, nullptr};
+  if (from == &kInitialMark) return {VarStart::kInitial, nullptr};
+  return {VarStart::kNodes, static_cast<const Node *>(from)};
+}
+
+// Where an inheriting name is read again once its value is rejected: above the declaring place
+VarScope scopeAbove(VarScope declaredAt) {
+  if (declaredAt == nullptr || declaredAt == &kInitialMark) return nullptr;
+  if (declaredAt == &kRootMark) return &kInitialMark;
+  if (declaredAt == &kSurfaceMark) return &kRootMark;
+  const Node *parent = parentElement(*static_cast<const Node *>(declaredAt));
+  if (parent == nullptr) return &kSurfaceMark;
+  return parent;
+}
+
+Declared declarationKind(const RegisteredProperty &property, const std::optional<std::string> &declared) {
+  const Declared kind = declaredAs(declared, property.inherits);
+  if (kind != Declared::kValue) return kind;
+  const bool applies = RegisteredProperties::instance().declarationApplies(property, *declared);
+  return applies ? Declared::kValue : Declared::kSkip;
+}
+
+VarDeclared valueOf(const RegisteredProperty &property, std::string text, VarScope at) {
+  return VarDeclared{std::move(text), at, property.inherits ? scopeAbove(at) : nullptr};
+}
+
+std::optional<VarDeclared> initialOf(const RegisteredProperty &property) {
+  if (!property.initialValue.has_value()) return std::nullopt;
+  return VarDeclared{*property.initialValue, nullptr, nullptr};
+}
+
+std::optional<VarDeclared> lookupRegisteredVar(
+    const IVarQuery &query, const RegisteredProperty &property, VarScope from);
+
+// A non-inheriting name sees its own declaration only, and below the top node nothing above it
+IVarStep ownStep(const IVarQuery &query, const RegisteredProperty &property, const Node &node) {
+  std::optional<std::string> own = declaredIn(node.varDecls, query.name);
+  const Declared kind = declarationKind(property, own);
+  if (kind == Declared::kValue) return {true, valueOf(property, *own, &node)};
+  if (kind == Declared::kInitial) return {true, initialOf(property)};
+  if (kind != Declared::kInherit) return {isBelowTopNode(node), initialOf(property)};
+  const Node *parent = parentElement(node);
+  if (parent == nullptr) return {true, initialOf(property)};
+  return {true, lookupRegisteredVar(query, property, parent)};
+}
+
+IVarStep chainStep(const IVarQuery &query, const RegisteredProperty &property, const Node &node) {
+  for (const Node *scope = node.varScope; scope != nullptr;
+       scope = scope->parent != nullptr ? scope->parent->varScope : nullptr) {
+    std::optional<std::string> declared = declaredIn(scope->varDecls, query.name);
+    const Declared kind = declarationKind(property, declared);
+    if (kind == Declared::kValue) return {true, valueOf(property, *declared, scope)};
+    if (kind == Declared::kInitial) return {true, initialOf(property)};
+  }
+  return {};
+}
+
+IVarStep nodesStep(const IVarQuery &query, const RegisteredProperty &property, const Node &node) {
+  if (!property.inherits) {
+    IVarStep own = ownStep(query, property, node);
+    if (own.isSettled) return own;
+  }
+  return chainStep(query, property, node);
+}
+
+// A registered property reads its initial value where nothing valid is declared
+// A non-inheriting one sees its own declaration, and the top node also `:root` as the root does
+std::optional<VarDeclared> lookupRegisteredVar(
+    const IVarQuery &query, const RegisteredProperty &property, VarScope from) {
+  const IVarOrigin origin = originOf(query.reader, from);
+  if (origin.start == VarStart::kInitial) return initialOf(property);
+  if (origin.start == VarStart::kNodes) {
+    IVarStep step = nodesStep(query, property, *origin.node);
+    if (step.isSettled) return step.declared;
+  }
+  if (origin.start != VarStart::kRoot) {
+    std::optional<std::string> onSurface = SurfaceVariables::instance().get(query.surface, query.name);
+    const Declared kind = declarationKind(property, onSurface);
+    if (kind == Declared::kValue) return valueOf(property, *onSurface, &kSurfaceMark);
+    if (kind == Declared::kInitial) return initialOf(property);
+  }
+  std::optional<std::string> onRoot = GlobalVariables::instance().get(query.name);
+  if (declarationKind(property, onRoot) != Declared::kValue) return initialOf(property);
+  return valueOf(property, *onRoot, &kRootMark);
+}
+
+// An unregistered name: `initial` ends the walk with nothing, `inherit` and `unset` go on upward
+std::optional<VarDeclared> lookupPlainVar(const IVarQuery &query, VarScope from) {
+  const IVarOrigin origin = originOf(query.reader, from);
+  if (origin.start == VarStart::kInitial) return std::nullopt;
+  if (origin.start == VarStart::kNodes) {
+    for (const Node *scope = origin.node->varScope; scope != nullptr;
+         scope = scope->parent != nullptr ? scope->parent->varScope : nullptr) {
+      std::optional<std::string> declared = declaredIn(scope->varDecls, query.name);
+      const Declared kind = declaredAs(declared, true);
+      if (kind == Declared::kValue) return VarDeclared{*declared, scope, nullptr};
+      if (kind == Declared::kInitial) return std::nullopt;
+    }
+  }
+  if (origin.start != VarStart::kRoot) {
+    std::optional<std::string> onSurface = SurfaceVariables::instance().get(query.surface, query.name);
+    const Declared kind = declaredAs(onSurface, true);
+    if (kind == Declared::kValue) return VarDeclared{*onSurface, &kSurfaceMark, nullptr};
+    if (kind == Declared::kInitial) return std::nullopt;
+  }
+  std::optional<std::string> onRoot = GlobalVariables::instance().get(query.name);
+  if (declaredAs(onRoot, true) != Declared::kValue) return std::nullopt;
+  return VarDeclared{*onRoot, &kRootMark, nullptr};
+}
+
+// The nearest declaration on the declaring scopes, node included, then the surface, then `:root`
+std::optional<VarDeclared> lookupVar(const IVarQuery &query, VarScope from) {
+  if (!RegisteredProperties::instance().isEmpty()) {
+    const std::shared_ptr<const RegisteredProperty> registered =
+        RegisteredProperties::instance().share(query.name);
+    if (registered != nullptr) return lookupRegisteredVar(query, *registered, from);
+  }
+  return lookupPlainVar(query, from);
+}
+
+// A lookup for one node's payload build that also records every name asked, found or not
+VarLookup recordingLookup(
+    const Node &node,
+    react::SurfaceId surfaceId,
+    std::vector<std::string> &reads) {
+  return [&node, surfaceId, &reads](std::string_view name, VarScope from) {
+    reads.emplace_back(name);
+    return lookupVar(IVarQuery{node, surfaceId, name}, from);
+  };
+}
+
+// A declaration that changed on `scope` reaches its readers at or below it, and only those
+void markVarScope(Node &scope, const VarDeclarations &before) {
+  std::vector<std::string> names;
+  for (const auto &[name, value] : before) names.push_back(name);
+  for (const auto &[name, value] : scope.varDecls) names.push_back(name);
+  for (const std::string &name : names) {
+    if (declaredIn(before, name) == declaredIn(scope.varDecls, name)) continue;
+    for (void *reader : VarReaders::instance().readersOf(name)) {
+      Node *candidate = static_cast<Node *>(reader);
+      for (Node *at = candidate; at != nullptr; at = at->parent) {
+        if (at != &scope) continue;
+        markDirty(*candidate);
+        break;
+      }
+    }
+  }
+}
+
+// Re-reads the node's own declarations after its style changed and wakes the readers they reach
+void refreshDeclarations(Node &node) {
+  VarDeclarations next = declaredStyleVars(node.props);
+  if (next == node.varDecls) return;
+  VarDeclarations before = std::move(node.varDecls);
+  node.varDecls = std::move(next);
+  refreshVarScope(node);
+  markVarScope(node, before);
+}
+
 /**
  * Close the holes a run of detaches left, and renumber what survived.
  *
@@ -436,6 +733,7 @@ void detachFromParent(const NodePtr &child) {
     }
   }
   child->parent = nullptr;
+  refreshVarScope(*child);
   markDirty(*parent);
 }
 
@@ -499,22 +797,9 @@ bool childIndicesAlign(const IOwnerTally &owners, const ChildSet &next) {
 }
 
 /**
- * Whether every replacement leaves the layout alone.
- *
- * THE CONDITION THE TARGETED PATH CANNOT BE CORRECT WITHOUT, and F-51 is the measurement that says
- * so. Replacing in place leaves the standing children owned by the PREVIOUS revision, so the first
- * layout pass that does work on this parent clones every one of them
- * (`yoga::Node::cloneChildrenIfNeeded` → `cloneChildInPlace`) and swaps them in behind us. The child
- * list `adoptLandedChildren` recorded at commit time then names nodes that are no longer there —
- * measured at 999 of 1 000 — and the NEXT commit's `ShadowNode::replaceChild` cannot find the child
- * it was asked to replace. That path ends in `react_native_assert(false && "Child to replace was not
- * found.")`, which is nothing at all in a Release build: the function returns having replaced
- * nothing and the mutation is silently dropped.
- *
- * A layout pass only does that work when the parent is dirty, and a parent goes dirty because a
- * child did. So the targeted path is safe exactly when no replacement moved layout — which is also
- * the only case where F-45 says it saves any clones. The two conditions coinciding is the reason to
- * trust the rule rather than a coincidence to note.
+ * Whether every replacement leaves the layout alone
+ * A layout pass clones the standing children behind us, then `replaceChild` cannot find its child
+ * The targeted path needs layout-clean replacements, or the mutation is silently dropped (F-51)
  */
 bool replacementsAreLayoutClean(const ChildSet &previous, const ChildSet &next) {
   for (size_t at = 0; at < next.size(); at += 1) {
@@ -543,22 +828,9 @@ bool replacementsAreFresh(
 }
 
 /**
- * What this parent's children ARE right now, as opposed to what we recorded them to be.
- *
- * THE LAYOUT PASS MUTATES A STANDING PARENT IN PLACE, and that is the fact this whole path was
- * disabled over. `YogaLayoutableShadowNode::cloneChildInPlace` clones a child and calls
- * `replaceChild(childNode, clonedChildNode, layoutableChildIndex)` on the parent it is already
- * holding — so the PARENT's own pointer never changes while its children vector does. That is what
- * defeats `adoptCommitted`'s `node.committed == landed` stop: the pointer is identical, the subtree
- * is not, and Fabric's "an identical child pointer means an identical subtree" invariant does not
- * hold across a layout pass. Our record then names a node that is no longer in the list, and
- * `ShadowNode::replaceChild` ends in `react_native_assert(false && "Child to replace was not
- * found.")` — silent in Release, where the mutation is simply dropped.
- *
- * The rule the disabling comment asked for is therefore not a predicate over which nodes Fabric may
- * substitute — it is to stop needing one. A record can go stale; the parent cannot be wrong about
- * its own children. Note `cloneChildInPlace` substitutes AT THE SAME INDEX, which is what makes
- * position the stable key both sides can agree on.
+ * What this parent's children ARE right now, as opposed to what we recorded
+ * The layout pass clones children in place (`cloneChildInPlace`), so a record can name a gone node
+ * Position is the stable key, since the substitution lands at the same index
  */
 const ChildSet &liveChildrenOf(const Node &node) {
   static const ChildSet kNone;
@@ -574,12 +846,8 @@ size_t targetedReplaces_ = 0;
 struct IWalkCost {
   double walkNs = 0;
   double propsNs = 0;
-  // `propsNs` is two unrelated things billed together — assembling the payload, and asking the node
-  // whether it even has a `payloadFold`. The second is a JSI property read plus, when the answer is
-  // yes, a `jsi::Function` allocation and a round trip through JS with the whole bag converted both
-  // ways. `foldProbe` caches only the NO, so a folding node pays the round trip every commit. Split
-  // out because two adapters building the identical tree disagreed 4x on `propsNs` and the sum
-  // cannot say which half moved.
+  // `propsNs` bills assembly and the `payloadFold` lookup together, so the lookup is split out
+  // `foldProbe` caches only the NO, so a folding node pays the JS round trip every commit
   double foldLookupNs = 0;
   size_t foldsFound = 0;
   // Inside a fold that runs: converting the bag out, the JS call, converting the result back.
@@ -1010,6 +1278,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
     // The parent's props, for the rules that are DERIVED from the node above (ScrollView's content
     // view takes `collapsableChildren` from the scroller). A pointer hop, because the tree is here —
     // the same question cost a JS closure and a crossing while the fold lived on the other side.
+    std::vector<std::string> varReads;
     folly::dynamic payload = fabricProps(
         node.viewName,
         node.tagName,
@@ -1018,7 +1287,9 @@ std::shared_ptr<const react::ShadowNode> materialize(
         ownerOf(node),
         selfOf(node, hasTextAncestor),
         IAncestorLookup{&ancestorPropsOf, &node},
-        firstChildOf(node));
+        firstChildOf(node),
+        recordingLookup(node, surfaceId, varReads));
+    trackVarReads(node, varReads);
     walkCost_.propsNs += nanosSince(startedAt);
     // The payload is needed TWICE and only one of those needs a copy. `RawProps` takes its
     // `folly::dynamic` BY VALUE (`RawProps.h:65`) and consumes it, so Fabric's half is a copy no
@@ -1064,6 +1335,7 @@ std::shared_ptr<const react::ShadowNode> materialize(
       if (fold) walkCost_.foldsFound += 1;
 
       startedAt = ISteadyClock::now();
+      std::vector<std::string> varReads;
       next = fabricProps(
           node.viewName,
           node.tagName,
@@ -1072,7 +1344,9 @@ std::shared_ptr<const react::ShadowNode> materialize(
           ownerOf(node),
           selfOf(node, hasTextAncestor),
           IAncestorLookup{&ancestorPropsOf, &node},
-          firstChildOf(node));
+          firstChildOf(node),
+          recordingLookup(node, surfaceId, varReads));
+      trackVarReads(node, varReads);
       walkCost_.propsNs += nanosSince(startedAt);
       startedAt = ISteadyClock::now();
       payload = diffProps(node.committedProps, next);
@@ -1149,6 +1423,315 @@ double millisBetween(
   return std::chrono::duration<double, std::milli>(ended - started).count();
 }
 
+// Container first show
+
+// Consumers whose variants arrived and that no commit hook pass has styled yet
+std::vector<std::weak_ptr<Node>> pendingConsumers_;
+// What each surface's last hook pass left for a later commit, which `applyOps` reports to JS
+DeferredConsumers<Node> deferredConsumers_;
+// Whether a commit on the surface is owed a follow-up by its own deferred consumers
+bool hasDeferredConsumers(react::SurfaceId surfaceId) {
+  return deferredConsumers_.hasAny(
+      surfaceId, [](const Node &node) { return node.containerVariants != nullptr; });
+}
+// One parse per envelope text, shared by every node of a class
+std::unordered_map<std::string, std::shared_ptr<const ContainerVariants>> variantsByEnvelope_;
+
+std::shared_ptr<const ContainerVariants> variantsOf(const std::string &envelope) {
+  const auto known = variantsByEnvelope_.find(envelope);
+  if (known != variantsByEnvelope_.end()) return known->second;
+  std::optional<ContainerVariants> parsed = parseContainerVariants(envelope);
+  std::shared_ptr<const ContainerVariants> shared = parsed.has_value()
+      ? std::make_shared<const ContainerVariants>(std::move(*parsed))
+      : nullptr;
+  variantsByEnvelope_.emplace(envelope, shared);
+  return shared;
+}
+
+// The last value `key` takes in a style slot, which is an object or an array of slots
+const folly::dynamic *styleValue(const folly::dynamic &style, const char *key) {
+  if (style.isObject()) return style.get_ptr(key);
+  if (!style.isArray()) return nullptr;
+  const folly::dynamic *found = nullptr;
+  for (const folly::dynamic &slot : style) {
+    if (const folly::dynamic *value = styleValue(slot, key)) found = value;
+  }
+  return found;
+}
+
+// The words of a `container-name`, without the keyword `none`
+std::vector<std::string> containerNamesIn(const folly::dynamic *declared) {
+  std::vector<std::string> names;
+  if (declared == nullptr || !declared->isString()) return names;
+  const std::string &text = declared->getString();
+  const auto isSpace = [&](size_t at) { return std::isspace(static_cast<unsigned char>(text[at])) != 0; };
+  size_t at = 0;
+  while (at < text.size()) {
+    while (at < text.size() && isSpace(at)) at += 1;
+    const size_t start = at;
+    while (at < text.size() && !isSpace(at)) at += 1;
+    if (at > start && text.compare(start, at - start, "none") != 0) {
+      names.emplace_back(text, start, at - start);
+    }
+  }
+  return names;
+}
+
+struct ContainerDeclaration {
+  std::vector<std::string> names;
+  bool isWidthOpen = false;
+  bool isHeightOpen = false;
+};
+
+bool isFixedLength(const folly::dynamic *value) {
+  if (value == nullptr || value->isNull()) return false;
+  return !(value->isString() && value->getString() == "auto");
+}
+
+// An axis is fixed by its own length, a flex or an aspect ratio, never by what the node holds
+// Only `size` contains the height, so an `inline-size` container is asked for its width alone
+void markOpenAxes(const folly::dynamic &style, bool containsHeight, ContainerDeclaration &declaration) {
+  // Set before the early return, т.к. a flex or aspect ratio fixes the sizes but contains no height
+  declaration.isHeightOpen = !containsHeight;
+  for (const char *key : {"flex", "flexGrow", "flexBasis", "aspectRatio"}) {
+    if (isFixedLength(styleValue(style, key))) return;
+  }
+  declaration.isWidthOpen = !isFixedLength(styleValue(style, "width"));
+  declaration.isHeightOpen = !containsHeight || !isFixedLength(styleValue(style, "height"));
+}
+
+// `nullopt` for a node that makes no container, else its names and the axes it leaves open
+std::optional<ContainerDeclaration> containerDeclarationOf(const Node &node) {
+  const folly::dynamic *style = node.props.get_ptr("style");
+  if (style == nullptr) return std::nullopt;
+  const folly::dynamic *type = styleValue(*style, "containerType");
+  if (type == nullptr || !type->isString()) return std::nullopt;
+  if (type->getString() != "size" && type->getString() != "inline-size") return std::nullopt;
+  ContainerDeclaration declaration;
+  declaration.names = containerNamesIn(styleValue(*style, "containerName"));
+  markOpenAxes(*style, type->getString() == "size", declaration);
+  return declaration;
+}
+
+// The path from `root` to the node, empty when it is not committed or not in that tree
+react::ShadowNode::AncestorList ancestorsIn(const Node &node, const react::RootShadowNode &root) {
+  if (node.committed == nullptr) return {};
+  return node.committed->getFamily().getAncestors(root);
+}
+
+// The frame size `root` laid the node out at, `nullopt` when the node is not in that tree
+std::optional<ContainerSize> laidOutSize(const Node &node, const react::RootShadowNode &root) {
+  const react::ShadowNode::AncestorList ancestors = ancestorsIn(node, root);
+  if (ancestors.empty()) return std::nullopt;
+  const auto &[parent, index] = ancestors.back();
+  const auto *layoutable = dynamic_cast<const react::LayoutableShadowNode *>(
+      parent.get().getChildren().at(static_cast<size_t>(index)).get());
+  if (layoutable == nullptr) {
+    SYMBIOTE_DLOG(std::string("container has no layout: ") + node.committed->getComponentName());
+    return std::nullopt;
+  }
+  const react::Size size = layoutable->getLayoutMetrics().frame.size;
+  return ContainerSize{size.width, size.height};
+}
+
+// The nearest container above the consumer that carries the asked name, as the JS side finds it
+ContainerLookup containerLookupFor(const Node &consumer, const react::RootShadowNode &root) {
+  return [&consumer, &root](const std::optional<std::string> &name) -> std::optional<ContainerSize> {
+    for (const Node *above = consumer.parent; above != nullptr; above = above->parent) {
+      const std::optional<ContainerDeclaration> declared = containerDeclarationOf(*above);
+      if (!declared.has_value()) continue;
+      const std::vector<std::string> &names = declared->names;
+      const bool isNamed = !name.has_value() || std::find(names.begin(), names.end(), *name) != names.end();
+      if (!isNamed) continue;
+      std::optional<ContainerSize> size = laidOutSize(*above, root);
+      if (size.has_value()) {
+        size->isWidthOpen = declared->isWidthOpen;
+        size->isHeightOpen = declared->isHeightOpen;
+      }
+      SYMBIOTE_DLOG(
+          std::string("container ") + above->viewName +
+          (size.has_value()
+               ? " width=" + std::to_string(size->width) + " height=" + std::to_string(size->height) +
+                   (size->isWidthOpen ? " widthOpen" : "") + (size->isHeightOpen ? " heightOpen" : "")
+               : std::string(" no size")));
+      return size;
+    }
+    return std::nullopt;
+  };
+}
+
+// Slot 0 of `style` is the class style, which is what a variant replaces
+void applyVariantStyle(Node &node, const folly::dynamic &variant) {
+  folly::dynamic *style = node.props.get_ptr("style");
+  if (style != nullptr && style->isArray() && !style->empty()) {
+    (*style)[0] = variant;
+    return;
+  }
+  node.props["style"] = style == nullptr ? folly::dynamic::array(variant)
+                                         : folly::dynamic::array(variant, *style);
+}
+
+// The props `fabricProps` builds for the node as it stands, the same call a first create makes
+folly::dynamic payloadOf(jsi::Runtime &runtime, Node &node, react::SurfaceId surfaceId) {
+  IPayloadFold fold = foldFor(runtime, node);
+  std::vector<std::string> varReads;
+  folly::dynamic payload = fabricProps(
+      node.viewName,
+      node.tagName,
+      node.props,
+      fold,
+      ownerOf(node),
+      selfOf(node, node.committedTextAncestor),
+      IAncestorLookup{&ancestorPropsOf, &node},
+      firstChildOf(node),
+      recordingLookup(node, surfaceId, varReads));
+  trackVarReads(node, varReads);
+  return payload;
+}
+
+struct ConsumerChange {
+  NodePtr node;
+  folly::dynamic payload;
+};
+
+// Styles consumers by the size of their container inside the commit, after a first layout pass
+// The size containers have is fixed by their own style, so one pass settles them without a cycle
+class ContainerCommitHook : public react::UIManagerCommitHook {
+ public:
+  void commitHookWasRegistered(const react::UIManager &) noexcept override {}
+  void commitHookWasUnregistered(const react::UIManager &) noexcept override {}
+
+  react::RootShadowNode::Unshared shadowTreeWillCommit(
+      const react::ShadowTree &shadowTree,
+      const react::RootShadowNode::Shared &oldRoot,
+      const react::RootShadowNode::Unshared &newRoot,
+      const react::ShadowTreeCommitOptions &) noexcept override {
+    if (runtime_ == nullptr || shadowTree.getSurfaceId() != surfaceId_) return newRoot;
+    SYMBIOTE_DLOG(std::string("commit hook, pending: ") + std::to_string(pendingConsumers_.size()));
+    try {
+      return styleConsumers(newRoot, oldRoot);
+    } catch (...) {
+      return newRoot;
+    }
+  }
+
+  void arm(jsi::Runtime &runtime, react::UIManager &uiManager, react::SurfaceId surfaceId) {
+    runtime_ = &runtime;
+    uiManager_ = &uiManager;
+    surfaceId_ = surfaceId;
+  }
+
+  void disarm() { runtime_ = nullptr; }
+
+ private:
+  // What the node must now send, `nullopt` when its container sizes ask for the plain style
+  std::optional<ConsumerChange> restyle(const NodePtr &node, const react::RootShadowNode &root) {
+    const ContainerVariants &variants = *node->containerVariants;
+    const uint32_t mask = holdingMask(variants, containerLookupFor(*node, root));
+    const std::optional<std::string> styleJson = styleJsonForMask(variants, mask);
+    SYMBIOTE_DLOG(
+        std::string("restyle ") + node->viewName + " mask=" + std::to_string(mask) +
+        (styleJson.has_value() ? " variant" : " plain"));
+    if (!styleJson.has_value()) return std::nullopt;
+    applyVariantStyle(*node, folly::parseJson(*styleJson));
+    folly::dynamic next = payloadOf(*runtime_, *node, surfaceId_);
+    folly::dynamic payload = diffProps(node->committedProps, next);
+    node->committedProps = std::move(next);
+    SYMBIOTE_DLOG(std::string("restyle diff ") + folly::toJson(payload));
+    if (payload.empty()) return std::nullopt;
+    return ConsumerChange{node, std::move(payload)};
+  }
+
+  react::RootShadowNode::Unshared withPayload(
+      const react::RootShadowNode::Unshared &root,
+      const ConsumerChange &change) {
+    const auto cloned = root->cloneTree(
+        change.node->committed->getFamily(), [&](const react::ShadowNode &standing) {
+          return uiManager_->cloneNode(
+              standing,
+              react::ShadowNodeFragment::childrenPlaceholder(),
+              react::RawProps(change.payload));
+        });
+    SYMBIOTE_DLOG(std::string("restyle clone ") + (cloned == nullptr ? "lost" : "kept"));
+    return cloned == nullptr ? root : std::static_pointer_cast<react::RootShadowNode>(cloned);
+  }
+
+  react::RootShadowNode::Unshared styleConsumers(
+      const react::RootShadowNode::Unshared &newRoot,
+      [[maybe_unused]] const react::RootShadowNode::Shared &oldRoot) {
+    newRoot->layoutIfNeeded();
+    std::vector<ConsumerChange> changes;
+    std::vector<std::weak_ptr<Node>> waiting;
+    std::vector<std::weak_ptr<Node>> deferred;
+    for (const std::weak_ptr<Node> &entry : pendingConsumers_) {
+      const NodePtr node = entry.lock();
+      if (node == nullptr || node->containerVariants == nullptr) continue;
+      // It reads its container's size, so a virtual text with no layout of its own is ready
+      if (ancestorsIn(*node, *newRoot).empty()) {
+        waiting.push_back(entry);
+        continue;
+      }
+#if defined(__ANDROID__)
+      // Android allocates a view before the commit that inserts it and never sends the props set
+      // in that commit, so a view new to this commit is styled by the next one
+      const bool isNewView = oldRoot != nullptr && ancestorsIn(*node, *oldRoot).empty() &&
+          node->committed->getTraits().check(react::ShadowNodeTraits::Trait::FormsView);
+      if (isNewView) {
+        waiting.push_back(entry);
+        deferred.push_back(entry);
+        continue;
+      }
+#endif
+      if (std::optional<ConsumerChange> change = restyle(node, *newRoot)) {
+        changes.push_back(std::move(*change));
+      }
+    }
+    pendingConsumers_ = std::move(waiting);
+    deferredConsumers_.replace(surfaceId_, std::move(deferred));
+    SYMBIOTE_DLOG(std::string("consumers still waiting: ") + std::to_string(pendingConsumers_.size()));
+    react::RootShadowNode::Unshared root = newRoot;
+    for (const ConsumerChange &change : changes) root = withPayload(root, change);
+    return root;
+  }
+
+  jsi::Runtime *runtime_ = nullptr;
+  react::UIManager *uiManager_ = nullptr;
+  react::SurfaceId surfaceId_ = 0;
+};
+
+// One hook per runtime, never freed: the UIManager keeps it by reference for as long as it lives
+// The marker on the global tells a fresh runtime at a reused address from the one hooked already
+ContainerCommitHook &hookFor(jsi::Runtime &runtime, react::UIManager &uiManager) {
+  static std::unordered_map<const jsi::Runtime *, ContainerCommitHook *> hooks;
+  constexpr const char *kMarker = "__symbioteContainerHook";
+  jsi::Object global = runtime.global();
+  const auto known = hooks.find(&runtime);
+  if (known != hooks.end() && global.hasProperty(runtime, kMarker)) return *known->second;
+  auto *hook = new ContainerCommitHook();
+  uiManager.registerCommitHook(*hook);
+  global.setProperty(runtime, kMarker, true);
+  hooks[&runtime] = hook;
+  return *hook;
+}
+
+// Arms the hook for the one commit that follows, when a consumer is waiting to be styled
+class ContainerHookScope {
+ public:
+  ContainerHookScope(jsi::Runtime &runtime, react::UIManager &uiManager, react::SurfaceId surfaceId) {
+    if (pendingConsumers_.empty()) return;
+    hook_ = &hookFor(runtime, uiManager);
+    hook_->arm(runtime, uiManager, surfaceId);
+  }
+  ~ContainerHookScope() {
+    if (hook_ != nullptr) hook_->disarm();
+  }
+  ContainerHookScope(const ContainerHookScope &) = delete;
+  ContainerHookScope &operator=(const ContainerHookScope &) = delete;
+
+ private:
+  ContainerCommitHook *hook_ = nullptr;
+};
+
 } // namespace
 
 jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
@@ -1160,6 +1743,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
 
   const auto applyStartedAt = ISteadyClock::now();
   walkCost_.applyCalls += 1;
+  // Returned to JS, which commits again once the views this commit left for the next are mounted
+  bool isFollowUpWanted = false;
   auto &uiManager = uiManagerFor(runtime, "applyOps");
 
   size_t opsLength = 0;
@@ -1399,6 +1984,10 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
           // A COPY and not a move: the entry is shared by every node the same object was handed to
           node->props[key] = value;
         }
+        // Only a style JS flagged, or one that held declarations before, can change them
+        if (key == "style" && (ops[at + 4] != 0 || !node->varDecls.empty())) {
+          refreshDeclarations(*node);
+        }
         markDirty(*node);
         walkCost_.setPropNs += nanosSince(setPropStartedAt);
         walkCost_.setProps += 1;
@@ -1419,6 +2008,45 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
       case kOpSetTag: {
         const auto &node = nodeAt(ops[at + 1]);
         node->tagName = stringAt(ops[at + 2]);
+        break;
+      }
+      // No `markDirty` either: the mark changes no payload, only which nodes a teardown visits
+      case kOpSetReleaseMark: {
+        nodeAt(ops[at + 1])->releaseMarked = true;
+        break;
+      }
+      // The `:root` table belongs to no node, so only the readers of a changed name are dirtied
+      case kOpSetGlobalVariable: {
+        const auto &name = stringAt(ops[at + 1]);
+        const std::optional<std::string> before = GlobalVariables::instance().get(name);
+        if (ops[at + 2] == kNoValue) {
+          GlobalVariables::instance().erase(name);
+        } else {
+          GlobalVariables::instance().set(name, stringAt(ops[at + 2]));
+        }
+        if (before != GlobalVariables::instance().get(name)) markVarReaders(name);
+        break;
+      }
+      // Same shape as the `:root` case, for one surface: only its own readers are dirtied
+      case kOpSetVariable: {
+        const auto surface = static_cast<react::SurfaceId>(ops[at + 1]);
+        const auto &name = stringAt(ops[at + 2]);
+        auto &table = SurfaceVariables::instance();
+        const std::optional<std::string> before = table.get(surface, name);
+        if (ops[at + 3] == kNoValue) {
+          table.erase(surface, name);
+        } else {
+          table.set(surface, name, stringAt(ops[at + 3]));
+        }
+        if (before != table.get(surface, name)) markSurfaceVarReaders(surface, name);
+        break;
+      }
+      // No `markDirty`: the variants change no payload, the commit hook styles the node from them
+      case kOpSetContainerVariants: {
+        const auto &node = nodeAt(ops[at + 1]);
+        node->containerVariants =
+            ops[at + 2] == kNoValue ? nullptr : variantsOf(stringAt(ops[at + 2]));
+        if (node->containerVariants != nullptr) pendingConsumers_.push_back(node);
         break;
       }
       // `markDirty`, unlike `kOpSetTag`, т.к. a listener can flip at any point in a screen's life
@@ -1482,14 +2110,15 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         walkCost_.walkNs += nanosSince(walkStartedAt);
         // SKIPPED when the root child set comes back identical, which is what makes the JS side's
         // commit fan-out free. See the skill, "kOpCommit"
-        if (surface->hasCommittedRenderable &&
+        if (!hasDeferredConsumers(surfaceId) && surface->hasCommittedRenderable &&
             sameNodes(surface->committedRenderable, *childSet)) {
           break;
         }
         surface->committedRenderable = *childSet;
         surface->hasCommittedRenderable = true;
         // `completeSurface` runs `ShadowTree::commit` with a lambda that REPLACES the root's
-        // children, so this needs neither a commit hook nor a retained pending root
+        // children, so a retained pending root is not needed. The hook is only for container styles
+        const ContainerHookScope hookScope(runtime, uiManager, surfaceId);
         uiManager.completeSurface(
             surfaceId,
             childSet,
@@ -1508,6 +2137,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
                 adoptCommitted(*rootOwners.nodes[index], landedRoot[index]);
               }
             });
+        isFollowUpWanted = hasDeferredConsumers(surfaceId);
         break;
       }
       default:
@@ -1516,7 +2146,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
   }
 
   walkCost_.applyNs += nanosSince(applyStartedAt);
-  return jsi::Value::undefined();
+  return jsi::Value(isFollowUpWanted);
 }
 
 jsi::Value Tree::getProp(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
@@ -1687,7 +2317,7 @@ bool collectTeardownSubtree(
   if (handle.isUndefined()) return false;
   const size_t reserved = into.size();
   into.push_back(std::move(handle));
-  bool isWanted = isRoot || !node->tagName.empty();
+  bool isWanted = isRoot || !node->tagName.empty() || node->releaseMarked;
   compactChildren(*node);
   for (const auto &child : node->children) {
     if (collectTeardownSubtree(runtime, child, into, false)) isWanted = true;
@@ -2053,6 +2683,74 @@ jsi::Value Tree::measureLayout(
 }
 
 #endif // SYMBIOTE_HAS_DOM_MEASURE
+
+jsi::Value Tree::readGlobalVariable(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 1 || !arguments[0].isString()) {
+    throw jsi::JSError(runtime, "symbiote engine: expected readGlobalVariable(name)");
+  }
+  const auto value = GlobalVariables::instance().get(arguments[0].asString(runtime).utf8(runtime));
+  if (!value.has_value()) {
+    return jsi::Value::undefined();
+  }
+  return jsi::String::createFromUtf8(runtime, *value);
+}
+
+jsi::Value Tree::readVariable(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 2 || !arguments[1].isString()) {
+    throw jsi::JSError(runtime, "symbiote engine: expected readVariable(handle, name)");
+  }
+  const auto node = nodeFrom(runtime, arguments[0].asObject(runtime), "readVariable");
+  // The computed value, as a `var()` on the node would read it: references substituted, typed
+  VarResolver resolver = registryResolver([&node](std::string_view name, VarScope from) {
+    return lookupVar(IVarQuery{*node, node->committedSurfaceId, name}, from);
+  });
+  const auto value = resolver.computed(arguments[1].asString(runtime).utf8(runtime));
+  if (!value.has_value()) {
+    return jsi::Value::undefined();
+  }
+  return jsi::String::createFromUtf8(runtime, *value);
+}
+
+jsi::Value Tree::registerProperty(
+    jsi::Runtime &runtime,
+    const jsi::Value *arguments,
+    size_t count) {
+  if (count < 4 || !arguments[0].isString() || !arguments[1].isString() || !arguments[2].isBool()) {
+    throw jsi::JSError(
+        runtime, "symbiote engine: expected registerProperty(name, syntax, inherits, initialValue)");
+  }
+  const std::string name = arguments[0].asString(runtime).utf8(runtime);
+  std::optional<std::string> initialValue;
+  if (arguments[3].isString()) initialValue = arguments[3].asString(runtime).utf8(runtime);
+  RegisteredProperties::instance().setColorParser(parseColorToken);
+  const RegisterOutcome outcome = RegisteredProperties::instance().add(
+      name, arguments[1].asString(runtime).utf8(runtime), arguments[2].getBool(), initialValue);
+  if (outcome == RegisterOutcome::kRegistered) markVarReaders(name);
+  return jsi::Value(static_cast<int>(outcome));
+}
+
+jsi::Value Tree::unregisterProperty(
+    jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
+  if (count < 1 || !arguments[0].isString()) {
+    throw jsi::JSError(runtime, "symbiote engine: expected unregisterProperty(name)");
+  }
+  const std::string name = arguments[0].asString(runtime).utf8(runtime);
+  const bool wasRegistered = RegisteredProperties::instance().remove(name);
+  if (wasRegistered) markVarReaders(name);
+  return jsi::Value(wasRegistered);
+}
+
+jsi::Value Tree::clearRegisteredProperties(
+    jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
+  RegisteredProperties::instance().clear();
+  return jsi::Value::undefined();
+}
 
 jsi::Value Tree::readSurfaceTelemetry(
     jsi::Runtime &runtime,

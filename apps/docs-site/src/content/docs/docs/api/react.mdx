@@ -80,13 +80,15 @@ Some modules are pure engine utilities (`Platform`, `StyleSheet`, `PixelRatio`,
 `I18nManager`, `Settings`, `LayoutAnimation`, `InteractionManager`,
 `StatusBar`) that are shared or thinly adapted depending on lifecycle needs.
 `useWindowDimensions`/`useColorScheme` hooks and `findNodeHandle` are also
-re-exported.
+re-exported. So are `matchMedia`, `setVariable`, `getComputedVariable` and
+`registerProperty`, and `RootTagContext` gives `setVariable` its surface; see
+[Media queries and variables](/docs/learn/media-queries-and-vars/).
 
 On Android, `Keyboard` and `Settings` do nothing until you also install
-[`@symbiote-native/android`](/docs/packages/android/):
+[`@symbiote-native/android`](/docs/packages/android/).
 `keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
-keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
-surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+keyboard-event source is `ReactRootView`'s layout listener. The bridgeless
+surface SymbioteNative mounts never triggers it. `Settings` reads back `null`,
 because RN's `Settings` has no stock Android implementation at all. That package
 supplies both native modules (`KeyboardObserver`, `SettingsManager`), is picked
 up by Gradle autolinking, and exports nothing from JS — installing it is the

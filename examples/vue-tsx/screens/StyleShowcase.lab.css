@@ -1,0 +1,169 @@
+/* The device lab: every probe paints a solid colour that no other rule of the app uses
+   so the e2e test can count its pixels in an element screenshot
+   Lengths in the conditions are rem, which the compiler turns into the same pixels on any base */
+
+:root {
+  --lab-accent: #8338ec;
+}
+
+.lab-readout {
+  color: #e2e8f0;
+  font-size: 0.75rem;
+}
+.lab-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* ---- @media: rose in a narrow window, teal from 600 wide ---------------------------------- */
+.lab-media-swatch {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 6px;
+  background-color: #e63946;
+}
+@media (min-width: 37.5rem) {
+  .lab-media-swatch {
+    background-color: #2a9d8f;
+  }
+}
+
+/* ---- @container: a fixed-size box that the button widens past 240, over a phone-wide screen */
+.lab-container {
+  container-type: size;
+  height: 7rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-width: 1px;
+  border-color: #41506a;
+}
+.lab-consumer-swatch {
+  width: 3rem;
+  height: 3rem;
+  background-color: #f4a261;
+}
+@container (min-width: 15rem) {
+  .lab-consumer-swatch {
+    background-color: #264653;
+  }
+}
+/* A text inside a text commits as virtual text, which has no layout of its own */
+.lab-nested-outer {
+  align-self: flex-start;
+}
+.lab-nested-inner {
+  color: #e76f51;
+  font-size: 3rem;
+  font-weight: 900;
+}
+@container (min-width: 15rem) {
+  .lab-nested-inner {
+    color: #6a4c93;
+  }
+}
+
+/* A box that is wide from its first frame, so the style is settled by the first commit
+   Its own colours, so a screenshot that also holds the box above cannot count for either */
+.lab-container-first {
+  container-type: size;
+  width: 20rem;
+  height: 7rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-width: 1px;
+  border-color: #41506a;
+}
+.lab-first-swatch {
+  width: 3rem;
+  height: 3rem;
+  background-color: #ff006e;
+}
+@container (min-width: 15rem) {
+  .lab-first-swatch {
+    background-color: #3a86ff;
+  }
+}
+.lab-first-nested-inner {
+  color: #fb5607;
+  font-size: 3rem;
+  font-weight: 900;
+}
+@container (min-width: 15rem) {
+  .lab-first-nested-inner {
+    color: #06d6a0;
+  }
+}
+
+/* ---- var(): the :root token above, then the value a button writes ------------------------ */
+.lab-var-swatch {
+  width: 3rem;
+  height: 3rem;
+  background-color: var(--lab-accent);
+}
+
+/* ---- var() precedence: a class that declares the token beats the surface, which beats :root */
+:root {
+  --lab-prec: #00b4d8;
+}
+.lab-prec-node {
+  --lab-prec: #9ef01a;
+}
+.lab-prec-swatch {
+  width: 3rem;
+  height: 3rem;
+  background-color: var(--lab-prec);
+}
+
+/* ---- @container on one axis, and a box that its own query never styles ------------------- */
+.lab-axis-box {
+  container-type: inline-size;
+  width: 20rem;
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  background-color: #6d597a;
+}
+@container (min-width: 15rem) {
+  .lab-axis-box {
+    background-color: #ffd60a;
+  }
+}
+.lab-axis-width {
+  width: 3rem;
+  height: 3rem;
+  background-color: #c9184a;
+}
+@container (min-width: 15rem) {
+  .lab-axis-width {
+    background-color: #4361ee;
+  }
+}
+.lab-axis-height {
+  width: 3rem;
+  height: 3rem;
+  background-color: #fcbf49;
+}
+@container (min-height: 1px) {
+  .lab-axis-height {
+    background-color: #2ec4b6;
+  }
+}
+
+/* ---- prefers-color-scheme: light by default, indigo on a dark device ---------------------- */
+.lab-scheme-swatch {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 6px;
+  background-color: #ff9f1c;
+}
+@media (prefers-color-scheme: dark) {
+  .lab-scheme-swatch {
+    background-color: #5e60ce;
+  }
+}

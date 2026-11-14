@@ -64,22 +64,26 @@ wired by hand; `examples/angular` is the reference.
 `Pressable`, `Button`, and `TouchableOpacity`/`TouchableHighlight`/
 `TouchableWithoutFeedback`/`TouchableNativeFeedback` expose `press`, `pressIn`,
 `pressOut`, `pressMove`, `longPress`, `hoverIn`, and `hoverOut` (`Button` only
-exposes `press`) as `EventEmitter<ISymbioteEvent>` — bind them with Angular's
-own event syntax, not a property binding. Every other component's events
-(`Switch`'s `(valueChange)`, `TextInput`'s `(valueChange)`/`(change)`, the
-accessibility callbacks on the components above, …) are `EventEmitter`s the
-same way, driven by the exact same handler shape the engine and the shared
-`@symbiote-native/components` state machines already define (`IPressHandler`,
-`(value: boolean) => void`, …). `TextInput` is the one component with two
-outputs where React/Vue fold their payload into one callback argument list:
-`(valueChange)` stays text-only, since an `EventEmitter` carries exactly one
-value and text-only keeps `[(value)]` two-way binding working, while
-`(change)` is a second, separate output for the raw native event. The one
-permanent exception across every component is the scroll-family events
+exposes `press`) as `EventEmitter<ISymbioteEvent>`. Bind them with Angular's
+own event syntax, not a property binding.
+
+Every other component's events are `EventEmitter`s the same way: `Switch`'s
+`(valueChange)`, `TextInput`'s `(valueChange)`/`(change)`, the accessibility
+callbacks on the components above, and so on. They use the same handler shape
+the engine and the shared `@symbiote-native/components` state machines define,
+such as `IPressHandler` or `(value: boolean) => void`.
+
+`TextInput` is the one component with two outputs where React/Vue fold their
+payload into one callback argument list. `(valueChange)` stays text-only, since
+an `EventEmitter` carries exactly one value and text-only keeps `[(value)]`
+two-way binding working. `(change)` is a second, separate output for the raw
+native event.
+
+The one permanent exception across every component is the scroll-family events
 (`onScroll`, `onScrollBeginDrag`, `onScrollEndDrag`, `onMomentumScrollBegin`,
-`onMomentumScrollEnd`) on `ScrollView` and the list components — they stay
-callback `@Input()`s (`[onScroll]="handler"`) because they can carry an
-`Animated.event(...)` marker for native-driven scroll, and `@Output()` only
+`onMomentumScrollEnd`) on `ScrollView` and the list components. They stay
+callback `@Input()`s (`[onScroll]="handler"`), because they can carry an
+`Animated.event(...)` marker for native-driven scroll. An `@Output()` only
 binds a template listener expression, never an arbitrary value.
 
 ## Forms (`@angular/forms`)
@@ -172,18 +176,20 @@ export class Example {
 ```
 
 `*portal="overlayHost"` renders its host element into whichever
-`PortalOutletDirective` `overlayHost` refers to — the same primitive as
-React's `createPortal` and Vue's `Teleport`. `overlayHost` comes from marking
-the destination with `portalOutlet` and exporting it to a template variable
-(`#overlayHost="portalOutlet"`), the same `#form="ngForm"` idiom Angular's own
-forms directives use — which also replaces the runtime `isSymbioteNode` guard
-React/Vue need: `strictTemplates` rejects anything but a real
-`PortalOutletDirective` here at compile time, so there's nothing left to
-validate at runtime. There is no `@angular/cdk` dependency behind this: it
-creates the embedded view directly inside the destination's own
-`ViewContainerRef` rather than moving already-created nodes, which would
-desync Angular's own view bookkeeping. **Same scope as React/Vue:** the
-target must live in the same surface as the `*portal` call site.
+`PortalOutletDirective` `overlayHost` refers to. It is the same primitive as
+React's `createPortal` and Vue's `Teleport`.
+
+`overlayHost` comes from marking the destination with `portalOutlet` and
+exporting it to a template variable (`#overlayHost="portalOutlet"`), the same
+`#form="ngForm"` idiom Angular's own forms directives use. That also replaces
+the runtime `isSymbioteNode` guard React/Vue need: `strictTemplates` rejects
+anything but a real `PortalOutletDirective` at compile time.
+
+There is no `@angular/cdk` dependency behind this. It creates the embedded view
+directly inside the destination's own `ViewContainerRef` rather than moving
+already-created nodes, which would desync Angular's own view bookkeeping.
+**Same scope as React/Vue:** the target must live in the same surface as the
+`*portal` call site.
 
 ## Cross-surface content (`createTunnel`)
 
@@ -221,12 +227,14 @@ export class Example {
 
 `*portal` only reaches a target in the _same_ surface. `createTunnel` is for
 two independently `mount()`-ed surfaces that share no Fabric tree at all.
+
 Angular can't synthesize a fresh component per `createTunnel()` call the way
-React/Vue do — there's no runtime JIT under Metro/Hermes — so `createTunnel()`
-here returns a plain signal-backed store, and `TunnelInDirective`
-(`*tunnelIn="tunnel"`) / `TunnelOut` (`<tunnel-out [tunnel]="tunnel" />`) are
-one static, pre-authored, AOT-compilable pair parameterized by that store —
-the same relationship the list directives have to their per-cell templates.
+React/Vue do, since there's no runtime JIT under Metro/Hermes. So
+`createTunnel()` here returns a plain signal-backed store.
+`TunnelInDirective` (`*tunnelIn="tunnel"`) and `TunnelOut`
+(`<tunnel-out [tunnel]="tunnel" />`) are one static, pre-authored,
+AOT-compilable pair parameterized by that store. The list directives have the
+same relationship to their per-cell templates.
 
 React, Vue, Svelte, and Solid all have the same primitive — see their own API
 references.
@@ -235,11 +243,13 @@ references.
 
 `@symbiote-native/angular` exports the same `AppRegistry`/`setHostRegistrar` entry
 point described in the
-[Core API](/docs/api/core/#app-entry-point-appregistry). One Angular-specific
-detail: Angular has no runtime template synthesis (no JIT under AOT/Metro), so
-a component passed to `setWrapperComponentProvider` must be a pre-authored
-standalone `@Component` whose template renders `<ng-content>` — the Angular
-idiom for "render my children" — rather than a closure built at call time:
+[Core API](/docs/api/core/#app-entry-point-appregistry).
+
+One Angular-specific detail: Angular has no runtime template synthesis (no JIT
+under AOT/Metro). A component passed to `setWrapperComponentProvider` must be a
+pre-authored standalone `@Component` whose template renders `<ng-content>`, the
+Angular idiom for "render my children". It cannot be a closure built at call
+time:
 
 ```ts
 import { Component } from '@angular/core';
@@ -294,15 +304,22 @@ The rest of the runtime-module surface re-exports the same way as React/Vue:
 `PermissionsAndroid`, `AccessibilityInfo`, `I18nManager`, `Settings`,
 `LayoutAnimation`, `InteractionManager`, `StatusBar`, and `findNodeHandle`.
 
+The CSS runtime is there too: `matchMedia`, `setVariable`, `getComputedVariable`
+and `registerProperty`. `injectRootTag()` gives `setVariable` its surface, see
+[Media queries and variables](/docs/learn/media-queries-and-vars/).
+
 On Android, `Keyboard` and `Settings` do nothing until you also install
-[`@symbiote-native/android`](/docs/packages/android/):
-`keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
-keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
-surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
-because RN's `Settings` has no stock Android implementation at all. That package
-supplies both native modules (`KeyboardObserver`, `SettingsManager`), is picked
-up by Gradle autolinking, and exports nothing from JS — installing it is the
-whole integration.
+[`@symbiote-native/android`](/docs/packages/android/).
+
+- `keyboardDidShow`/`keyboardDidHide` never fire. Android's only stock
+  keyboard-event source is `ReactRootView`'s layout listener, which the
+  bridgeless surface SymbioteNative mounts never triggers.
+- `Settings` reads back `null`, because RN's `Settings` has no stock Android
+  implementation at all.
+
+That package supplies both native modules (`KeyboardObserver`,
+`SettingsManager`), is picked up by Gradle autolinking, and exports nothing from
+JS. Installing it is the whole integration.
 
 ## Animations and gestures
 
@@ -322,10 +339,11 @@ public `provideZonelessChangeDetection()`, which assumes a `platform-browser`
 bootstrap this DOM-less renderer does not use.
 
 A native event or `markForCheck()` still walks dirty flags up to every ancestor
-to the root, same as any zoneless Angular app — an unrelated press re-running
-the whole tree isn't a SymbioteNative quirk, it's why demo screens are split into
-real child components instead of `@if`/`@for` blocks, which always re-execute
-with their containing view.
+to the root, same as any zoneless Angular app. An unrelated press re-running the
+whole tree isn't a SymbioteNative quirk.
+
+That is why demo screens are split into real child components instead of
+`@if`/`@for` blocks, which always re-execute with their containing view.
 
 ## Boundary
 

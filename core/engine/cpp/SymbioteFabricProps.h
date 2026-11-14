@@ -3,7 +3,12 @@
 #include <folly/dynamic.h>
 
 #include <functional>
+#include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
+
+#include "SymbioteVarSubstitute.h"
 
 namespace symbiote {
 
@@ -68,9 +73,9 @@ using IPayloadFold = std::function<folly::dynamic(const folly::dynamic &)>;
 /**
  * `tagName` is the INTRINSIC TAG (`pressable`), empty for a node that carries no host behavior.
  *
- * It is separate from `component` because it has to be: a `<pressable>` commits as `RCTView`, so
- * the Fabric view name cannot distinguish it from a plain view, and a rule keyed off the view name
- * would either miss every pressable or fire on every view. `<text-input>` is the case that hid
+ * It is separate from `component`: a `<pressable>` commits as `RCTView`, so the view name
+ * cannot tell it from a plain view, so a rule keyed off it misses pressables or hits every view.
+ * `<text-input>` hid this, since its view name is unique and its first port needed no tag
  * this — its view name happens to name it uniquely, so the first port needed no tag at all.
  */
 /**
@@ -80,9 +85,8 @@ using IPayloadFold = std::function<folly::dynamic(const folly::dynamic &)>;
  * of one node's own bag. Several of RN's component bodies build a node whose props are DERIVED from
  * the node above it — ScrollView's content view takes `collapsableChildren` from the scroller's
  * `maintainVisibleContentPosition`, ImageBackground's image takes its size from the wrapper's style.
- * In the wrapper world that was ordinary: one `render()` saw both. Split into per-node rules it looks
- * impossible, and this argument is why it is not: the TREE LIVES IN C++ NOW, so a node already knows
- * its parent and reading it costs a pointer hop rather than a JS closure and a crossing.
+ * In the wrapper world one `render()` saw both. Split per node it looks impossible, but the TREE
+ * LIVES IN C++ NOW: a node knows its parent, and reading it costs a pointer hop, not a crossing
  *
  * It does NOT make everything portable. A rule may read the parent's PROPS, which are declarative
  * and present at commit time. It cannot read live JS state (`stickyFold`'s `translateY`) or anything
@@ -109,9 +113,9 @@ using IPayloadFold = std::function<folly::dynamic(const folly::dynamic &)>;
 /**
  * A rule's way of asking for an ANCESTOR further up than its parent.
  *
- * `ownerProps` answers the common case and `Button`'s label is the one that needs more: its style is
- * a function of the BUTTON's `color` and `disabled` while its parent is the wrapping view, so the
- * node it must read is a grandparent on iOS and a parent on Android. "Two up" is the wrong question
+ * `ownerProps` serves the common case, `Button`'s label needs more: its style follows the BUTTON's
+ * `color` and `disabled`, and that node is a grandparent on iOS and a parent on Android.
+ * "Two up" is the wrong question
  * to build a seam around — what the rule wants is **the nearest ancestor that is a button**, which
  * is a CSS ancestor selector and is the shape a browser would use.
  *
@@ -132,13 +136,12 @@ struct IAncestorLookup {
 /**
  * The parent, as the three facts a rule can ask about it.
  *
- * `props` was a bare parameter until the descendant rule below needed the other two, and bundling
- * them is not tidying: a rule keyed on the parent's TAG is a different kind of rule from one keyed
- * on its own, and this is the one place that distinction is expressible.
+ * `props` was a bare parameter until the descendant rule needed the other two, and bundling them
+ * lets a rule key on the parent's TAG, which a rule keyed on its own tag cannot do.
  *
- * `tagName` is what makes a DESCENDANT rule possible — the shape a user-agent stylesheet has always
- * had (`td > *`), and the only shape that can serve `TouchableNativeFeedback` /
- * `TouchableWithoutFeedback`. Those render no view: RN's bodies end in `cloneElement(child, {…})`,
+ * `tagName` is what makes a DESCENDANT rule possible: the shape a UA stylesheet has always had
+ * (`td > *`), and the only one that serves `TouchableNativeFeedback` / `TouchableWithoutFeedback`.
+ * Those render no view: RN's bodies end in `cloneElement(child, {...})`,
  * so our tag commits an anchor and the owner's props land on whatever the app wrote underneath. That
  * child's own tag is usually EMPTY — a plain `<view>` registers no behavior — so a self-keyed rule
  * can never reach it, and giving it the owner's tag is not available either, since it may already
@@ -152,10 +155,9 @@ struct IOwner {
   const folly::dynamic *props = nullptr;
   const char *tagName = nullptr;
   bool hasPressListener = false;
-  // TouchableHighlight's two halves land on TWO nodes — background on the container, opacity on the
-  // single child (`TouchableHighlight.js:358-361, 379-383`) — so the child's rule needs the owner's
-  // feedback state, which is `ISelf`'s and therefore unreachable from down here without these. Same
-  // argument `hasPressListener` above already makes: a parent's bit, read one hop up.
+  // TouchableHighlight lands on TWO nodes: background on the container, opacity on its child
+  // (`TouchableHighlight.js:358-361, 379-383`): the child rule needs the owner's feedback state
+  // that `ISelf` holds; same as `hasPressListener` above, a parent's bit read one hop up
   bool underlayShown = false;
   bool hasAnyPressListener = false;
 };
@@ -163,11 +165,9 @@ struct IOwner {
 /**
  * The FIRST CHILD, as the two facts a rule can ask about it — the only seam here that reads DOWN.
  *
- * `IOwner`, `IAncestorLookup` and `ownerProps` all read UP, and three iterations of this migration
- * recorded ScrollView's Android RefreshControl wrap as unportable because it is the one rule that
- * needs the other direction: `AndroidSwipeRefreshLayout` WRAPS the scroll view, and the app's style
- * is split across the two boxes with the wrapper taking the LAYOUT half of a style written on the
- * node BELOW it (`ScrollView.js:1854-1863`).
+ * `IOwner`, `IAncestorLookup` and `ownerProps` all read UP. ScrollView's Android refresh wrap
+ * needs the other direction: `AndroidSwipeRefreshLayout` WRAPS the scroll view and takes the LAYOUT
+ * half of a style written on the node BELOW it (`ScrollView.js:1854-1863`)
  *
  * IT IS NOT A NEW KIND OF CLAIM, which is what makes it affordable. `ownerProps`' own argument was
  * that the tree lives in C++, so reading another node costs a pointer hop rather than a closure and
@@ -193,7 +193,7 @@ struct IFirstChild {
 /**
  * The node's own facts that are NOT props — the bits a behavior owns and the platform is entitled to.
  *
- * It was a bare `bool hasPressListener` parameter until a second bit needed to cross, and bundling
+ * It was a bare `bool hasPressListener` parameter until a second bit needed to cross. Bundling
  * is the same move `IOwner` made when `ownerProps` grew a tag: a lone bool beside three structs is
  * the shape that grows a fourth positional argument nobody can read at the call site.
  *
@@ -225,6 +225,16 @@ folly::dynamic fabricProps(
     const IOwner &owner = {},
     const ISelf &self = {},
     const IAncestorLookup &ancestors = {},
-    const IFirstChild &firstChild = {});
+    const IFirstChild &firstChild = {},
+    const VarLookup &varLookup = {});
+
+// A colour token as the int `processColorValue` yields, or nothing when it is not a colour
+std::optional<long long> parseColorToken(const std::string &token);
+
+// A node's own custom property declarations, name and authored text
+using VarDeclarations = std::vector<std::pair<std::string, std::string>>;
+
+// What a node's style declares, one entry per name with the last entry winning, in first-seen order
+VarDeclarations declaredStyleVars(const folly::dynamic &props);
 
 } // namespace symbiote

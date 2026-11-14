@@ -26,8 +26,12 @@ export type IRecorded = {
   instanceHandle: unknown;
   viewName: string;
   tagName: string;
+  // Set by `OP_SET_RELEASE_MARK`, which keeps the node in the narrowed teardown walk
+  isReleaseMarked: boolean;
   ownedListeners: Record<string, boolean>;
   underlayShown: boolean;
+  // The envelope `OP_SET_CONTAINER_VARIANTS` last set, recorded and not evaluated: the host does
+  containerVariants: string | undefined;
   props: Record<string, unknown>;
   parent: IRecorded | undefined;
   children: IRecorded[];
@@ -245,7 +249,7 @@ export function createRecordingHost(): IRecordingHost {
       const walk = (node: IRecorded, isRoot: boolean): boolean => {
         const reserved = out.length;
         out.push(node.handle);
-        let isWanted = isRoot || node.tagName !== '';
+        let isWanted = isRoot || node.tagName !== '' || node.isReleaseMarked;
         for (const child of node.children) {
           if (walk(child, false)) isWanted = true;
         }

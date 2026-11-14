@@ -1,5 +1,17 @@
 # @symbiote-native/svelte
 
+## 3.5.0
+
+### Minor Changes
+
+- [#104](https://github.com/OneEyed1366/symbiote-native/pull/104) [`9bff70c`](https://github.com/OneEyed1366/symbiote-native/commit/9bff70c94ca9e0a26ae9c236492d592f6e46459d) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A component can read the tag of the surface it is rendered into: `useRootTag()` in Vue and Svelte, `injectRootTag` in Angular, `RootTagContext` in Solid. It is the argument `setVariable` needs, so a screen can write a CSS variable to its own surface.
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @symbiote-native/components@3.3.0
+  - @symbiote-native/css-parser@0.6.0
+
 ## 3.4.0
 
 ### Minor Changes

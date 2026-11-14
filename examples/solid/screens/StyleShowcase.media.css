@@ -1,0 +1,25 @@
+/* `@media` is evaluated at runtime, so the tile repaints when the window or the device changes
+   Slate is the base, green means a window of 600 or more, an amber border means landscape */
+.sc-media-tile {
+  height: 3.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border-width: 2px;
+  border-color: #41506a;
+  background-color: #16243a;
+}
+@media (min-width: 600px) {
+  .sc-media-tile {
+    background-color: #2f7d4f;
+  }
+}
+@media (orientation: landscape) {
+  .sc-media-tile {
+    border-color: #e0a23a;
+  }
+}
+.sc-media-text {
+  color: #ffffff;
+  font-size: 0.75rem;
+}

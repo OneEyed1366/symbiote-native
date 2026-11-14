@@ -9,7 +9,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 `<style>` block in a Vue SFC or a Svelte component, or an SCSS/Sass/Less/Stylus source — into
 React Native style objects at build
 time, inside a Metro transformer. The runtime half lives elsewhere: `@symbiote-native/engine`'s
-`style-registry` (`registerStyles` / `resolveClassName`) is what turns `className="card"` back
+`style-registry` (`registerRules` / `resolveClassName`) is what turns `className="card"` back
 into a style object at render time. What to write in your stylesheets and how classes resolve per
 adapter is covered by the [Styling guide](/docs/learn/styling/) and [How to: style a
 component](/docs/howtos/styling/) — this page is about the package itself: how it gets into your
@@ -272,22 +272,24 @@ transform worker awaits the call either way, and Less/Stylus have no synchronous
 
 ### Compiler core
 
-| Signature                                                                                     | Description                                                                                                                                                                                                                                                             |
-| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `parseCSS(css: string, options?: ICssParserOptions): Record<string, Record<string, unknown>>` | Compiles plain CSS text into a `{ className: styleObject }` map — postcss AST walk, `var()`/`calc()` resolution, and CSS property → RN `ViewStyle`/`TextStyle` mapping                                                                                                  |
-| `extractClassName(selector: string): string \| null`                                          | Converts one CSS selector to the camelCase key `parseCSS` registers it under — `.card` → `card`, `.btn.primary` → `btnPrimary`, `.card .title` → `cardTitle`. Returns `null` for a selector with no RN equivalent (bare element, `*`, anything carrying a pseudo-class) |
-| `kebabToCamel(value: string): string`                                                         | Kebab-case → camelCase. Exported because a template's `class="section-label"` authoring must normalize to the same key `parseCSS` registered the selector under                                                                                                         |
-| `globalClassNamesIn(css: string): Set<string>`                                                | Scans CSS text for `:global(.name)`-wrapped class names, camelCased. A caller doing its own scope-suffixing uses this to exempt those names, since `parseCSS`'s output carries no per-key metadata                                                                      |
-| `hashFilePath(filePath: string): string`                                                      | A short deterministic id derived from a file path, used as the scope suffix so two files can each define `.card` without colliding in the shared runtime registry                                                                                                       |
+| Signature | Description |
+| --- | --- |
+| `compileCssToRules(css: string, options: ICompileRulesOptions): ICompiledCss` | Compiles plain CSS text with lightningcss into a list of rules, each with its class tokens, specificity, source order and RN style. It also returns the `@media` and `@container` condition table, the `:root` custom properties and the `@property` rules |
+| `compileScopedCss(css: string, options: IScopedCssOptions): IScopedCss` | The same compile for a scoped block (a Svelte `<style>`, a Vue `<style scoped>`). It returns the rules under their scoped names and the name map the markup rewriter resolves class tokens through |
+| `compileCssModule(css: string, filename: string): ICompiledCssModule` | One source compiled as a CSS module: scoped rules, the `classMap` default export, and the same condition, variable and property tables |
+| `serializeRules(rules: readonly IStyleRule[]): string` | Renders rules as the JS literal a registration call takes |
+| `conditionsArgument(conditions)`, `propertiesCall(properties, conditions)` | Emit helpers for the trailing condition-table argument and the `registerProperties(...)` call |
+| `hashFilePath(filePath: string): string` | A short deterministic id derived from a file path, used as the scope suffix so two files can each define `.card` without colliding in the shared runtime registry |
 
-`ICssParserOptions` has one optional field, `filename: string` — passed to postcss as the source
-name for error reporting.
+`ICompileRulesOptions` takes `filename: string`, an optional `remToPx` (the root font size used for `rem`) and an optional CSS Modules `pattern`
+with `[local]` first. A rule outside any `@media` or `@container` has no `cond`. Otherwise `cond` indexes `ICompiledCss.conditions`, and
+`:root` variables and `@property` rules index the same table.
 
 ### Standalone stylesheet files
 
 | Signature                                                                                                  | Description                                                                                                                                                                                                                                                                                        |
 | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `compileCssFile(source: string, filename: string, options?: ICssParserOptions): Promise<ICompiledCssFile>` | Compiles one stylesheet file into JS module source. A plain file emits a `registerStyles(...)` side-effect module with no export; a `.module.*` file additionally scopes every class to a per-file hash and default-exports the name→scopedName map. Preprocessor sources are reduced to CSS first |
+| `compileCssFile(source: string, filename: string): Promise<ICompiledCssFile>` | Compiles one stylesheet file into JS module source. A plain file emits a `registerRules(...)` side-effect module with no export; a `.module.*` file additionally scopes every class to a per-file hash and default-exports the name→scopedName map. Preprocessor sources are reduced to CSS first |
 | `isCssModuleFile(filename: string): boolean`                                                               | Whether a filename's stem ends in `.module` (`Card.module.scss` → `true`) — the check that decides scoped-with-a-map vs. global-side-effect output                                                                                                                                                 |
 
 `ICompiledCssFile` has one field, `code: string` — the generated JS module source.
@@ -333,10 +335,10 @@ name for error reporting.
   routes a `.css` import to the transformer at all, and the import fails to resolve. Note that
   `detectLanguage` also recognizes `.stylus`; add it to `sourceExts` too if you use that spelling
   rather than `.styl`.
-- **`@media` and other at-rules are dropped**, with a console warning, before the rule walk — so
-  is any selector carrying a pseudo-class (`.card:hover`). RN has no hover/media-query concept, and
-  keeping the rule's other declarations would silently merge hover-only styles into the
-  always-applied base style.
+- **`@media` and `@container` stay on the rule as a condition**, and `var()` ships as raw text. The engine
+  resolves them on the device, see [the guide](/docs/learn/media-queries-and-vars/). `@supports` and any
+  selector carrying a pseudo-class (`.card:hover`) are dropped with a console warning before the rule walk.
+  RN has no hover concept, and keeping the other declarations would merge hover-only styles into the base style.
 - **The TypeScript plugin covers plain `.module.css` only.** `getScriptSnapshot` must be
   synchronous, and Less and Stylus have no sync compile API — `.module.scss`/`.less`/`.styl` still
   get their on-disk `.d.ts` from `css-dts` at `pretypecheck` time, just no live per-class
@@ -358,13 +360,13 @@ Two halves, split across build time and runtime:
       │  build time, inside Metro                                    │  runtime, all adapters
       ▼                                                              ▼
 @symbiote-native/css-parser                        @symbiote-native/engine's style-registry
-  preprocessors → parseCSS → JS module source        registerStyles() / resolveClassName()
+  preprocessors -> compileCssToRules -> JS module source    registerRules() / resolveClassName()
 ```
 
-A preprocessor source is reduced to plain CSS text first, so `parseCSS` is the single downstream
-consumer either way and every mechanism — scoping, `:global()`, CSS Modules — behaves identically
-regardless of source language. `compileCssFile` then emits JS module source that calls
-`registerStyles(...)`, which is what lands in the bundle; the compiler itself does not.
+A preprocessor source is reduced to plain CSS text first, so `compileCssToRules` is the single downstream
+consumer either way. Scoping, `:global()` and CSS Modules behave the same regardless of source language.
+`compileCssFile` then emits JS module source that calls `registerRules(...)`.
+That call is what lands in the bundle, and the compiler itself does not.
 
 Each adapter's `metro-css-parser.cjs` is a one-line re-export:
 

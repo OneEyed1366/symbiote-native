@@ -25,21 +25,21 @@ import './CompoundClassDemo.css';
     <view class="section-nested">
       <text class="section-label">Compound class · component stylesheet</text>
       <view class="row">
-        <view class="badge" testID="angular-compound-badge-plain">
+        <view class="badge" testID="compound-badge-plain">
           <text class="badge-text">plain</text>
         </view>
-        <view class="badge loud" testID="angular-compound-badge-loud">
+        <view class="badge loud" testID="compound-badge-loud">
           <text class="badge-text">loud</text>
         </view>
-        <view [class]="dynamicClass" testID="angular-compound-badge-dynamic">
+        <view [class]="dynamicClass" testID="compound-badge-dynamic">
           <text class="badge-text">dynamic</text>
         </view>
       </view>
-      <text class="note-text" testID="angular-compound-badge-readout">{{
+      <text class="note-text" testID="compound-badge-readout">{{
         readout
       }}</text>
       <ActionButton
-        testID="angular-compound-badge-toggle"
+        testID="compound-badge-toggle"
         [title]="isLoud ? 'Drop .loud' : 'Add .loud'"
         color="#dd0031"
         (press)="toggle()"

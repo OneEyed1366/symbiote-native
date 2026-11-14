@@ -11,7 +11,10 @@ import {
   OP_INSERT_BEFORE,
   OP_REMOVE_CHILD,
   OP_SET_COMPONENT,
+  OP_SET_CONTAINER_VARIANTS,
+  OP_SET_GLOBAL_VARIABLE,
   OP_SET_OWNED_LISTENER,
+  OP_SET_RELEASE_MARK,
   OP_SET_TAG,
   OP_SET_UNDERLAY_SHOWN,
   OP_SET_PROP,
@@ -33,6 +36,7 @@ type IOpWords = {
 
 type IApplyContext = {
   batch: IMutationBatch;
+  globalVariables: Map<string, string>;
   at: (slot: number) => IRecorded;
   create: (
     slot: number,
@@ -48,6 +52,8 @@ export type IRecordedTree = {
   commits: number;
   /** Every node the ops created, in creation order, which is what `find` searches. */
   readonly authored: IRecorded[];
+  /** The process-wide `:root` table, as native holds it after the ops so far. */
+  readonly globalVariables: Map<string, string>;
   applyOps: (batch: IMutationBatch) => void;
   recordedOf: (handle: object) => IRecorded | undefined;
   nodeOf: (handle: object, what: string) => IRecorded;
@@ -132,6 +138,16 @@ function applyValueOp(ctx: IApplyContext, op: IOpWords): boolean {
     case OP_SET_TAG:
       ctx.at(op.a).tagName = strings[op.b];
       return true;
+    case OP_SET_RELEASE_MARK:
+      ctx.at(op.a).isReleaseMarked = true;
+      return true;
+    case OP_SET_CONTAINER_VARIANTS:
+      ctx.at(op.a).containerVariants = op.b === NO_VALUE ? undefined : strings[op.b];
+      return true;
+    case OP_SET_GLOBAL_VARIABLE:
+      if (op.b === NO_VALUE) ctx.globalVariables.delete(strings[op.a]);
+      else ctx.globalVariables.set(strings[op.a], strings[op.b]);
+      return true;
     case OP_SET_OWNED_LISTENER:
       ctx.at(op.a).ownedListeners[strings[op.b]] = op.c !== 0;
       return true;
@@ -186,8 +202,10 @@ function newRecord(
     instanceHandle,
     viewName,
     tagName: '',
+    isReleaseMarked: false,
     ownedListeners: {},
     underlayShown: false,
+    containerVariants: undefined,
     props,
     parent: undefined,
     children: [],
@@ -200,6 +218,7 @@ export function createRecordedTree(): IRecordedTree {
   // A `WeakMap` cannot be enumerated and `find` has to start somewhere. Strong references, so
   // `forget()` is what a long file calls to stop this growing
   const authored: IRecorded[] = [];
+  const globalVariables = new Map<string, string>();
 
   const nodeOf = (handle: object, what: string): IRecorded => {
     const node = recorded.get(handle);
@@ -212,11 +231,13 @@ export function createRecordedTree(): IRecordedTree {
   const tree: IRecordedTree = {
     commits: 0,
     authored,
+    globalVariables,
     recordedOf: handle => recorded.get(handle),
     nodeOf,
     applyOps(batch: IMutationBatch): void {
       walkBatch({
         batch,
+        globalVariables,
         at: slot => nodeOf(handleAt(batch, slot), 'applyOps'),
         create: (slot, viewName, props, instanceHandle) => {
           const node = newRecord(
@@ -236,6 +257,7 @@ export function createRecordedTree(): IRecordedTree {
     },
     reset(): void {
       authored.length = 0;
+      globalVariables.clear();
       tree.commits = 0;
     },
     forget(): void {

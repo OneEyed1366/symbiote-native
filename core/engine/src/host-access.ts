@@ -32,7 +32,6 @@ import {
   SURFACE_COMPONENT,
   type ISymbioteNode,
 } from './node';
-import type { SymbioteSurface } from './surface';
 
 // One frozen empty list rather than a fresh `[]`, because the fast path in `childrenOf` is the
 // common answer during a build: solid asks 2 000 times on a 1 000-row create and every answer is
@@ -102,9 +101,8 @@ export function subtreesOf(
   return treeHost()?.subtreesOf(roots).filter(isSymbioteNode) ?? [];
 }
 
-// The same walk narrowed to what a teardown must visit — see ITreeHost.teardownSubtreesOf. The
-// gate is the animated one, not a behavior one: a binding is per node and carries no tag, so an
-// app that animates needs every node back and gets the full walk.
+// Narrowed to the nodes a teardown visits, see `ITreeHost.teardownSubtreesOf`
+// An animated binding is per node with no tag, so an app that animates needs every node
 export function teardownSubtreesOf(
   roots: readonly ISymbioteNode[],
 ): readonly ISymbioteNode[] {
@@ -159,7 +157,7 @@ export function firstChildOf(node: ISymbioteNode): ISymbioteNode | undefined {
 // because three adapters still pass it, though it's no longer read (see below).
 export function nextSiblingOf(
   node: ISymbioteNode,
-  _surface?: SymbioteSurface,
+  _surface?: object,
 ): ISymbioteNode | undefined {
   // One host call, not parentOf plus a whole child list — the old spelling built every sibling to
   // read one of them, quadratic on a keyed patch calling this once per row. The host holds the

@@ -1,23 +1,15 @@
-// Co-located unit test for the typed declaration mapper. Every case feeds REAL lightningcss
-// output — the helper below parses the CSS and hands `declarationToStyle` the same objects a
-// visitor would — because the whole point of this file is that the AST already carries the
-// structure the old text parser had to re-derive; asserting against a hand-built fake object
-// would test the fake.
-//
-// Cases marked "differs from the text parser" are deliberate: they are the three silent bugs
-// recorded in `.claude/rules/style-registry-collisions.md` (traps 4 and 5, plus the cross-file
-// `var()` trap), plus the colour normalisation lightningcss does on the way in.
+// Unit test of the typed declaration mapper, fed with real lightningcss output, never a fake
+// A case marked "differs from the text parser" is deliberate, see traps 4 and 5 in the notes
 
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { transform } from 'lightningcss';
-import { declarationToStyle, variablesIn } from './declarations.ts';
+import { declarationToStyle } from './declarations.ts';
 import type { IStyleObject } from './declarations.ts';
 
-interface ICompileOptions {
-  readonly variables?: Record<string, string>;
+type ICompileOptions = {
   readonly remToPx?: number;
   readonly filename?: string;
-}
+};
 
 let fileCounter = 0;
 
@@ -41,7 +33,6 @@ function compile(body: string, options: ICompileOptions = {}): IStyleObject {
 
   const context = {
     filename: options.filename ?? `case-${++fileCounter}.css`,
-    variables: new Map(Object.entries(options.variables ?? {})),
     remToPx: options.remToPx,
   };
 
@@ -99,7 +90,7 @@ describe('declarationToStyle — longhands and simple values', () => {
   });
 
   it('ignores anything that is not a lightningcss declaration', () => {
-    const context = { filename: 'x.css', variables: new Map<string, string>() };
+    const context = { filename: 'x.css' };
     expect(declarationToStyle(null, context)).toEqual({});
     expect(declarationToStyle('padding: 8px', context)).toEqual({});
     expect(declarationToStyle({ nope: true }, context)).toEqual({});
@@ -234,7 +225,6 @@ describe('declarationToStyle — calc() (trap 5)', () => {
     'width: calc(100% - 24px)',
     'width: calc(50% + 10px)',
     'width: calc(100vw - 32px)',
-    'width: min(100px, 50%)',
   ];
 
   it.each(dropped)('drops `%s` with a warning', css => {
@@ -242,6 +232,30 @@ describe('declarationToStyle — calc() (trap 5)', () => {
     expect(warnings()).toHaveLength(1);
     expect(warnings()[0]).toContain('[@symbiote-native/css-parser]');
   });
+
+  const shippedAsText: ReadonlyArray<readonly [string, IStyleObject]> = [
+    ['width: min(10px, 2rem)', { width: 'min(10px, 2rem)' }],
+    ['margin-left: calc(1px + min(1em, 2px))', { marginLeft: 'calc(1px + min(1em, 2px))' }],
+  ];
+
+  it.each(shippedAsText)('ships `%s` as text for the engine to evaluate', (css, expected) => {
+    expect(compile(css)).toEqual(expected);
+    expect(warnings()).toEqual([]);
+  });
+
+  const shippedButUnresolvable: ReadonlyArray<readonly [string, IStyleObject]> = [
+    ['width: min(100px, 50%)', { width: 'min(100px, 50%)' }],
+    ['height: clamp(1rem, 5vw, 3rem)', { height: 'clamp(1rem, 5vw, 3rem)' }],
+  ];
+
+  it.each(shippedButUnresolvable)(
+    'ships `%s` as text and warns the engine cannot compute it',
+    (css, expected) => {
+      expect(compile(css)).toEqual(expected);
+      expect(warnings()).toHaveLength(1);
+      expect(warnings()[0]).toContain('left unset at runtime');
+    },
+  );
 
   it('names calc() as the reason when the expression is what failed', () => {
     compile('width: calc(100% - 24px)');
@@ -331,57 +345,68 @@ describe('declarationToStyle — raw passthrough properties', () => {
   });
 });
 
+// The rule-level cases are in `raw-var.test.ts`, here only what a single declaration maps to
 describe('declarationToStyle — custom properties and var()', () => {
-  it('ignores a `--x` declaration: the caller collects those in a pre-pass', () => {
-    expect(compile('--mist: #eee')).toEqual({});
+  it('ships a `--x` declaration under its own name', () => {
+    expect(compile('--mist: #eee')).toEqual({ '--mist': '#eee' });
     expect(warnings()).toEqual([]);
   });
 
-  it('substitutes a declared custom property', () => {
-    expect(
-      compile('background-color: var(--mist)', {
-        variables: { '--mist': '#eee' },
-      }),
-    ).toEqual({ backgroundColor: '#eee' });
-  });
-
-  it('substitutes inside a shorthand and still expands the result', () => {
-    expect(
-      compile('padding: var(--pad) 16px', { variables: { '--pad': '8px' } }),
-    ).toEqual({
-      paddingTop: 8,
-      paddingRight: 16,
-      paddingBottom: 8,
-      paddingLeft: 16,
+  it('keeps a declared custom property as a reference', () => {
+    expect(compile('background-color: var(--mist)')).toEqual({
+      backgroundColor: 'var(--mist)',
     });
   });
 
-  it('substitutes a var() nested in calc()', () => {
-    expect(
-      compile('width: calc(var(--w) + 2px)', { variables: { '--w': '1rem' } }),
-    ).toEqual({ width: 18 });
+  it('keeps a shorthand whole, since the device expands it after substituting', () => {
+    expect(compile('padding: var(--pad) 16px')).toEqual({
+      padding: 'var(--pad) 16px',
+    });
   });
 
-  it('follows a custom property that itself uses another one', () => {
-    expect(
-      compile('color: var(--fg)', {
-        variables: { '--fg': 'var(--ink)', '--ink': '#123456' },
-      }),
-    ).toEqual({ color: '#123456' });
+  it('keeps a var() nested in calc()', () => {
+    expect(compile('width: calc(var(--w) + 2px)')).toEqual({
+      width: 'calc(var(--w) + 2px)',
+    });
   });
 
-  it('uses the var() fallback when the name is undeclared', () => {
-    expect(compile('color: var(--nope, #333)')).toEqual({ color: '#333' });
+  it('keeps the fallback, and warns of nothing', () => {
+    expect(compile('color: var(--nope, #333)')).toEqual({
+      color: 'var(--nope, #333)',
+    });
     expect(warnings()).toEqual([]);
   });
 
-  it('DIFFERS from the text parser: drops an undeclared var() instead of shipping its text', () => {
-    // The text parser registers the literal string `"var(--mist)"` and sends it to Fabric, which
-    // paints nothing — the cross-file trap in `.claude/rules/style-registry-collisions.md`.
-    expect(compile('color: var(--mist)')).toEqual({});
-    expect(warnings()).toHaveLength(1);
-    expect(warnings()[0]).toContain('"--mist"');
-    expect(warnings()[0]).toContain('not declared in this file');
+  it('keeps a reference to a variable no file declares, as the device may know it', () => {
+    expect(compile('color: var(--mist)')).toEqual({ color: 'var(--mist)' });
+    expect(warnings()).toEqual([]);
+  });
+});
+
+describe('declarationToStyle — container declarations', () => {
+  it.each([
+    ['container-type: size', { containerType: 'size' }],
+    ['container-type: inline-size', { containerType: 'inline-size' }],
+    ['container-type: normal', { containerType: 'normal' }],
+    ['container-name: card', { containerName: 'card' }],
+    ['container-name: card side', { containerName: 'card side' }],
+    ['container-name: none', { containerName: 'none' }],
+  ])('maps `%s`', (css, expected) => {
+    expect(compile(css)).toEqual(expected);
+    expect(warnings()).toEqual([]);
+  });
+
+  it.each([
+    ['container: card / inline-size', { containerName: 'card', containerType: 'inline-size' }],
+    ['container: card', { containerName: 'card', containerType: 'normal' }],
+    ['container: a b / size', { containerName: 'a b', containerType: 'size' }],
+  ])('expands the shorthand `%s`', (css, expected) => {
+    expect(compile(css)).toEqual(expected);
+  });
+
+  it('drops scroll-state, which nothing here can query, and says so', () => {
+    expect(compile('container-type: scroll-state')).toEqual({});
+    expect(warnings().join('\n')).toContain('scroll-state');
   });
 });
 
@@ -462,70 +487,3 @@ describe('declarationToStyle — text-shadow (object-valued style entry)', () =>
   });
 });
 
-describe('variablesIn', () => {
-  it('collects a custom property declared in :root', () => {
-    expect([...variablesIn(':root{--mist:#eee}', 'a.css')]).toEqual([
-      ['--mist', '#eee'],
-    ]);
-  });
-
-  it('collects a custom property declared in an ordinary class rule', () => {
-    // Nothing orders `:root` first, which is why this is a pass of its own.
-    expect([...variablesIn('.card{--pad:8px;color:red}', 'a.css')]).toEqual([
-      ['--pad', '8px'],
-    ]);
-  });
-
-  it('collects one declared inside an at-rule', () => {
-    expect([
-      ...variablesIn('@media (min-width:600px){.wide{--m:4px}}', 'a.css'),
-    ]).toEqual([['--m', '4px']]);
-  });
-
-  it('lets the later declaration of a name win, as the cascade does', () => {
-    const variables = variablesIn(':root{--a:#eee}.card{--a:#111}', 'a.css');
-    expect(variables.get('--a')).toBe('#111');
-    expect(variables.size).toBe(1);
-  });
-
-  it('returns an empty map for a file that declares none', () => {
-    expect(variablesIn('.card{color:red}', 'a.css').size).toBe(0);
-    expect(variablesIn('', 'a.css').size).toBe(0);
-  });
-
-  it('stores a var() chain VERBATIM — resolution stays in declarationToStyle', () => {
-    const variables = variablesIn(
-      ':root{--ink:#123456;--fg:var(--ink)}',
-      'a.css',
-    );
-    expect(variables.get('--fg')).toBe('var(--ink)');
-    expect(variables.get('--ink')).toBe('#123456');
-  });
-
-  it('keeps a var() fallback in the stored text', () => {
-    expect(
-      variablesIn(':root{--f:var(--nope, 12px)}', 'a.css').get('--f'),
-    ).toBe('var(--nope, 12px)');
-  });
-
-  it('keeps a multi-token value intact', () => {
-    expect(
-      variablesIn(':root{--g:1px solid rgba(0,0,0,.5)}', 'a.css').get('--g'),
-    ).toBe('1px solid rgba(0, 0, 0, 0.5)');
-  });
-
-  it('feeds declarationToStyle end to end', () => {
-    const css = '.card{--pad:8px;padding:var(--pad) 16px}';
-    const variables = variablesIn(css, 'e2e.css');
-    expect(
-      compile('padding: var(--pad) 16px', {
-        variables: Object.fromEntries(variables),
-      }),
-    ).toEqual({
-      paddingTop: 8,
-      paddingRight: 16,
-      paddingBottom: 8,
-      paddingLeft: 16,
-    });
-  });
-});

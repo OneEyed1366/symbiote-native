@@ -4,10 +4,33 @@
 import { isEventFor } from './view-config';
 import {
   canonicalClassName,
+  conditionIdsOf,
+  containerVariantsOf,
   isClassNameValue,
   resolveClassName,
+  type IClassNameValue,
+  type IContainerVariants,
 } from './style-registry';
+import {
+  containerLookup,
+  containerStyleOf,
+  declareContainer,
+  isContainer,
+  queueConsumer,
+  revokeContainer,
+} from './container-tracking';
 import { dlog } from './debug';
+import {
+  hasConditions,
+  hasContainerConditions,
+  isContainerCondition,
+} from './style-registry/media-conditions';
+import {
+  recordSetContainerVariants,
+  recordSetReleaseMark,
+} from './mutation-buffer';
+import { ensureMediaEnvironment } from './media-environment';
+import { watchMediaClass } from './style-registry/media-subscriptions';
 import { slotPropNameFor } from './host-behavior';
 import { hasAnimatedNodes } from './animated/graph';
 import { bindAnimatedEvent, bindAnimatedValue } from './animated/host-binding';
@@ -22,11 +45,20 @@ import {
 } from './node-style';
 import {
   RESPONDER_EVENTS,
+  hasListenerFor,
   isOnEventName,
   listenerName,
   setEventListener,
 } from './node-events';
-import type { ISymbioteNode } from './node-types';
+import {
+  isSymbioteNode,
+  type IClassStyleParts,
+  type ISymbioteNode,
+} from './node-types';
+
+// Fabric sends `layout` only to a node carrying this flag, which a container sets for itself
+const LAYOUT_EVENT = 'layout';
+const LAYOUT_FLAG = 'onLayout';
 
 const CLASS_PROP_KEYS: ReadonlySet<string> = new Set(['class', 'className']);
 
@@ -88,6 +120,7 @@ function routeStyleValue(node: ISymbioteNode, resolved: unknown): void {
     parts.explicitStyle = resolved({ pressed: false });
     parts.activeStyle = resolved({ pressed: true });
     parts.activeStyleFromCallback = true;
+    syncContainer(node, parts);
     pushClassStyle(node, parts);
     return;
   }
@@ -107,6 +140,91 @@ function routeStyleValue(node: ISymbioteNode, resolved: unknown): void {
     parts.activeStyle = undefined;
     parts.activeStyleFromCallback = false;
   }
+  syncContainer(node, parts);
+  pushClassStyle(node, parts);
+}
+
+// The envelope the host holds for each node, so an unchanged one is never sent again
+const shippedEnvelopes = new WeakMap<object, string>();
+// One JSON text per cached variants array, shared by every node of the class
+const envelopeByVariants = new WeakMap<IContainerVariants, string>();
+
+function envelopeOf(variants: IContainerVariants): string {
+  const known = envelopeByVariants.get(variants);
+  if (known !== undefined) return known;
+  const text = JSON.stringify(variants);
+  envelopeByVariants.set(variants, text);
+  return text;
+}
+
+// The host styles a node by its container in the first commit, from what this sends
+function shipContainerVariants(
+  node: ISymbioteNode,
+  className: IClassNameValue,
+): void {
+  if (!hasContainerConditions()) return;
+  const variants =
+    typeof className === 'string' ? containerVariantsOf(className) : undefined;
+  const envelope = variants === undefined ? undefined : envelopeOf(variants);
+  if (envelope === shippedEnvelopes.get(node)) return;
+  recordSetContainerVariants(node, envelope);
+  if (envelope === undefined) shippedEnvelopes.delete(node);
+  else shippedEnvelopes.set(node, envelope);
+}
+
+// Subscribes the node to the conditions its class read, and marks it for the teardown walk once
+// A class that reads a container condition also waits to be linked to the containers above it
+function subscribeClass(node: ISymbioteNode, className: IClassNameValue): void {
+  if (watchMediaClass(node, className, restyleClass)) {
+    recordSetReleaseMark(node);
+  }
+  if (
+    hasContainerConditions() &&
+    conditionIdsOf(className).some(isContainerCondition)
+  ) {
+    queueConsumer(node, restyleClass);
+  }
+  shipContainerVariants(node, className);
+}
+
+// The container a node answers to is known after its commit, so the first resolve sees none
+function resolveForNode(
+  node: ISymbioteNode,
+  className: IClassNameValue,
+): ReturnType<typeof resolveClassName> {
+  return resolveClassName(
+    className,
+    hasContainerConditions() ? containerLookup(node) : undefined,
+  );
+}
+
+// A node is a container while its style says so, and then asks Fabric for its `layout` event
+function syncContainer(node: ISymbioteNode, parts: IClassStyleParts): void {
+  if (!hasContainerConditions()) return;
+  const container = containerStyleOf(parts.classStyle, parts.explicitStyle);
+  const was = isContainer(node);
+  if (container === undefined) {
+    if (!was) return;
+    revokeContainer(node);
+    setProp(
+      node,
+      LAYOUT_FLAG,
+      hasListenerFor(node, LAYOUT_EVENT) ? true : undefined,
+    );
+    return;
+  }
+  declareContainer(node, container.names, container.open, container.unfixed);
+  if (!was) setProp(node, LAYOUT_FLAG, true);
+}
+
+// Re-resolves a node after a flip or a return, keeping the old object when nothing changed
+function restyleClass(node: object): void {
+  if (!isSymbioteNode(node)) return;
+  const parts = stylePartsOf(node);
+  const next = resolveForNode(node, parts.className);
+  if (!isSameShallowStyle(next, parts.classStyle)) parts.classStyle = next;
+  subscribeClass(node, parts.className);
+  syncContainer(node, parts);
   pushClassStyle(node, parts);
 }
 
@@ -123,7 +241,12 @@ function routeStyleSlot(
     parts.className = canonicalClassName(
       isClassNameValue(resolved) ? resolved : undefined,
     );
-    parts.classStyle = resolveClassName(parts.className);
+    // The environment snapshot has to exist before a conditional class resolves against it
+    if (hasConditions()) ensureMediaEnvironment();
+    parts.classStyle = resolveForNode(node, parts.className);
+    // Subscribed after resolving, since the conditions a class read are known only then
+    if (hasConditions()) subscribeClass(node, parts.className);
+    syncContainer(node, parts);
     pushClassStyle(node, parts);
     return true;
   }

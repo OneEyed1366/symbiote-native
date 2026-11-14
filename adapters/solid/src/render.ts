@@ -12,11 +12,11 @@ import {
 } from '@symbiote-native/engine';
 import { catchError, createRoot, type Component } from 'solid-js';
 import { createComponent, insert, setActiveSurface } from './renderer';
+import { RootTagContext } from './root-tag-context';
 
-// One Solid root per surface, so a surface can be torn down (unmount) or cleanly re-mounted on the
-// same rootTag: the bridgeless host stops and restarts a surface on Fast Refresh and on
-// lifecycle/focus changes, reusing the rootTag. The value is Solid's own dispose function — the
-// whole reactive root goes with it, effects and cleanups included.
+// One Solid root per surface, so a surface can be torn down or re-mounted on the same `rootTag`
+// The bridgeless host does that on Fast Refresh and on lifecycle or focus changes
+// The value is Solid's own `dispose`, the whole reactive root goes with it
 const roots = new Map<IRootTag, () => void>();
 
 // Insertion-ordered, so the last entry is the most recently mounted surface. Kept alongside
@@ -31,16 +31,9 @@ function teardown(rootTag: IRootTag): void {
   dispose();
   roots.delete(rootTag);
   surfaces.delete(rootTag);
-  // Cleared AFTER dispose() on purpose: disposing runs user cleanups, which can still mutate the
-  // tree, and those mutations should reach the surface they belong to rather than be dropped by
-  // renderer.ts's post-unmount guard.
-  //
-  // And cleared ONLY when the surface going away is the one the renderer is actually committing
-  // into. Clearing unconditionally killed a surface that was still mounted: with two surfaces up,
-  // unmounting the FIRST left the second alive but permanently uncommitted — every later mutation
-  // hit renderer.ts's "mutation after unmount" guard and was silently dropped. That is reachable
-  // from ordinary code the moment two surfaces exist, which is exactly the createTunnel case
-  // (../create-tunnel): the source surface stops, the target must keep painting.
+  // Cleared after `dispose()`, since user cleanups run inside it and can still mutate the tree
+  // Cleared only for the surface the renderer commits into, else a live surface goes dead
+  // With two surfaces up, unmounting the first must leave the second painting, as `createTunnel`
   if (activeRootTag !== rootTag) {
     disposeRoot(rootTag);
     return;
@@ -86,25 +79,23 @@ export function mount(
   activeRootTag = rootTag;
   setActiveSurface(surface);
 
-  // `createComponent(RootComponent, {})` is exactly what compiled JSX emits for `<RootComponent />`
-  // — written by hand here because this file is plain TS, deliberately: render.ts is the one module
-  // an app's entry point imports before any JSX has been compiled, so keeping it JSX-free means it
-  // needs no Babel pass of its own.
-  //
-  // The surface IS the render container: a top-level insert routes to surface.appendChild
-  // (renderer.ts's insertNode), and the engine wraps surface.children in its synthetic flex root.
-  //
-  // `createRoot` + `insert` IS renderer.ts's `render(code, surface)`, spelled out so `catchError`
-  // can sit BETWEEN them. Solid's own `render` runs `insert(element, code())` — the insert lands
-  // outside anything `code` wrapped, so a root component returning a bare accessor would build its
-  // render effect under an owner with no error handler and throw past this seam. Written this way
-  // the insert is inside, and every computation the mount creates inherits the handler.
+  // `createComponent` is what compiled JSX emits, written by hand: render.ts must stay JSX-free
+  // `createRoot` + `insert` is `render()` spelled out, so `catchError` wraps the insert as well
+  // The Provider hands the surface tag to `useContext(RootTagContext)` for the whole tree
   let unwinding: IUnwinding | undefined;
 
   const dispose = createRoot(disposeRootScope => {
     catchError(
       () => {
-        insert(surface, createComponent(RootComponent, {}));
+        insert(
+          surface,
+          createComponent(RootTagContext.Provider, {
+            value: rootTag,
+            get children() {
+              return createComponent(RootComponent, {});
+            },
+          }),
+        );
       },
       error => {
         if (unwinding?.error !== error) {
