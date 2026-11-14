@@ -9,7 +9,8 @@
 // `createLinkingIntegration` reads an Accessor in `onMount`, and a `ref` is called while its
 // component is created, before any effect, so one plain signal wired through is enough
 
-import { createSignal, For, onMount } from 'solid-js';
+import { createSignal, For, onCleanup, onMount } from 'solid-js';
+import { BackHandler } from '@symbiote-native/solid';
 import {
   Stack,
   createLinkingIntegration,
@@ -106,6 +107,21 @@ export default function App() {
   // It sits at the root, not in a screen, as the first route mounted is Menu
   onMount(() => {
     hide();
+  });
+
+  // Without a handler the Android Back key on the lab screen took the app to the launcher
+  // At the root `canGoBack` is false and the system leaves the app as usual
+  onMount(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        const handle = stackHandle();
+        if (handle === null || !handle.canGoBack()) return false;
+        handle.pop();
+        return true;
+      },
+    );
+    onCleanup(() => subscription.remove());
   });
 
   return (

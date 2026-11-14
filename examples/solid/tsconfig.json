@@ -11,5 +11,7 @@
     "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
   },
   "include": ["**/*.ts", "**/*.tsx"],
-  "exclude": ["**/node_modules", "**/Pods"]
+  // e2e/ has its own tsconfig (Detox on Jest, `types: [jest, detox, node]`); leaving it in this
+  // project too reports its jest globals as undefined names.
+  "exclude": ["**/node_modules", "**/Pods", "e2e"]
 }
