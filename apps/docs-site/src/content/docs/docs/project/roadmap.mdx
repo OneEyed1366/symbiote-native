@@ -109,6 +109,12 @@ in-editor autocomplete — see the [styling guide](/docs/learn/styling/) for
 setup. Svelte's own `<style>` block (scoped by default) compiles through the
 same pipeline. Tailwind CSS remains the open seam in this family.
 
+Runtime `@media`, `@container`, `var()`, `@property` and `matchMedia` are in the engine
+and shared by every adapter, see [Media queries and variables](/docs/learn/media-queries-and-vars/).
+The React example's `media-vars` and `container-axis` e2e specs pass 13 of 13 on an iOS simulator and an Android emulator.
+`setVariable` takes the surface from `useContext(RootTagContext)` on React and Solid, `useRootTag()` on Vue and Svelte, and `injectRootTag()` on Angular.
+Not built yet: reactive wrappers for `matchMedia` and `getComputedVariable` (the how-to shows one per adapter).
+
 ## Component parity rule
 
 A component is done only when it reaches full feature parity across adapters.

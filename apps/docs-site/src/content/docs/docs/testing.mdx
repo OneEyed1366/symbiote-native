@@ -55,6 +55,16 @@ The `e2e:*` scripts live in each example's own `package.json`
   harness yet at all.
 </Aside>
 
+## Responsive styles on a device
+
+`@media`, `@container` and `var()` depend on the window and the system, so the headless fake slot cannot flip them.
+The React example carries lab specs for them in `examples/react/e2e`: `media-vars`, `container-axis`, `color-scheme`, `var-precedence` and `remount`. The other examples have a `media-vars` spec too.
+
+- They call `device.setOrientation()` to cross a breakpoint and read the result from the paint of a probe swatch.
+- `container-axis` checks that an `inline-size` container answers a width query and not a height query, and that a container never styles itself.
+- `color-scheme` turns the device theme from outside Detox and restores it afterwards, `var-precedence` covers the order of `var()` sources, and `remount` leaves the screen and comes back.
+- They run with the same `e2e:*` scripts as the journeys. Only the React run on a device is confirmed so far.
+
 ## A gotcha specific to perpetual animations
 
 Detox's default synchronization waits for the app to go idle before running

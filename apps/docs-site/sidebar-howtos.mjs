@@ -4,6 +4,7 @@ export const howtosSidebar = {
   items: [
     { label: 'Overview', slug: 'docs/howtos' },
     { label: 'Style a component', slug: 'docs/howtos/styling' },
+    { label: 'Make styles responsive', slug: 'docs/howtos/responsive-styles' },
     { label: 'Animate a value', slug: 'docs/howtos/animations' },
     { label: 'Handle press/change events', slug: 'docs/howtos/events' },
     { label: 'Two-way bind a value', slug: 'docs/howtos/two-way-binding' },

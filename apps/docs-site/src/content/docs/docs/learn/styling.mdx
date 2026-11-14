@@ -46,7 +46,7 @@ them for a full stylesheet running on device.
 
 A build-time-only compiler (`@symbiote-native/css-parser`) turns each rule into a
 plain style object; `class="card"` resolves it back at render time through a
-runtime registry (`registerStyles`/`resolveClassName`, exported from
+runtime registry (`registerRules`/`resolveClassName`, exported from
 `@symbiote-native/engine`). This registry is shared by every adapter, not just Vue —
 React's `className`, Vue's `class`/`:class`, and Angular's `class`/`[class]`
 all resolve through the same lookup.
@@ -54,8 +54,7 @@ all resolve through the same lookup.
 ## Vue SFC `<style>` blocks
 
 A Vue SFC `<style>` block (including `scoped`) compiles into native style
-objects the same way — no CSS ships in the app bundle, no runtime CSS engine
-exists:
+objects the same way, and no CSS text ships in the app bundle:
 
 ```vue
 <template>
@@ -102,7 +101,7 @@ other property:
 ```
 
 A property with genuinely no RN equivalent (`animation`, pseudo-classes,
-media queries) is dropped with a build warning instead — see "What is not
+`@supports`) is dropped with a build warning instead, see "What is not
 CSS" below.
 
 ## Svelte's own `<style>` block
@@ -375,22 +374,27 @@ needs any of the three.
 
 ## What is not CSS
 
-There is no DOM, so there is nothing for a browser selector to match —
-pseudo-classes (`:hover`, `:focus`, `:nth-child`), media queries, and
-`animation` have no RN target and are dropped at build time, not silently
-misapplied. `:active` is the single exception, and it is not a general opening
-of CSS state: a press is the one state the engine itself tracks, so `.btn:active`
-compiles to a token beside `.btn` and wins the cascade exactly as its specificity
-says. Nothing else in that family follows — there is no hover or focus for it to
-mirror. Prefer `onPressIn`/`onPressOut` in the examples you write; reach for
-`:active` when the pressed look is purely visual and you want it resolved without
-a render. Tailwind CSS is not supported. Everything else — plain CSS
-(including `box-shadow`, `transform`, `filter`, `transform-origin`, and
-`background-image`), CSS Modules, and the SCSS/Less/Stylus preprocessors
-above — is a stable, build-time-only compile step: no CSS engine, no selector
-matching, and no extra runtime cost ships in the app bundle. It works the
-same way across React, Vue, Angular, Svelte, and Solid, including Svelte's own
-default-scoped `<style>` block.
+There is no DOM, so there is nothing for a browser selector to match.
+Pseudo-classes (`:hover`, `:focus`, `:nth-child`), `@supports` and `animation`
+have no RN target and are dropped at build time, not silently misapplied.
+`@media`, `@container` and `var()` are kept and resolved on the device, see
+[Media queries, container queries and CSS
+variables](/docs/learn/media-queries-and-vars/).
+
+`:active` is the single exception among pseudo-classes. A press is the one
+state the engine itself tracks, so `.btn:active` compiles to a token beside
+`.btn` and wins the cascade exactly as its specificity says. There is no hover
+or focus for anything else to mirror. Prefer `onPressIn`/`onPressOut` in the
+examples you write, and reach for `:active` when the pressed look is purely
+visual and you want it resolved without a render.
+
+Tailwind CSS is not supported. Plain CSS (including `box-shadow`, `transform`,
+`filter`, `transform-origin`, and `background-image`), CSS Modules, and the
+SCSS/Less/Stylus preprocessors above compile at build time. Only `@media`,
+`@container` and `var()` are evaluated on the device, against a condition
+table the compiler emits, and a node pays for them only when a rule uses one.
+It works the same way across React, Vue, Angular, Svelte, and Solid, including
+Svelte's own default-scoped `<style>` block.
 
 ## StyleSheet.create — the alternative
 
