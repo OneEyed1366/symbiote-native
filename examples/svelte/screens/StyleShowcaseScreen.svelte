@@ -6,11 +6,15 @@
   import './StyleShowcase.css';
   import './StyleShowcase.limits.css';
   import './StyleShowcase.media.css';
+  import './StyleShowcase.lab.css';
   import './showcase.scss';
   import './showcase.less';
   import './showcase.styl';
   import AnimationPanel from './style-showcase/AnimationPanel.svelte';
   import CompoundPanel from './style-showcase/CompoundPanel.svelte';
+  import ContainerLab from './style-showcase/ContainerLab.svelte';
+  import MediaLab from './style-showcase/MediaLab.svelte';
+  import VarLab from './style-showcase/VarLab.svelte';
   import DeclarationsPanel from './style-showcase/DeclarationsPanel.svelte';
   import LimitsPanel from './style-showcase/LimitsPanel.svelte';
   import MediaPanel from './style-showcase/MediaPanel.svelte';
@@ -58,5 +62,8 @@
     <PreprocessorsPanel />
     <LimitsPanel />
     <MediaPanel />
+    <MediaLab />
+    <ContainerLab />
+    <VarLab />
   </scroll-view>
 </safe-area-view>

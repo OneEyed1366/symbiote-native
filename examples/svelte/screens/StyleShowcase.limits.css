@@ -1,5 +1,5 @@
-/* The deliberately-unsupported sheet. Every rule below is here to be DROPPED or to behave
-   wrongly, and every one of them prints a warning into the Metro output under the
+/* The deliberately-limited sheet. Every rule below is DROPPED, behaves wrongly or holds only under
+   a condition, and the first two print a warning into the Metro output under the
    `[@symbiote-native/css-parser]` / `[symbiote-css]` prefix naming this file. A tile that starts
    painting the red variant is the regression.
 
@@ -10,9 +10,9 @@
   --sc-limit-lime: #a3d94f;
 }
 
-/* ---- @supports / @container: dropped whole, rules included -------------------------------
-   React Native has no feature query and no container query yet, so neither is honoured
-   Both must stay slate, red means a condition started being honoured */
+/* ---- @supports dropped whole, @container kept but with no container here -----------------
+   `@supports` has no RN meaning, so its rules go, `@container` needs a `container-type` ancestor
+   Both must stay slate, red means `@supports` was honoured or this tile gained a container */
 .sc-limit-cond {
   height: 3.5rem;
   align-items: center;
