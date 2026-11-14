@@ -194,6 +194,12 @@ export {
   I18nManager,
   Dimensions,
   Appearance,
+  matchMedia,
+  MediaQueryList,
+  MediaQueryListEvent,
+  setVariable,
+  getComputedVariable,
+  registerProperty,
   AppState,
   Keyboard,
   KEYBOARD_EVENT,
@@ -310,6 +316,7 @@ export { Portal, type IPortalProps, type IPortalTarget } from './create-portal';
 // bucket is named `runes/`, not `hooks/`/`composables/`.
 export { useWindowDimensions } from './runes/use-window-dimensions.svelte';
 export { useColorScheme } from './runes/use-color-scheme.svelte';
+export { useRootTag } from './runes/use-root-tag';
 export {
   useAnimatedColor,
   useAnimatedValue,

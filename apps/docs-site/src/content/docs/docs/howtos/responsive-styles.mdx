@@ -1,0 +1,197 @@
+---
+title: 'How to: make styles responsive'
+description: Change a style with the window, a container, the color scheme or a runtime variable.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+You want a class to look different on a narrow window, in a dark scheme, or inside a small box. The CSS is the same on every adapter.
+Read the [guide](/docs/learn/media-queries-and-vars/) for the full model.
+
+## Change a style at a breakpoint
+
+```css
+.card {
+  padding: 12px;
+}
+@media (min-width: 37.5rem) {
+  .card {
+    padding: 24px;
+  }
+}
+```
+
+Use `rem` or `px`. The rule restyles only when the window crosses 600 wide, not on every resize.
+
+## Follow the color scheme
+
+```css
+.screen {
+  background-color: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  .screen {
+    background-color: #0f172a;
+  }
+}
+```
+
+The same works for `prefers-reduced-motion`, `prefers-contrast` and `orientation`.
+
+## Size against a parent, not the window
+
+Give the parent a definite size and a `container-type`. Descendants then query it:
+
+```css
+.panel {
+  container-type: inline-size;
+  width: 100%;
+}
+@container (min-width: 15rem) {
+  .panel-title {
+    font-size: 20px;
+  }
+}
+```
+
+A container with no `width`, `flex` or `aspectRatio` on that axis fails the query, and the engine logs one `console.warn` for that container.
+
+## Theme with a variable
+
+Declare the token once and read it with `var()`:
+
+```css
+:root {
+  --accent: #8338ec;
+}
+.badge {
+  background-color: var(--accent);
+}
+```
+
+Re-declare it under a media query to switch the whole theme with the color scheme:
+
+```css
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #c4a1ff;
+  }
+}
+```
+
+Every `var(--accent)` follows the scheme with no class on any node. Later rules win, as in the cascade.
+
+Override it for the whole surface from code, and remove it to fall back to `:root`:
+
+```ts
+setVariable(surface, '--accent', '#ffbe0b');
+setVariable(surface, '--accent', undefined);
+```
+
+`surface` is the root tag of the app, read through each adapter's own accessor, listed in the [guide](/docs/learn/media-queries-and-vars/#write-a-variable-from-code).
+A `--x` declared in a class on a node wins over the surface value for that node and its descendants.
+
+## Type a variable with `@property`
+
+A typed property computes to a canonical value and can stop inheritance:
+
+```css
+@property --gap {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 8px;
+}
+```
+
+`registerProperty({ name: '--gap', syntax: '<length>', inherits: false, initialValue: '8px' })` does the same from code.
+
+## Branch in code on a query
+
+`matchMedia` returns a snapshot plus a `change` event, with no reactivity of its own. Wrap it once in your framework's state.
+Pass `signal` to `addEventListener` so the listener goes away with the component:
+
+<Tabs syncKey="framework">
+  <TabItem label="React">
+```tsx
+import { useEffect, useState } from 'react';
+import { matchMedia } from '@symbiote-native/react';
+
+function useMatchMedia(query: string) {
+  const [matches, setMatches] = useState(() => matchMedia(query).matches);
+  useEffect(() => {
+    const list = matchMedia(query);
+    const controller = new AbortController();
+    setMatches(list.matches);
+    list.addEventListener('change', event => setMatches(event.matches), { signal: controller.signal });
+    return () => controller.abort();
+  }, [query]);
+  return matches;
+}
+```
+  </TabItem>
+  <TabItem label="Vue">
+```ts
+import { onScopeDispose, ref } from 'vue';
+import { matchMedia } from '@symbiote-native/vue';
+
+export function useMatchMedia(query: string) {
+  const list = matchMedia(query);
+  const matches = ref(list.matches);
+  const controller = new AbortController();
+  list.addEventListener('change', event => (matches.value = event.matches), { signal: controller.signal });
+  onScopeDispose(() => controller.abort());
+  return matches;
+}
+```
+  </TabItem>
+  <TabItem label="Solid">
+```ts
+import { createSignal, onCleanup } from 'solid-js';
+import { matchMedia } from '@symbiote-native/solid';
+
+export function createMatchMedia(query: string) {
+  const list = matchMedia(query);
+  const [matches, setMatches] = createSignal(list.matches);
+  const controller = new AbortController();
+  list.addEventListener('change', event => setMatches(event.matches), { signal: controller.signal });
+  onCleanup(() => controller.abort());
+  return matches;
+}
+```
+  </TabItem>
+  <TabItem label="Svelte">
+```svelte
+<script lang="ts">
+  import { matchMedia } from '@symbiote-native/svelte';
+
+  const list = matchMedia('(min-width: 600px)');
+  let wide = $state(list.matches);
+
+  $effect(() => {
+    const controller = new AbortController();
+    list.addEventListener('change', event => (wide = event.matches), { signal: controller.signal });
+    return () => controller.abort();
+  });
+</script>
+```
+  Svelte also ships `orientation` and `createWidthQuery` for the common cases.
+  </TabItem>
+  <TabItem label="Angular">
+```ts
+import { DestroyRef, inject, signal } from '@angular/core';
+import { matchMedia } from '@symbiote-native/angular';
+
+export function injectMatchMedia(query: string) {
+  const list = matchMedia(query);
+  const matches = signal(list.matches);
+  const controller = new AbortController();
+  list.addEventListener('change', event => matches.set(event.matches), { signal: controller.signal });
+  inject(DestroyRef).onDestroy(() => controller.abort());
+  return matches.asReadonly();
+}
+```
+  </TabItem>
+</Tabs>
+
+`matchMedia` is exported by every adapter. The color scheme has a framework-native form too:
+`useColorScheme` on React, Vue and Svelte, `createColorScheme` on Solid, `ColorSchemeService` on Angular.

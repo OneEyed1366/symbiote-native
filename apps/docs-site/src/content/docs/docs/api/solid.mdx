@@ -154,7 +154,10 @@ adapters, so app code keeps one import root: `Platform`, `StyleSheet`,
 `I18nManager`, `Appearance`, `AppState`, `Keyboard`, `BackHandler`,
 `PermissionsAndroid`, `LayoutAnimation`, `InteractionManager`,
 `AccessibilityInfo`, `findNodeHandle`, and `dlog`/`isDebug` for diagnostic
-logging.
+logging. The CSS runtime is there too: `matchMedia`, `setVariable`,
+`getComputedVariable` and `registerProperty`, with `RootTagContext` that gives
+`setVariable` its surface, see
+[Media queries and variables](/docs/learn/media-queries-and-vars/).
 
 Two reactive reads are **primitives**, not hooks: Solid's ecosystem term for
 a composable reactive function, and why this adapter's lifecycle bucket is
@@ -183,10 +186,10 @@ that owns its own subscription is `create*`. `useNavigation`/`useRoute` from
 existing router rather than creating one.
 
 On Android, `Keyboard` and `Settings` do nothing until you also install
-[`@symbiote-native/android`](/docs/packages/android/):
+[`@symbiote-native/android`](/docs/packages/android/).
 `keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
-keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
-surface SymbioteNative mounts never triggers it, and `Settings` reads back
+keyboard-event source is `ReactRootView`'s layout listener. The bridgeless
+surface SymbioteNative mounts never triggers it. `Settings` reads back
 `null`, because RN's `Settings` has no stock Android implementation at all.
 
 ## Animations and gestures

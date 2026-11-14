@@ -148,13 +148,16 @@ so app code keeps one import root: `Platform`, `StyleSheet`, `Dimensions`,
 `PermissionsAndroid`, `AccessibilityInfo`, `I18nManager`, `Settings`,
 `LayoutAnimation`, `InteractionManager`, `StatusBar`, plus the
 `useWindowDimensions`/`useColorScheme` composables, `findNodeHandle`, and
-`dlog`/`isDebug` for diagnostic logging.
+`dlog`/`isDebug` for diagnostic logging. The CSS runtime is there too:
+`matchMedia`, `setVariable`, `getComputedVariable` and `registerProperty`,
+with the `useRootTag` composable that gives `setVariable` its surface,
+see [Media queries and variables](/docs/learn/media-queries-and-vars/).
 
 On Android, `Keyboard` and `Settings` do nothing until you also install
-[`@symbiote-native/android`](/docs/packages/android/):
+[`@symbiote-native/android`](/docs/packages/android/).
 `keyboardDidShow`/`keyboardDidHide` never fire, because Android's only stock
-keyboard-event source is `ReactRootView`'s layout listener and the bridgeless
-surface SymbioteNative mounts never triggers it, and `Settings` reads back `null`,
+keyboard-event source is `ReactRootView`'s layout listener. The bridgeless
+surface SymbioteNative mounts never triggers it. `Settings` reads back `null`,
 because RN's `Settings` has no stock Android implementation at all. That package
 supplies both native modules (`KeyboardObserver`, `SettingsManager`), is picked
 up by Gradle autolinking, and exports nothing from JS — installing it is the
@@ -218,8 +221,8 @@ const overlayTunnel = createTunnel(); // module-level singleton, importable from
 
 `Teleport` only reaches a target in the _same_ surface. `createTunnel` is for
 two independently `mount()`-ed surfaces that share no Fabric tree at all.
-`In` and `Out` are separate components — not composables, since a composable
-can't accept template markup — linked only by a small reactive store: `In`
+`In` and `Out` are separate components, not composables, since a composable
+can't accept template markup. They are linked only by a small reactive store: `In`
 registers its slot content wherever it renders, `Out` reads the store and
 paints in whichever surface actually mounts it.
 

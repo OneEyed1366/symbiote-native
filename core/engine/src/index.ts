@@ -216,6 +216,7 @@ export type {
 } from './styles';
 export { StyleSheet, computeHairlineWidth } from './style-sheet';
 export {
+  registerRootVariables,
   resolveClassName,
   styleOfProps,
   isClassNameValue,
@@ -225,7 +226,11 @@ export {
   clearGlobalStyles,
   keyframesNamed,
 } from './keyframes-registry';
-export type { IClassNameValue, IStyleRule } from './style-registry';
+export type {
+  IClassNameValue,
+  IRootVariable,
+  IStyleRule,
+} from './style-registry';
 export { renameClassTokens } from './style-registry/scope';
 export type {
   IClassNameRenames,
@@ -478,6 +483,17 @@ export type {
 } from './dimensions';
 export type { IPixelRatioStatic } from './pixel-ratio';
 export type { IColorSchemeName, IColorSchemePreference } from './appearance';
+// `matchMedia` answers from the same environment as the `@media` rules of a class
+export { matchMedia, MediaQueryList, MediaQueryListEvent } from './match-media';
+// A custom property on one surface, the web's `documentElement.style.setProperty`
+export { getComputedVariable, setVariable } from './surface-variables';
+export {
+  clearRegisteredProperties,
+  registerProperties,
+  registerProperty,
+  type ICompiledProperty,
+  type IPropertyDescriptor,
+} from './registered-properties';
 export type { IAppStateStatus, IAppStateEvent } from './app-state';
 // AppRegistry core: registry bookkeeping + host-registrar bridge + headless tasks, shared by
 // every adapter. Each adapter calls createAppRegistry with its own runnableFor (the one

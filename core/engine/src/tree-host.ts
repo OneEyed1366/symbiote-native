@@ -37,13 +37,11 @@ export type ICommittedRecord = {
   familyGeneration?: number;
 };
 
-// A structural census of the host's tree: how many nodes it holds, how many the commit skips, and
-// the width of every parent with a skipped child — exactly what the child-set build re-scans
-// every time that parent reconciles.
+// A structural census of the host's tree: nodes held, nodes the commit skips, and the width of
+// every parent with a skipped child, which the child-set build re-scans per reconcile
 
-// Anchor count is an adapter property, not an app one: Angular's components bind to a host element
-// and always allocate one, where React/Vue/Svelte/Solid don't — the same screen is anchor-free
-// under four adapters and carries one per instance under the fifth.
+// Anchor count depends on the adapter, not the app, т.к. Angular always allocates a host element
+// per component and React, Vue, Svelte and Solid do not
 export type ITreeCensus = {
   nodes: number;
   anchors: number;
@@ -69,11 +67,11 @@ export const EMPTY_CENSUS: ITreeCensus = {
 // gesture or lifecycle rate, but a gesture is not one touch: a per-level walk once cost 18-19
 // crossings per event/frame, all reduced to 1.
 
-// parentsOf, subtreesOf and ancestorsOf are that fix: each answers its singular twin's question,
-// in one crossing, for the three walks whose size is the tree's rather than a node's — teardown
-// down, dispatch and responder negotiation up.
+// `parentsOf`, `subtreesOf` and `ancestorsOf` are that fix, one crossing each
+// They serve the three walks sized by the tree: teardown down, dispatch and responder up
 export type ITreeHost = {
-  applyOps: (batch: IMutationBatch) => void;
+  // `true` when the commit left views to be styled by the next one, which JS then makes
+  applyOps: (batch: IMutationBatch) => boolean | void;
   propOf: (handle: object, key: string) => unknown;
   // The whole bag, for the callers that fold over it rather than ask for one name — every host
   // behavior's payload fold. Kept beside `propOf` rather than derived from it: the host holds the
@@ -105,18 +103,16 @@ export type ITreeHost = {
   // answering early would orphan every child behind a dead one, since cleanChildren's loop ends
   // on undefined.
   firstChildOf: (handle: object) => object | undefined;
-  // The next entry in the parent's child list — not parentOf + childrenOf spelled in JS, which is
-  // quadratic on the path that uses it: Vue's renderer names this once per row while patching a
-  // keyed list, so building the sibling list per call crosses a handle per entry every time.
+  // The next entry in the parent's child list, not `parentOf` plus `childrenOf` spelled in JS
+  // That spelling is quadratic: Vue's renderer asks once per row while patching a keyed list
 
-  // A surface parent answers like any other: the surface is an ordinary node in the host's tree,
-  // so a top-level node's siblings are its children.
+  // A surface parent answers like any other, being an ordinary node in the host's tree
+  // So a top-level node's siblings are its children
   nextSiblingOf: (handle: object) => object | undefined;
   // ── the two batched reads, and why they take a list ────────────────────────────────────────────
 
-  // Each answers its singular twin's question, for many nodes in one crossing — the teardown sweep
-  // is the one read whose size is the tree's, not the gesture's: clearing rows one at a time would
-  // cross a handle per node walked, which is what named the sweep.
+  // Each answers its singular twin's question for many nodes in one crossing
+  // The teardown sweep is sized by the tree, so one row at a time crossed a handle per node
 
   // Per-element semantics are the twins' unchanged, deliberately: this is a cost fix, and a sweep
   // that tore down a different set of nodes than before would be a behaviour change wearing one.
@@ -130,9 +126,8 @@ export type ITreeHost = {
   // Not a replacement for subtreesOf: an animated binding is per node and carries no tag, so
   // host-access.ts asks for the full walk whenever one exists.
   teardownSubtreesOf: (roots: readonly object[]) => readonly object[];
-  // The node itself and every ancestor above it, deepest first — the upward twin of subtreesOf,
-  // for the same reason: event dispatch needs this chain for every event (capture reversed, bubble
-  // forward), and responder negotiation needs it again on every drag frame.
+  // The node itself and every ancestor above it, deepest first, the upward twin of `subtreesOf`
+  // Event dispatch needs the chain per event, responder negotiation on every drag frame
 
   // A surface is included, exactly as parentOf's answer is — stopping at one is host-access.ts's
   // job, done by reading the answer's component.
@@ -180,6 +175,10 @@ export type ITreeHost = {
     handle: object,
     includeTransform: boolean,
   ) => IDomRect | undefined;
+
+  // What a `var()` on the node would read, `undefined` when nothing declares the name or the host
+  // predates the read
+  readVariable?: (handle: object, name: string) => string | undefined;
 };
 
 export type IDomRect = {
@@ -203,9 +202,8 @@ export function treeHost(): ITreeHost | undefined {
   return host;
 }
 
-// Push everything recorded since the last apply into the host. Every read goes through here first
-// — a reconciler navigates the tree mid-build (Vue/Solid/Svelte/Angular all ask for a parent or
-// sibling before commit), so a host only told at completeRoot would answer about a stale tree.
+// Push what was recorded since the last apply into the host, every read goes here first
+// A reconciler navigates the tree mid-build, so a host told only at `completeRoot` answers stale
 
 // Adapters that coalesce writes, given the last moment to record what they're holding. Angular's
 // styling engine has no whole-value call (ɵɵstyleMap delivers one key per setStyle), so the
@@ -245,6 +243,31 @@ export function flushOps(): void {
   host.applyOps(takeBatch());
 }
 
+// Android mounts a commit's views from what they were allocated with, so native holds a style set
+// in the commit that inserts them back for the next one. That commit comes after the frames below
+const FOLLOW_UP_FRAMES = 2;
+const FOLLOW_UP_LIMIT = 3;
+
+function commitAfterMount(
+  rootTag: IRootTag,
+  surface: IMutationHandle,
+  attempt: number,
+  framesLeft: number = FOLLOW_UP_FRAMES,
+): void {
+  if (framesLeft > 0) {
+    requestAnimationFrame(() =>
+      commitAfterMount(rootTag, surface, attempt, framesLeft - 1),
+    );
+    return;
+  }
+  if (host === undefined) return;
+  recordCommit(rootTag, surface);
+  const isFollowUpWanted = host.applyOps(takeBatch());
+  if (isFollowUpWanted === true && attempt < FOLLOW_UP_LIMIT) {
+    commitAfterMount(rootTag, surface, attempt + 1);
+  }
+}
+
 // Commits this window, for readCommitProfile below.
 let commits = 0;
 
@@ -257,9 +280,8 @@ let lastCommittedTag: IRootTag | undefined;
 // children belong to the root child set the same way an anchor's belong to its parent's list,
 // which is why OP_COMMIT names one node and the host needs no rootTag -> map.
 
-// `others` is every other live surface, needed because the buffer is global while a commit names
-// one root — a portal or cross-surface move can mutate a different surface than the one
-// committing, and naming every root here is what flushes what actually changed.
+// `others` is every other live surface, since the buffer is global while a commit names one root
+// A portal or cross-surface move can mutate another surface, and naming every root flushes it
 
 // A single-surface app (the overwhelming case) passes an empty list, byte-identical to naming
 // only itself.
@@ -277,9 +299,8 @@ export function commitSurfaceOps(
   // completeRoot on an identical child set, but only after rebuilding it: every child is
   // revisited to discover none moved, linear cost for a commit that publishes nothing.
 
-  // Post-commit hooks are NOT affected: notifyCommitted/runPostCommitHooks/runDeferredAttaches/
-  // afterCommit all run after this call in surface.ts, deliberately ungated on native calls — a
-  // fold that strips a prop makes its commit byte-identical, and the hook must still fire.
+  // Post-commit hooks run after this call in surface.ts, ungated on native calls
+  // A fold that strips a prop makes its commit byte-identical, and the hook must still fire
   if (!hasChangedSinceCommit()) return;
   for (const [otherTag, otherSurface] of others) {
     recordCommit(otherTag, otherSurface);
@@ -290,8 +311,11 @@ export function commitSurfaceOps(
     recordCommit(rootTag, surface);
     lastCommittedTag = rootTag;
   }
-  host.applyOps(takeBatch());
+  const isFollowUpWanted = host.applyOps(takeBatch());
   noteCommitDrained();
+  if (isFollowUpWanted === true && rootTag !== undefined) {
+    commitAfterMount(rootTag, surface, 1);
+  }
 }
 
 // What the commit path cost on this host since the last read. Reading zeroes the accumulator, so
@@ -322,9 +346,8 @@ export type ICommitProfile = {
   decodeMs: number;
 };
 
-// Reading this now drains the surface telemetry too — nodesCreated is folded in from
-// readSurfaceTelemetry, which zeroes on read in C++, so a sampler polling this on an interval
-// empties what a later readSurfaceTelemetry call would have reported.
+// Reading this drains the surface telemetry too, `nodesCreated` being folded in from it
+// `readSurfaceTelemetry` zeroes on read in C++, so a sampler polling here empties a later call
 export function readCommitProfile(): ICommitProfile {
   // One read, not two: readSurfaceTelemetry zeroes the C++ accumulator, so asking twice hands the
   // second caller zeroes and the field would read as "the buffer never crossed".
@@ -407,9 +430,8 @@ export type ISurfaceTelemetry = {
   setPropMs: number;
   propConvertMs: number;
   setProps: number;
-  // The two setProp ops that changed nothing, counted apart since they're not the same waste:
-  // deletesOfAbsent leaves before value conversion (a hash lookup), writesOfUnchanged leaves after
-  // it (a paid JSI conversion for nothing) — the expensive one, reported as WRITES n/m on device.
+  // The two `setProp` ops that changed nothing, counted apart since they are not the same waste
+  // `deletesOfAbsent` leaves before value conversion, `writesOfUnchanged` pays a JSI conversion
   deletesOfAbsent: number;
   writesOfUnchanged: number;
   // How well the buffer's value interning worked: entries in the batch's value table, vs. how many
@@ -434,9 +456,8 @@ export type ISurfaceTelemetry = {
   // subtree, and whether that cost is the crossing or the JS loop above decides where to optimize.
   hostReadMs: number;
   hostReadHandles: number;
-  // How many times applyOps was entered since the last read. String/value tables intern per batch,
-  // so many small flushes can't fold a repeated value across them — distinguishing "sends more
-  // values" from "sends the same values in more batches", identical in valueEntries alone.
+  // How many times `applyOps` was entered since the last read
+  // Tables intern per batch, so small flushes cannot fold a repeated value across them
   applyCalls: number;
 };
 

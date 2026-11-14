@@ -20,6 +20,7 @@ import {
 } from '@symbiote-native/engine';
 import { patchGlobals, restoreGlobals } from './dom-shim';
 import { createRootShimElement } from './root-element';
+import { ROOT_TAG_KEY } from './runes/use-root-tag';
 
 type IMountedApp = {
   readonly svelteApp: ReturnType<typeof svelteMount>;
@@ -37,18 +38,9 @@ function teardown(rootTag: IRootTag): void {
   disposeRoot(rootTag);
 }
 
-// `transformError` is svelte's own mount-level hook for errors a `<svelte:boundary>` is about to
-// HANDLE - upstream reaches for it to run SvelteKit's `handleError`. Svelte calls it only from
-// Boundary.#handle_error (dom/blocks/boundary.js), i.e. only once some boundary with an `onerror`
-// or a `failed` snippet has claimed the error, and it inherits down the boundary tree, so one
-// hook at mount covers every boundary the app writes. We use it as a read-only tap and return the
-// error untouched, so the `failed` snippet still receives the real thing.
-//
-// Why this is `dlog` and NOT reportUncaughtError - read this before "fixing" it back: writing a
-// `<svelte:boundary>` IS the developer saying "this can throw and I am handling it here".
-// Answering that with a full-screen redbox over the fallback the app just rendered contradicts
-// what the app asked for. The UNCAUGHT path below still reports; the only difference is whether
-// anyone claimed the error. Same asymmetry as the React adapter's onCaughtError.
+// `transformError` runs once a `<svelte:boundary>` claims an error, one hook covers every boundary
+// A read-only tap: the error returns untouched, so the `failed` snippet still gets it
+// Logged, not reported: a boundary means the dev handles it, no redbox over the fallback
 function tapBoundaryError(error: unknown): unknown {
   dlog(() => `svelte render (caught by <svelte:boundary>): ${String(error)}`);
   return error;
@@ -73,25 +65,13 @@ export function mount(
     svelteApp = svelteMount(RootComponent, {
       target,
       props: props ?? {},
+      context: new Map([[ROOT_TAG_KEY, rootTag]]),
       transformError: tapBoundaryError,
     });
   } catch (error) {
-    // Svelte has no mount-level hook for an UNCAUGHT error, so the seam is the throw itself:
-    // while a subtree is still being created, error-handling.js rethrows synchronously
-    // (`handle_error` bails out before REACTION_RAN is set, and the implicit root boundary
-    // `_mount` installs carries only a `pending` snippet, so it re-throws too). Without this the
-    // throw left the surface half-committed - nothing painted, nothing logged, a blank screen.
-    //
-    // Reported AND rethrown, deliberately: the report is the channel we control and is the whole
-    // point of this seam, while the rethrow keeps upstream's contract that `mount()` fails loudly
-    // - an app or a test harness wrapping mount() in its own try/catch must still see the error.
-    //
-    // Reaches the SYNCHRONOUS mount-time throw only. An error raised later - a reactive update,
-    // an `$effect` body, a rejected `{#await}` - is rethrown from inside svelte's own microtask
-    // flush (queue_micro_task, internal/client/dom/task.js), past any try/catch of ours; those
-    // land on the host's uncaught-exception path. `flushSync()` here would pull the mount-time
-    // `$effect` case in, at the price of running user effects BEFORE the engine's first commit,
-    // where getNativeTag() is still undefined - a worse bug than the one it closes.
+    // Svelte has no mount-level hook for an uncaught error, so the seam is the synchronous throw
+    // Reported and rethrown, `mount()` keeps failing loudly for a caller's own try/catch
+    // Later errors land in svelte's microtask flush, past this catch
     reportUncaughtError(error, {
       origin: 'svelte render (no <svelte:boundary>)',
     });

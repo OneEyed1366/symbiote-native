@@ -13,6 +13,7 @@ import {
   slotDerivesFrom,
 } from './host-behavior';
 import { resolveStructuredStyle } from './structured-style';
+import { declaresVariables } from './style-declarations';
 import {
   IMAGE_SOURCE_PROPS,
   assertSinglePlaceholder,
@@ -115,7 +116,8 @@ export function writeProp(
   // `boxShadow` / `filter` / `transform` and Image's source props resolve on the way IN, at this
   // same choke point, т.к. the C++ payload builder has no JS to do it headless
   let written: unknown = value;
-  if (key === 'style' || key === 'activeStyle') {
+  const isStyle = key === 'style';
+  if (isStyle || key === 'activeStyle') {
     written = resolveStructuredStyle(value);
   } else if (node.resolvesImageSources && IMAGE_SOURCE_PROPS.has(key)) {
     checkImageSourceWrite(node, key, value);
@@ -141,7 +143,7 @@ export function writeProp(
   // Written over with a non-function, so the stash must let go or it keeps answering
   const bag = functionProps.get(node);
   if (bag !== undefined) bag.delete(key);
-  recordSetProp(node, key, written);
+  recordSetProp(node, key, written, isStyle && declaresVariables(written));
 }
 
 /** What `propOf` consults before asking the host, `undefined` when nothing was stashed. */

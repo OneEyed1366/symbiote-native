@@ -730,6 +730,9 @@ importers:
         specifier: 'catalog:'
         version: 1.32.0
     devDependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../engine
       '@types/less':
         specifier: 'catalog:'
         version: 3.0.8

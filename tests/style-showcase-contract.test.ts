@@ -1,21 +1,6 @@
-// The contract examples/react's StyleShowcaseScreen demonstrates, asserted.
-//
-// That screen is a showcase of the whole @symbiote-native/css-parser surface, built so a
-// regression PAINTS: its corner-radius tile goes square, its filtered tile becomes its own twin,
-// its limits tiles turn red. That only works while the CSS behind each tile still compiles to
-// what the tile claims — and nobody looks at a simulator on every commit. The golden corpus
-// snapshot next door pins the emitted BYTES of these same six sheets, which catches any change
-// at all but says nothing about which change matters; this file names the specific facts each
-// tile rests on, so a break reports the tile rather than a diff.
-//
-// It drives the real compiler over the real sheets on disk and then the real runtime registry
-// over the emitted rules, so a break on either half is caught: a rule that stops being emitted,
-// and a rule that stops WINNING.
-//
-// Lives here rather than in examples/react because examples/* is outside the pnpm workspace and
-// resolves @symbiote-native/* from published tarballs — a test there would grade the last
-// release, not the working tree. `tests/**` is this config's bucket for a check that reads
-// several packages and asserts a contract between them.
+// The contract `examples/react`'s `StyleShowcaseScreen` demonstrates, asserted per tile
+// The real compiler runs over the real sheets, then the real registry over the emitted rules
+// Lives here, not in `examples/react`, since examples resolve published tarballs, not the tree
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,11 +14,17 @@ import {
   vi,
 } from 'vitest';
 import { compileCssFile } from '../core/css-parser/src/metro-css-module/index.ts';
+import { containerStyleOf } from '../core/engine/src/container-tracking.ts';
 import type { IStyleRule } from '../core/engine/src/style-registry/index.ts';
+import type {
+  IMediaCondition,
+  IMediaEnvironment,
+} from '../core/engine/src/style-registry/media-evaluate.ts';
 import {
   clearGlobalStyles,
   registerRules,
   resolveClassName,
+  setMediaEnvironment,
 } from '../core/engine/src/style-registry/index.ts';
 
 const REPO_ROOT = path.resolve(
@@ -45,19 +36,23 @@ const SHEET_DIR = 'examples/react/screens';
 const MAIN = `${SHEET_DIR}/StyleShowcase.css`;
 const MODULE = `${SHEET_DIR}/StyleShowcase.module.css`;
 const LIMITS = `${SHEET_DIR}/StyleShowcase.limits.css`;
+const MEDIA = `${SHEET_DIR}/StyleShowcase.media.css`;
+const LAB = `${SHEET_DIR}/StyleShowcase.lab.css`;
+const LAB_E2E = 'examples/react/e2e/lab-colors.ts';
+const LAB_PANELS = `${SHEET_DIR}/style-showcase/lab-panels.tsx`;
 const SCSS = `${SHEET_DIR}/showcase.scss`;
 const LESS = `${SHEET_DIR}/showcase.less`;
 const STYLUS = `${SHEET_DIR}/showcase.styl`;
 
-interface ICompiled {
+type ICompiled = {
   readonly rules: readonly IStyleRule[];
+  readonly conditions: readonly IMediaCondition[];
   readonly exports: Record<string, string>;
   readonly warnings: readonly string[];
-}
+};
 
-// The compiled module is JS source, so the payload is read back out of it rather than eval'd —
-// the registerRules([...]) argument and the `export default` map are exactly what Metro hands
-// the bundle, and both are plain JSON by construction.
+// The compiled module is JS source, so the payload is read back out of it rather than eval'd
+// Both the `registerRules` rules and the `export default` map are plain JSON by construction
 async function compile(relativePath: string): Promise<ICompiled> {
   const warnings: string[] = [];
   const spy = vi
@@ -70,7 +65,8 @@ async function compile(relativePath: string): Promise<ICompiled> {
   const { code } = await compileCssFile(source, relativePath);
   spy.mockRestore();
 
-  const rulesMatch = /registerRules\((\[[\s\S]*?\])\);/.exec(code);
+  const rulesMatch =
+    /registerRules\((\[[\s\S]*?\])(?:, (\[[\s\S]*?\]))?\);/.exec(code);
   if (rulesMatch === null) {
     throw new Error(`${relativePath}: emitted no registerRules() call`);
   }
@@ -78,6 +74,7 @@ async function compile(relativePath: string): Promise<ICompiled> {
 
   return {
     rules: JSON.parse(rulesMatch[1]),
+    conditions: rulesMatch[2] === undefined ? [] : JSON.parse(rulesMatch[2]),
     exports: exportsMatch === null ? {} : JSON.parse(exportsMatch[1]),
     warnings,
   };
@@ -97,17 +94,20 @@ function ruleFor(
 let main: ICompiled;
 let cssModule: ICompiled;
 let limits: ICompiled;
+let media: ICompiled;
+let lab: ICompiled;
 let scss: ICompiled;
 let less: ICompiled;
 let stylus: ICompiled;
 
-// Sequential, NOT Promise.all: compile() installs a console.warn spy for the duration of one
-// compile, and concurrent compiles would each restore the other's spy — the warnings then land
-// on whichever file happened to be listening, and the three limits assertions read empty.
+// Sequential, NOT Promise.all, since each compile installs a `console.warn` spy
+// Concurrent compiles would restore each other's spy and misfile the warnings
 beforeAll(async () => {
   main = await compile(MAIN);
   cssModule = await compile(MODULE);
   limits = await compile(LIMITS);
+  media = await compile(MEDIA);
+  lab = await compile(LAB);
   scss = await compile(SCSS);
   less = await compile(LESS);
   stylus = await compile(STYLUS);
@@ -180,11 +180,12 @@ describe('panel 2 — specificity and source order', () => {
     expect(Number(compound?.order)).toBeLessThan(Number(base?.order));
   });
 
+  // The token stays a `var()` here, since C++ substitutes it per node on the device
   it('lets the earlier, more specific rule win the fill', () => {
     registerRules(main.rules);
     expect(
       resolveClassName('sc-spec-tile sc-spec-strong').backgroundColor,
-    ).toBe('#2f7d4f');
+    ).toBe('var(--sc-win)');
   });
 
   it('breaks an equal-specificity tie by the later line', () => {
@@ -192,8 +193,8 @@ describe('panel 2 — specificity and source order', () => {
     const resolved = resolveClassName(
       'sc-spec-tile sc-spec-early sc-spec-late',
     );
-    // #7bd0ff is .sc-spec-late; #f2789a is .sc-spec-early, declared immediately above it.
-    expect(resolved.borderColor).toBe('#7bd0ff');
+    // `--sc-sky` is .sc-spec-late; `--sc-rose` is .sc-spec-early, declared immediately above it
+    expect(resolved.borderColor).toBe('var(--sc-sky)');
   });
 });
 
@@ -268,18 +269,25 @@ describe('panel 7 — SCSS, Less and Stylus really ran', () => {
   // Each padding is a variable times two, so the number appears nowhere in the source: seeing it
   // proves the preprocessor evaluated, not merely that the file was found.
   it.each([
-    ['scss', () => scss, 'scss-tile', 26, 14],
-    ['less', () => less, 'less-tile', 22, 18],
-    ['stylus', () => stylus, 'styl-tile', 18, 22],
-  ])(
-    '%s emits arithmetic and a mixin result',
-    (_language, get, token, horizontalPadding, radius) => {
-      expect(ruleFor(get(), String(token))?.style).toMatchObject({
-        paddingRight: horizontalPadding,
-        borderRadius: radius,
-      });
-    },
-  );
+    [
+      'scss',
+      () => scss,
+      { token: 'scss-tile', paddingRight: 26, borderRadius: 14 },
+    ],
+    [
+      'less',
+      () => less,
+      { token: 'less-tile', paddingRight: 22, borderRadius: 18 },
+    ],
+    [
+      'stylus',
+      () => stylus,
+      { token: 'styl-tile', paddingRight: 18, borderRadius: 22 },
+    ],
+  ])('%s emits arithmetic and a mixin result', (_language, get, expected) => {
+    const { token, ...style } = expected;
+    expect(ruleFor(get(), token)?.style).toMatchObject(style);
+  });
 
   it.each([
     ['scss', () => scss, 'scss-tile', 'scss-tile-on'],
@@ -298,24 +306,24 @@ describe('panel 7 — SCSS, Less and Stylus really ran', () => {
 });
 
 describe('panel 8 — the limits, each with its warning', () => {
-  it('drops @media, @supports and @container whole, and says so', () => {
-    // ONE rule for .sc-limit-cond — the base. Three more would mean a condition was honoured,
-    // which is worse than dropping: the rules inside would paint unconditionally.
+  it('drops @supports whole and says so, and keeps @container behind its condition', () => {
+    // The base paints always, the `@container` body only once a container above it matches
     const conditionRules = limits.rules.filter(rule =>
       rule.tokens.includes('sc-limit-cond'),
     );
-    expect(conditionRules).toHaveLength(1);
+    expect(conditionRules).toHaveLength(2);
     expect(conditionRules[0].style.backgroundColor).toBe('#16243a');
+    expect(conditionRules[0].cond).toBeUndefined();
+    expect(conditionRules[1].cond).toBe(0);
+    expect(limits.conditions[0]).toEqual(['@', null, ['>=', 'width', 1]]);
 
-    for (const atRule of ['@media', '@supports', '@container']) {
-      expect(
-        limits.warnings.some(
-          warning =>
-            warning.includes(atRule) && warning.includes('not supported'),
-        ),
-        `no warning naming ${atRule}`,
-      ).toBe(true);
-    }
+    expect(
+      limits.warnings.some(
+        warning =>
+          warning.includes('@supports') && warning.includes('not supported'),
+      ),
+      'no warning naming @supports',
+    ).toBe(true);
   });
 
   it('drops a calc() mixing a percentage with a length, and keeps a bare percentage', () => {
@@ -329,33 +337,203 @@ describe('panel 8 — the limits, each with its warning', () => {
   });
 
   it('reduces a descendant selector to a compound one — the wrong-fire, pinned', () => {
-    // Stage 4 is open: the combinator rides along in the rule but nothing consumes it, so
-    // `.a .b` matches an element carrying BOTH names. This asserts the WRONG behaviour on
-    // purpose — the tile shows it, and when stage 4 lands this test is what says so.
+    // Pins a known wrong-fire: nothing consumes the combinator, so `.a .b` matches one element
+    // carrying both names, and this test is what says so once descendant matching lands
     const descendant = ruleFor(limits, 'sc-combo-parent', 'sc-combo-child');
     expect(descendant?.specificity).toEqual([0, 2, 0]);
 
     registerRules(limits.rules);
-    // The nested child, which is what the rule was written for, gets nothing.
+    // The nested child, which the rule was written for, gets nothing
     expect(resolveClassName('sc-combo-child').backgroundColor).toBe('#1c2c46');
-    // The single element carrying both names, which the web would never match, goes red.
+    // The single element carrying both names, which the web never matches, goes red
     expect(
       resolveClassName('sc-combo-parent sc-combo-child').backgroundColor,
     ).toBe('#7a1f2b');
   });
 
-  it('resolves a var() from this file and drops one from another', () => {
+  it('ships a var() raw whether this file or another declares it', () => {
     expect(ruleFor(limits, 'sc-limit-var-local')?.style.borderColor).toBe(
-      '#a3d94f',
+      'var(--sc-limit-lime)',
     );
-    // The foreign reference was the only declaration in its rule, so the rule itself is gone —
-    // it used to ship the literal string "var(--mist)" to Fabric instead, build-clean.
-    expect(ruleFor(limits, 'sc-limit-var-foreign')).toBeUndefined();
+    expect(ruleFor(limits, 'sc-limit-var-foreign')?.style.borderColor).toBe(
+      'var(--mist)',
+    );
     expect(
-      limits.warnings.some(
-        warning =>
-          warning.includes('--mist') && warning.includes('not declared'),
-      ),
-    ).toBe(true);
+      limits.warnings.some(warning => warning.includes('not declared')),
+    ).toBe(false);
+  });
+});
+
+const PHONE: IMediaEnvironment = {
+  width: 390,
+  height: 844,
+  resolution: 3,
+  orientation: 'portrait',
+  'prefers-color-scheme': 'light',
+  'prefers-reduced-motion': 'no-preference',
+  'prefers-contrast': 'no-preference',
+  'prefers-reduced-transparency': 'no-preference',
+  platform: 'ios',
+  dir: 'ltr',
+};
+
+describe('panel 9 — @media, evaluated at runtime', () => {
+  function tileStyle() {
+    registerRules(media.rules, media.conditions);
+    return resolveClassName('sc-media-tile');
+  }
+
+  it('paints the slate base on a narrow portrait window, with no warning', () => {
+    setMediaEnvironment(PHONE);
+    expect(tileStyle()).toMatchObject({ backgroundColor: '#16243a' });
+    expect(media.warnings).toEqual([]);
+  });
+
+  it('turns green once the window is 600 wide, and slate again when it shrinks', () => {
+    setMediaEnvironment(PHONE);
+    registerRules(media.rules, media.conditions);
+
+    setMediaEnvironment({ ...PHONE, width: 800 });
+    expect(resolveClassName('sc-media-tile').backgroundColor).toBe('#2f7d4f');
+
+    setMediaEnvironment(PHONE);
+    expect(resolveClassName('sc-media-tile').backgroundColor).toBe('#16243a');
+  });
+
+  it('gets an amber border in landscape and keeps its fill', () => {
+    setMediaEnvironment({
+      ...PHONE,
+      width: 844,
+      height: 390,
+      orientation: 'landscape',
+    });
+    expect(tileStyle()).toMatchObject({
+      borderColor: '#e0a23a',
+      backgroundColor: '#2f7d4f',
+    });
+  });
+});
+
+describe('panels 10 to 12 - the device lab', () => {
+  const boxOf = (width: number) => () => ({ width, height: 112 });
+
+  it('paints rose below 600 wide and teal from 600, with no warning', () => {
+    registerRules(lab.rules, lab.conditions);
+
+    setMediaEnvironment({ ...PHONE, width: 599 });
+    expect(resolveClassName('lab-media-swatch').backgroundColor).toBe(
+      '#e63946',
+    );
+
+    setMediaEnvironment({ ...PHONE, width: 600 });
+    expect(resolveClassName('lab-media-swatch').backgroundColor).toBe(
+      '#2a9d8f',
+    );
+    expect(lab.warnings).toEqual([]);
+  });
+
+  it.each([
+    ['lab-consumer-swatch', 'backgroundColor', '#f4a261', '#264653'],
+    ['lab-nested-inner', 'color', '#e76f51', '#6a4c93'],
+    ['lab-first-swatch', 'backgroundColor', '#ff006e', '#3a86ff'],
+    ['lab-first-nested-inner', 'color', '#fb5607', '#06d6a0'],
+  ])(
+    '%s is plain below 240 wide and held from 240',
+    (token, property, plain, held) => {
+      setMediaEnvironment(PHONE);
+      registerRules(lab.rules, lab.conditions);
+
+      expect(resolveClassName(token, boxOf(239))).toMatchObject({
+        [property]: plain,
+      });
+      expect(resolveClassName(token, boxOf(240))).toMatchObject({
+        [property]: held,
+      });
+    },
+  );
+
+  it('makes a container of each box and fixes the first one at 320', () => {
+    expect(ruleFor(lab, 'lab-container')?.style).toMatchObject({
+      containerType: 'size',
+    });
+    expect(ruleFor(lab, 'lab-container-first')?.style).toMatchObject({
+      containerType: 'size',
+      width: 320,
+    });
+  });
+
+  it('ships the var() raw, since the value comes from the token or the surface', () => {
+    expect(ruleFor(lab, 'lab-var-swatch')?.style.backgroundColor).toBe(
+      'var(--lab-accent)',
+    );
+  });
+
+  it('keeps the light colour on a light device and takes indigo on a dark one', () => {
+    registerRules(lab.rules, lab.conditions);
+
+    setMediaEnvironment({ ...PHONE, 'prefers-color-scheme': 'light' });
+    expect(resolveClassName('lab-scheme-swatch').backgroundColor).toBe(
+      '#ff9f1c',
+    );
+
+    setMediaEnvironment({ ...PHONE, 'prefers-color-scheme': 'dark' });
+    expect(resolveClassName('lab-scheme-swatch').backgroundColor).toBe(
+      '#5e60ce',
+    );
+  });
+
+  it('reads the precedence token with var() and declares it on a :root token and a node class', () => {
+    expect(ruleFor(lab, 'lab-prec-swatch')?.style.backgroundColor).toBe(
+      'var(--lab-prec)',
+    );
+    expect(ruleFor(lab, 'lab-prec-node')?.style).toMatchObject({
+      '--lab-prec': '#9ef01a',
+    });
+  });
+
+  it('makes an inline-size container, and a height query in it never holds', () => {
+    setMediaEnvironment(PHONE);
+    registerRules(lab.rules, lab.conditions);
+    const open = containerStyleOf(
+      ruleFor(lab, 'lab-axis-box')?.style,
+      undefined,
+    )?.open;
+    const inlineSize = () => ({ width: 320, height: 112, open });
+
+    expect(ruleFor(lab, 'lab-axis-box')?.style).toMatchObject({
+      containerType: 'inline-size',
+    });
+    expect(resolveClassName('lab-axis-width', inlineSize).backgroundColor).toBe(
+      '#4361ee',
+    );
+    expect(
+      resolveClassName('lab-axis-height', inlineSize).backgroundColor,
+    ).toBe('#fcbf49');
+  });
+
+  it('leaves the container box plain, since its own query asks a container above it', () => {
+    setMediaEnvironment(PHONE);
+    registerRules(lab.rules, lab.conditions);
+
+    expect(
+      resolveClassName('lab-axis-box', () => undefined).backgroundColor,
+    ).toBe('#6d597a');
+  });
+
+  it('declares every colour the device test counts, each once', () => {
+    // The amber override is written by the panel at runtime, every other colour by the sheet
+    const sheet = [LAB, LAB_PANELS]
+      .map(file => readFileSync(path.join(REPO_ROOT, file), 'utf8'))
+      .join('\n')
+      .replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '')
+      .toLowerCase();
+    const spec = readFileSync(path.join(REPO_ROOT, LAB_E2E), 'utf8');
+    const counted = [...spec.matchAll(/hexToRgb\('(#[0-9a-f]{6})'\)/gi)].map(
+      match => match[1].toLowerCase(),
+    );
+
+    expect(counted).toHaveLength(23);
+    expect(counted.filter(color => !sheet.includes(color))).toEqual([]);
+    expect(new Set(counted).size).toBe(counted.length);
   });
 });

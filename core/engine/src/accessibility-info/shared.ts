@@ -10,8 +10,8 @@
 // files, not derived from this file's name. Mirrors
 // RN's Libraries/Components/AccessibilityInfo/AccessibilityInfo.js.
 
-import { isSymbioteNode, type ISymbioteNode } from '../node';
 import type { IEventSubscription } from '../native-events';
+import { isSymbioteNode, type ISymbioteNode } from '../node-types';
 import { sendAccessibilityEvent as dispatchAccessibilityEvent } from '../imperative';
 import { dlog } from '../debug';
 export { isBoolean } from '../type-guards';
@@ -43,10 +43,10 @@ export type IAccessibilityChangeEvent = IAccessibilityChangeEventName;
 export type IAccessibilityHandle = ISymbioteNode | number | null | undefined;
 
 // The `announcementFinished` payload (iOS). All other events carry a bare boolean.
-export interface IAccessibilityAnnouncementFinishedEvent {
+export type IAccessibilityAnnouncementFinishedEvent = {
   announcement: string;
   success: boolean;
-}
+};
 
 // A change handler receives either a boolean (most events) or the announcement
 // payload (`announcementFinished`). Callers narrow as needed.
@@ -56,15 +56,15 @@ export type IAccessibilityChangeEventHandler = (
 
 // Options for announceForAccessibilityWithOptions. Both fields are iOS-only; on
 // Android they are ignored and the announcement is posted plainly (mirrors RN).
-export interface IAnnounceForAccessibilityOptions {
+export type IAnnounceForAccessibilityOptions = {
   queue?: boolean;
   priority?: 'low' | 'default' | 'high';
-}
+};
 
 // The unified imperative surface both platform impls satisfy. Every getter resolves
 // to a boolean (false on a platform whose native module lacks the query, mirroring
 // RN); getRecommendedTimeoutMillis resolves to a number.
-export interface IAccessibilityInfoStatic {
+export type IAccessibilityInfoStatic = {
   isScreenReaderEnabled(): Promise<boolean>;
   isReduceMotionEnabled(): Promise<boolean>;
   isBoldTextEnabled(): Promise<boolean>;
@@ -90,24 +90,14 @@ export interface IAccessibilityInfoStatic {
     eventName: IAccessibilityChangeEventName,
     handler: IAccessibilityChangeEventHandler,
   ): IEventSubscription;
-}
+};
 
 // The named events sendAccessibilityEvent can dispatch (RN's AccessibilityEventTypes).
 export type IAccessibilityEventType =
   'click' | 'focus' | 'viewHoverEnter' | 'windowStateChange';
 
-// The routing behind IAccessibilityInfoStatic.sendAccessibilityEvent, shared by both
-// platforms: resolve the handle to a real SymbioteNode and dispatch through the Fabric
-// slot. RN's Fabric path hands the public-instance handle straight to
-// nativeFabricUIManager.sendAccessibilityEvent with the STRING eventType, and the C++
-// side maps it; the handle here IS the SymbioteNode (symbiote augments the node in
-// place as its public instance).
-//
-// The one thing that genuinely diverges by platform - iOS's early return on 'click'
-// (VoiceOver has no click producer, AccessibilityInfo.js) - is NOT decided here: a
-// platform passes `shouldSkip`, which both decides AND logs its own skip (so iOS keeps
-// its exact "iOS no-op (RN parity)" message); Android omits it and every event reaches
-// the slot.
+// Resolves the handle to a node and dispatches the event through the Fabric slot
+// A platform passes `shouldSkip` to decide and log its own skip, which iOS uses for 'click'
 export function routeSendAccessibilityEvent(
   platformLabel: string,
   handle: IAccessibilityHandle,

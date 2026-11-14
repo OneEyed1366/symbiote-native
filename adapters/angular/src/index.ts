@@ -242,6 +242,7 @@ export {
   connectWatchedSignal,
   PermissionsServiceBase,
 } from './services';
+export { ROOT_TAG, injectRootTag } from './root-tag';
 export {
   createAnimatedColor as injectAnimatedColor,
   createAnimatedValue as injectAnimatedValue,
@@ -264,6 +265,12 @@ export {
   I18nManager,
   Dimensions,
   Appearance,
+  matchMedia,
+  MediaQueryList,
+  MediaQueryListEvent,
+  setVariable,
+  getComputedVariable,
+  registerProperty,
   AppState,
   Keyboard,
   KEYBOARD_EVENT,

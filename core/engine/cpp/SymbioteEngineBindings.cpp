@@ -213,6 +213,11 @@ void installBindings(jsi::Runtime &runtime) {
 
   // Diagnostic, read on demand rather than per op. See `Tree::readSurfaceTelemetry`.
   install("readSurfaceTelemetry", 1, &Tree::readSurfaceTelemetry);
+  install("readGlobalVariable", 1, &Tree::readGlobalVariable);
+  install("readVariable", 2, &Tree::readVariable);
+  install("registerProperty", 4, &Tree::registerProperty);
+  install("unregisterProperty", 1, &Tree::unregisterProperty);
+  install("clearRegisteredProperties", 0, &Tree::clearRegisteredProperties);
 
   runtime.global().setProperty(runtime, "__symbioteEngineNative", std::move(bindings));
 }

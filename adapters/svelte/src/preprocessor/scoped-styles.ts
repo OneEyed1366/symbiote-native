@@ -1,66 +1,32 @@
-// A `.svelte` file's `<style>` block, compiled to real native styles.
-//
-// WHY SVELTE'S OWN CSS OUTPUT CANNOT BE CONSUMED — measure this before "simplifying" any of the
-// below back to "just wire up `result.css`". Compiled with this adapter's options
-// (`generate:'client', fragments:'tree', css:'external'`), a `<style>` block behaves one of two
-// ways:
-//
-//   <view class="card">   ->  result.css: `.card.svelte-4psua6 { … }`
-//                                      result.js:  `$.set_class(node, 1, 'card svelte-4psua6')`
-//   <View class="card">            ->  warning: css_unused_selector
-//                                      result.css: `/* (unused) .card { … }*/`
-//
-// The first is dead: `set_class` writes `dom.className`, which `ShimElement` does not implement,
-// and app code never authors a host tag anyway (§22a). The second is 100% of real app code —
-// Svelte refuses to scope a parent's styles into a child COMPONENT, so by the time `result.css`
-// exists every rule is commented out. Nothing is left to register, so the scoping has to happen
-// HERE, before the compiler ever sees the block — the same pass `adapters/vue/metro-vue-
-// transformer.cjs` runs for a Vue SFC (symbiote-sfc-style-compiler §5), moved from a compiler
-// node-transform to a source rewrite because Svelte's compiler exposes no AST hook.
-//
-// Four steps, in order:
-//   1. cut the block out TEXTUALLY (see STYLE_TAG_PATTERN) and compile it through
-//      @symbiote-native/css-parser's `compileScopedCss`, exactly like Vue's <style scoped> —
-//      lightningcss renames every class this file owns, `card` -> `card__svelte-<hash>`, and
-//      hands back the name map; the styles register under those names in the same global
-//      registry App.css and Vue SFC blocks populate.
-//   2. rewrite `class` in THIS file's own markup by READING that map — never by re-deriving the
-//      name, which is how the two halves used to be two implementations of "what is this class
-//      called now". Static values resolve here, at build time; a dynamic `class={expr}` is
-//      wrapped in a runtime call to `scopeSvelteClass` (../style-scope) that resolves through the
-//      SAME map, emitted beside it.
-//   3. delete the `<style>` block from the source handed on, so Svelte emits no
-//      `css_unused_selector` warnings and adds no scope hash of its own.
-//   4. append one `<script module>` line holding the `registerRules()` call and the name map.
-//
-// SCOPING SEMANTICS, AND THE ONE DELIBERATE DIVERGENCE FROM SVELTE-ON-THE-WEB. Svelte scopes by
-// FILE: only markup written in this file carries the scope, never markup a child component owns
-// — reproduced exactly, step 2 only ever rewrites this file's own source text. Where this
-// diverges is the component boundary: on the web, `<Child class="card"/>` does NOT apply the
-// parent's `.card`, because the hash never lands on the child's element. Here it does, because
-// the scoped NAME travels as an ordinary prop and every Symbiote component forwards `class` down
-// to its host node. Not incidental: a component here renders only other components, so the web
-// rule would make every `<style>` block a no-op — exactly the bug this file exists to fix. An
-// author's mental model still holds: "my `<style>` styles the markup I wrote".
-//
-// Registered in `svelte.config.js`'s `preprocess` AND called directly by
-// `metro-svelte-transformer.cjs`, for the same reason `forbid-web-only-constructs.ts` is — the
-// config covers `svelte-check`/the language server, the transformer covers a consuming app whose
-// own config never registers it.
-//
-// LINE NUMBERS ARE PRESERVED ON PURPOSE (this preprocessor emits no source map): the `<style>`
-// block is replaced by the same number of newlines it occupied rather than deleted outright, and
-// the injected script is one line appended after all original content, or spliced onto the
-// existing `<script module>` tag's own line — so every original line keeps its number and a
-// `svelte-check` diagnostic still points at the right place.
+// A `.svelte` file's `<style>` block, compiled to real native styles
+// Svelte's own `result.css` is unusable here, so scoping runs on the source before `compile()`
+
+// With `css: 'external'` a rule on a host tag is dead, since `ShimElement` has no `className`
+// A rule on a component is emitted as `css_unused_selector`, and that is all real app code
+
+// Cut the block out as text and compile it with `compileScopedCss`, as Vue's `<style scoped>`
+// Then rewrite `class` in the markup from the returned name map, never re-deriving a name
+// Last, drop the block and append one `<script module>` line with `registerRules()` and the map
+
+// Scoping is per file, as on the web: only markup written in this file carries the scope
+// Unlike the web it crosses a component boundary, since the scoped name travels as a `class` prop
+// A component here renders only other components, so the web rule would make every block a no-op
+
+// Registered in `svelte.config.js` for `svelte-check` and the language server
+// The metro transformer calls it too, since a consuming app's config never registers it
+
+// Line numbers are preserved on purpose, because no source map is emitted
+// The block becomes the same number of newlines and the injected script is one appended line
 
 import { parse } from 'svelte/compiler';
 import {
   compile as compilePreprocessor,
   compileScopedCss,
+  conditionsArgument,
   hashFilePath,
   type IPreprocessorLanguage,
-  type IStyleRule,
+  type IScopedCss,
+  serializeRules,
 } from '@symbiote-native/css-parser';
 // Resolved by package SELF-REFERENCE, not the relative `../scope-token` the rest of this package
 // would write — same reason metro-svelte-transformer.cjs reaches for
@@ -83,6 +49,8 @@ const RUNTIME_MODULE = '@symbiote-native/svelte/style-scope';
 // Every injected identifier is `__symbiote`-prefixed and import-aliased so a component that
 // happens to declare its own `registerRules` / `scopeSvelteClass` cannot collide with it.
 const REGISTER_RULES_LOCAL = '__symbioteRegisterRules';
+const REGISTER_ROOT_LOCAL = '__symbioteRegisterRootVariables';
+const REGISTER_PROPERTIES_LOCAL = '__symbioteRegisterProperties';
 const SCOPE_CLASS_LOCAL = '__symbioteScopeClass';
 const SCOPED_NAMES_LOCAL = '__symbioteScopedNames';
 
@@ -104,24 +72,23 @@ const STYLE_LANG_TO_PREPROCESSOR: ReadonlyMap<string, IPreprocessorLanguage> =
 // of its own — so one is synthesized from the component's, exactly as Vue's transformer does.
 const INDENTED_SASS_LANG = 'sass';
 
-interface IEdit {
+type IEdit = {
   readonly start: number;
   readonly end: number;
   readonly text: string;
-}
+};
 
-interface IMarkupInput {
+type IMarkupInput = {
   readonly content: string;
   readonly filename?: string;
-}
+};
 
 export function scopedStyles(): {
   markup(input: IMarkupInput): Promise<{ code: string }>;
 } {
   return {
     async markup({ content, filename }) {
-      // Cheap gate: the overwhelming majority of components carry no <style> block at all, and
-      // this saves them a full parse on every Metro transform.
+      // Cheap gate, most components have no `<style>` block and skip a full parse per transform
       if (!content.includes('<style')) return { code: content };
 
       const styleBlock = findStyleBlock(content);
@@ -129,16 +96,14 @@ export function scopedStyles(): {
 
       const path = filename ?? 'component.svelte';
       const css = await compileStyleBlock(styleBlock, path);
-      // A `:global(...)` selector opts out of scoping and registers under its plain name, the
-      // same escape hatch Vue's <style scoped> has. lightningcss decides that — a name it did not
-      // rename is absent from `names` and every token of it passes through untouched below.
-      const { rules, names } = compileScopedCss(css, {
+      // A `:global(...)` selector registers under its plain name, as in Vue's `<style scoped>`
+      // lightningcss leaves its name out of `names`, so every token of it passes through
+      const scoped = compileScopedCss(css, {
         filename: path,
         pattern: `[local]__${SCOPE_ID_PREFIX}${hashFilePath(path)}`,
       });
 
-      // Parsed WITHOUT the style block, and with it replaced by same-length whitespace, so every
-      // offset the AST reports still indexes `content` itself.
+      // The style block is blanked to same-length whitespace, so AST offsets still index `content`
       const ast: unknown = parse(withoutStyleBlock(content, styleBlock), {
         filename,
         modern: true,
@@ -147,9 +112,13 @@ export function scopedStyles(): {
       const edits: IEdit[] = [
         blankOut(styleBlock.start, styleBlock.end, content),
       ];
-      collectClassEdits(fragmentNodes(ast), content, names, edits);
-      if (rules.length > 0) {
-        edits.push(injectModuleScript(ast, content, rules, names));
+      collectClassEdits(fragmentNodes(ast), content, scoped.names, edits);
+      const registersAnything =
+        scoped.rules.length > 0 ||
+        scoped.rootVariables.length > 0 ||
+        scoped.properties.length > 0;
+      if (registersAnything) {
+        edits.push(injectModuleScript(ast, content, scoped));
       }
 
       return { code: applyEdits(content, edits) };
@@ -157,12 +126,8 @@ export function scopedStyles(): {
   };
 }
 
-// ---------------------------------------------------------------------------------------------
-// The <style> block, located WITHOUT parsing it.
-//
-// This is svelte's own tag regex (src/compiler/preprocess/index.js): what its official
-// `preprocess()` style hook uses to hand a block's content unparsed, the reason `svelte-preprocess`
-// can compile SCSS at all — `parse().css` would validate it as CSS whatever `lang` says.
+// The `<style>` block, located without parsing it, with svelte's own tag regex
+// `parse().css` would validate SCSS as CSS, so this is how `svelte-preprocess` gets raw content
 
 // A `<!-- -->` comment is an alternative of the pattern purely so a commented-out block is
 // skipped rather than matched.
@@ -172,12 +137,12 @@ const STYLE_TAG_PATTERN =
 
 const LANG_ATTRIBUTE_PATTERN = /\blang\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/;
 
-interface IStyleBlock {
+type IStyleBlock = {
   readonly start: number;
   readonly end: number;
   readonly source: string;
   readonly lang: string;
-}
+};
 
 function findStyleBlock(content: string): IStyleBlock | undefined {
   for (const match of content.matchAll(STYLE_TAG_PATTERN)) {
@@ -429,55 +394,62 @@ function escapeTemplateLiteral(text: string): string {
 // ---------------------------------------------------------------------------------------------
 // Emitting
 
-// `combinators` is compile-time-only — the registry matches by token subset and never reads it —
-// so it is stripped rather than shipped in every app bundle. Same cut `@symbiote-native/css-
-// parser`'s `serializeRules` makes for a standalone `.css` file; a Svelte `<style>` block has no
-// reason to ship more.
-function serializeRules(rules: readonly IStyleRule[]): string {
-  return JSON.stringify(
-    rules.map(({ tokens, specificity, order, style }) => ({
-      tokens,
-      specificity,
-      order,
-      style,
-    })),
-  );
+// Kept apart so `injectModuleScript` reads as the engine calls, then the scope map, then the splice
+// The rules, the `:root` tokens and the `@property` rules each get an import and a call
+function engineCalls(styles: IScopedCss): string[] {
+  const { rules, conditions, rootVariables, properties } = styles;
+  const table = conditionsArgument(conditions);
+  const lines = [
+    `import { registerRules as ${REGISTER_RULES_LOCAL} } from '${ENGINE_MODULE}';`,
+    `${REGISTER_RULES_LOCAL}(${serializeRules(rules)}${table});`,
+  ];
+  if (rootVariables.length > 0) {
+    lines.unshift(
+      `import { registerRootVariables as ${REGISTER_ROOT_LOCAL} } from '${ENGINE_MODULE}';`,
+    );
+    lines.push(
+      `${REGISTER_ROOT_LOCAL}(${JSON.stringify(rootVariables)}${table});`,
+    );
+  }
+  if (properties.length > 0) {
+    lines.unshift(
+      `import { registerProperties as ${REGISTER_PROPERTIES_LOCAL} } from '${ENGINE_MODULE}';`,
+    );
+    lines.push(
+      `${REGISTER_PROPERTIES_LOCAL}(${JSON.stringify(properties)}${table});`,
+    );
+  }
+  return lines;
 }
 
 function injectModuleScript(
   ast: unknown,
   content: string,
-  rules: readonly IStyleRule[],
-  names: IScopedNames,
+  styles: IScopedCss,
 ): IEdit {
-  const lines = [
-    `import { registerRules as ${REGISTER_RULES_LOCAL} } from '${ENGINE_MODULE}';`,
-    `${REGISTER_RULES_LOCAL}(${serializeRules(rules)});`,
-  ];
+  const { names } = styles;
+  const lines = engineCalls(styles);
   if (names.size > 0) {
     lines.unshift(
       `import { scopeSvelteClass as ${SCOPE_CLASS_LOCAL} } from '${RUNTIME_MODULE}';`,
     );
-    // The SAME map the static rewrite above read, shipped verbatim: a dynamic value's tokens are
-    // only known at runtime, and re-deriving their names there is the divergence this map exists
-    // to make impossible.
+    // The map the static rewrite read, shipped as is, since dynamic tokens only exist at runtime
+    // Re-deriving their names there is the divergence this map prevents
     lines.push(
       `const ${SCOPED_NAMES_LOCAL} = new Map(${JSON.stringify([...names])});`,
     );
   }
   const source = lines.join(' ');
 
-  // Svelte rejects a second `<script module>`, so an existing one is spliced into rather than
-  // duplicated — at the very start of its body, which is the end of its own opening-tag line, so
-  // no line number and no column of real code moves.
+  // Svelte rejects a second `<script module>`, so an existing one is spliced into
+  // The splice sits at the end of its opening-tag line, so no real code moves
   const moduleBody = moduleScriptBodyStart(ast);
   if (moduleBody !== undefined) {
     return { start: moduleBody, end: moduleBody, text: source };
   }
 
-  // No module script: append one after everything. A trailing `<script module>` compiles and its
-  // consts are visible to the markup above it (verified against svelte 5.56.8), and appending
-  // leaves every original offset untouched.
+  // No module script: append one after everything, which leaves every original offset untouched
+  // A trailing `<script module>` compiles and its consts are visible to the markup above it
   const lang = instanceScriptLang(ast) === 'ts' ? ' lang="ts"' : '';
   return {
     start: content.length,

@@ -667,7 +667,11 @@ const binary = path.join(
 // `-Xes6-block-scoping` IS NOT OPTIONAL: `hermesc` defaults it off, so `const one` in a `for…of`
 // stops being per-iteration and every closure in `report()`'s case chain captures the LAST case —
 // a wrong ANSWER, not an error. A single-case fixture passes happily, which is how this hides.
-const shouldRunBytecode = process.env.SYMBIOTE_ITEST_BYTECODE === '1';
+// Unset, `build-release` runs bytecode too: its heap budgets are calibrated there, `=0` opts out
+const bytecodeSetting = process.env.SYMBIOTE_ITEST_BYTECODE;
+const shouldRunBytecode =
+  bytecodeSetting === '1' ||
+  (bytecodeSetting === undefined && buildDirectory === 'build-release');
 
 // `hermesc` ships inside the `hermes-engine` pod, not on npm, so it is the SAME compiler the app
 // build uses and pairs with the `hermesvm.framework` the tester links against
@@ -692,7 +696,7 @@ function findHermesc() {
 }
 
 const hermesc = shouldRunBytecode ? findHermesc() : undefined;
-if (shouldRunBytecode && hermesc === undefined) {
+if (bytecodeSetting === '1' && hermesc === undefined) {
   console.error(
     'SYMBIOTE_ITEST_BYTECODE=1 but no hermesc found - run `node scripts/fetch-hermes.mjs`',
   );
@@ -791,7 +795,14 @@ const nodePaths = [
 // The tester binary is a clean per-process invocation — one bundle in on argv, stdout/stderr out,
 // no shared file or port across runs — so nothing here needs the runs to be sequential. The binary
 // wall time dominates a run, not the bundling this file already caches.
-const testConcurrency = Math.max(1, availableParallelism());
+// A release build holds timing budgets, so its testers run a quarter of the cores at a time
+// `SYMBIOTE_ITEST_JOBS` sets the count, bundling is not timed and always uses every core
+const cores = availableParallelism();
+const testConcurrency = Math.max(
+  1,
+  Number(process.env.SYMBIOTE_ITEST_JOBS) ||
+    (isBenchBuild ? Math.floor(cores / 4) : cores),
+);
 
 /**
  * A fixed chunk of `Promise.all` stalls on its slowest member, and benchmarks mix with unit tests
@@ -849,7 +860,7 @@ let buildMs = 0;
 let runMs = 0;
 
 try {
-  const limitBuild = createLimiter(testConcurrency);
+  const limitBuild = createLimiter(cores);
   // Builds overlap now, so `buildMs` is the sum of each build's own duration
   const timeBuild = async run => {
     const start = performance.now();

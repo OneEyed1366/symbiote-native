@@ -7,7 +7,8 @@
 
 import './App.css';
 import './navigation.css';
-import { defineComponent, onMounted, ref } from 'vue';
+import { defineComponent, onMounted, onScopeDispose, ref } from 'vue';
+import { BackHandler } from '@symbiote-native/vue';
 import { Stack, useLinkingIntegration } from '@symbiote-native/navigation/vue';
 import type { INavigatorHandle } from '@symbiote-native/navigation/vue';
 import { MenuScreen } from './screens/MenuScreen';
@@ -44,6 +45,16 @@ const App = defineComponent({
     // Children mount first, so the Stack has filled `stackHandle` through `expose()` by then
     // eslint-disable-next-line react-hooks/rules-of-hooks -- a Vue composable inside `setup()`
     useLinkingIntegration(APP_LINKING_CONFIG, stackHandle);
+
+    // Without a handler the Android Back key on the lab screen took the app to the launcher
+    // At the root `canGoBack` is false and the system leaves the app as usual
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      const handle = stackHandle.value;
+      if (handle === null || !handle.canGoBack()) return false;
+      handle.pop();
+      return true;
+    });
+    onScopeDispose(() => backSubscription.remove());
 
     return () => (
       <Stack ref={stackHandle} initialRouteName={ROUTE_NAME.Menu}>

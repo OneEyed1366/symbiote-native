@@ -34,6 +34,7 @@ import {
   type Type,
 } from '@angular/core';
 import { SymbioteRendererFactory } from '../renderer';
+import { ROOT_TAG } from '../root-tag';
 import { ColorSchemeService, WindowDimensionsService } from '../services';
 
 // The two FFI-edge casts of this adapter, both confined here to bootstrap. Angular's core
@@ -57,13 +58,9 @@ function asAngularHost(hostNode: SymbioteSurface | ISymbioteNode): Element {
   return hostNode as unknown as Element;
 }
 
-// A bare `view` node, created directly through the engine (bypassing Angular's own
-// createElement, which only resolves KNOWN symbiote primitives, never an arbitrary component's
-// selector — see SymbioteRenderer.createElement). Used as the AppRegistry root's host when a
-// wrapperComponentProvider is set: Angular has no hostElement-less bootstrap for our renderer
-// (it would try `renderer.createElement(rootComponent.selector)`, which throws for anything
-// that isn't one of our primitives), so the root needs an explicit host too, one we then hand
-// to the wrapper as projectable content.
+// A bare `view` node made through the engine, since Angular's `createElement` resolves only
+// known primitives, never a component selector
+// Host of the root when `wrapperComponentProvider` is set, projected into the wrapper
 function createDetachedViewHost(): ISymbioteNode {
   // 'view', not 'View': the public name is not a Fabric view name, and until
   // makeDescriptorFor learned to reject one it fell through to a view literally named `View`.
@@ -73,53 +70,32 @@ function createDetachedViewHost(): ISymbioteNode {
   );
 }
 
-// Angular's whole unhandled-error funnel: INTERNAL_APPLICATION_ERROR_HANDLER resolves this token
-// and hands it everything the framework caught on the app's behalf — a scheduled (async) tick that
-// threw, a template listener that threw, a rejected pending task. Routed to the engine so an
-// Angular app reaches the same native redbox as a React one instead of a console line nobody sees
-// off a dev machine.
-//
-// There is deliberately no caught-vs-uncaught split here, unlike the React adapter's
-// onUncaughtError/onCaughtError pair. Angular has no error boundary, and every path where the app
-// DID handle something keeps clear of this seam on its own: a `@defer` block with an `@error`
-// branch renders that branch (defer/rendering.ts calls handleUncaughtError only when there is
-// none), `resource()` parks the failure in its own error signal, and an app-level try/catch or
-// `catchError` never reaches Angular at all. So anything arriving here is by construction
-// unclaimed, and the redbox is the right answer for all of it.
-//
-// Two things this must not do. It must not also call `super.handleError` — reportUncaughtError
-// picks exactly one channel (host reporter or console) precisely because RN routes console.error
-// into LogBox too, so the pair would double-report every error. And it must not throw: the
-// scheduler invokes this from inside its own `catch` (zoneless_scheduling_impl.ts's tick), where a
-// second throw escapes to the host and kills the "report and keep running" behaviour the provider
-// exists for.
+// Angular's whole unhandled-error funnel, routed to the engine for the native redbox
+// No caught-vs-uncaught split, Angular has no error boundary and handled errors never arrive
+// Never `super.handleError` (double report) and never throws (the scheduler calls it in a `catch`)
 class SymbioteErrorHandler extends ErrorHandler {
   override handleError(error: unknown): void {
     reportUncaughtError(error, { origin: 'angular render' });
   }
 }
 
-interface IMountedApp {
+type IMountedApp = {
   cmpRef: ComponentRef<unknown>;
   rootRef: ComponentRef<unknown> | undefined;
   injector: EnvironmentInjector;
   /**
-   * Kept so teardown can release it. Angular never will: it is provided as a `useValue`, so the
-   * injector has nothing to destroy, and the renderer it owns listens to the engine's flush door
-   * for as long as the surface lives. See `SymbioteRendererFactory.dispose`.
+   * Kept so teardown can release it, a `useValue` provider gives the injector nothing to destroy
+   * See `SymbioteRendererFactory.dispose`
    */
   rendererFactory: SymbioteRendererFactory;
-}
+};
 
-// AppRegistry's `wrapperComponentProvider` support: the root renders detached (Angular gives
-// it its own host node via our renderer, not yet attached anywhere), and the wrapper — the
-// component actually attached to the surface — receives that host node as a projected child.
-// `<ng-content>` in the wrapper's template is the Angular idiom for "render my children", the
-// direct twin of React's `createElement(Wrapper, null, rootElement)`.
-export interface IMountOptions {
+// `wrapperComponentProvider` support: the root renders detached and the wrapper, attached to the
+// surface, receives its host as projected content through `<ng-content>`
+export type IMountOptions = {
   initialProps?: object;
   wrapperComponent?: Type<unknown>;
-}
+};
 
 // App-level providers (`provideHttpClient()` and the like), set once at bootstrap
 let rootProviders: (Provider | EnvironmentProviders)[] = [];
@@ -158,14 +134,9 @@ function teardown(rootTag: IRootTag): void {
   disposeRoot(rootTag);
 }
 
-// Metro's build switch, and esbuild's in this repo's headless runner. Declared HERE rather than in
-// an ambient `globals.d.ts`, because the AOT tests (`elements.test.ts`, `style-input-aot.test.ts`)
-// build their own ngtsc programs from an explicit file list that an ambient declaration never
-// reaches — seven of them went red with `Cannot find name '__DEV__'`, reported as an empty
-// diagnostic set, which reads as "the template checker found nothing" and is not that.
-//
-// `declare const` emits no JavaScript, so it shadows nothing at runtime and both bundlers still
-// substitute the identifier.
+// Metro's build switch, and esbuild's in this repo's headless runner
+// Declared here, not in an ambient `globals.d.ts`: the AOT tests build their own ngtsc programs
+// from an explicit file list that never reaches an ambient declaration
 declare const __DEV__: boolean;
 
 /**
@@ -202,6 +173,7 @@ function settleAngularDevMode(): void {
 
 // Kept apart from `mount` so the provider list reads as one block
 function createRootInjector(
+  rootTag: IRootTag,
   surface: SymbioteSurface,
   rendererFactory: SymbioteRendererFactory,
 ): EnvironmentInjector {
@@ -209,6 +181,7 @@ function createRootInjector(
     [
       ...rootProviders,
       { provide: RendererFactory2, useValue: rendererFactory },
+      { provide: ROOT_TAG, useValue: rootTag },
       // `resource()` resolves TransferState, which calls `doc.getElementById`
       // a stub without it throws mid-construction and the whole screen renders nothing
       {
@@ -232,10 +205,10 @@ function createRootInjector(
   );
 }
 
-interface IRoots {
+type IRoots = {
   cmpRef: ComponentRef<unknown>;
   rootRef: ComponentRef<unknown> | undefined;
-}
+};
 
 function createRoots(
   injector: EnvironmentInjector,
@@ -279,7 +252,7 @@ export function mount(
 
   const surface = createSurface(rootTag);
   const rendererFactory = new SymbioteRendererFactory(surface);
-  const injector = createRootInjector(surface, rendererFactory);
+  const injector = createRootInjector(rootTag, surface, rendererFactory);
   const { cmpRef, rootRef } = createRoots(
     injector,
     surface,

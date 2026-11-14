@@ -1,22 +1,41 @@
-// Runtime style registry. Side-effect CSS imports (compiled by the sibling CSS-to-style
-// build package, not this module) call registerRules() with the token SET each selector
-// names; components look them up via resolveClassName(). No CSS parsing here - just an
-// inverted Map<token, rules> and a subset test.
-//
-// A rule matches when its tokens are a subset of the element's classes, in any order
-// Tokens arrive as authored, т.к. a key collapsed from them could not be split back reliably
+// Runtime style registry: compiled CSS imports call `registerRules`, components `resolveClassName`
+// A rule matches when its tokens are a subset of the element's classes, in any order and length,
+// and matches cascade by derived scope, specificity, epoch and source order
 
 import type { IViewStyle, ITextStyle } from '../styles';
+import {
+  conditionIdsOfKey,
+  dependentKeys,
+  forgetDependents,
+  holdsCondition,
+  internConditions,
+  isContainerCondition,
+  resetConditions,
+  settledConditionOf,
+  trackDependents,
+  untrackDependents,
+  updateEnvironment,
+} from './media-conditions';
+import type {
+  IContainerLookup,
+  IMediaCondition,
+  IMediaEnvironment,
+  ISettledCondition,
+} from './media-evaluate';
+import { clearRootVariables, publishRootVariables } from './root-variables';
 import { hasVariants, mergeStyle } from './variants';
+
+export { registerRootVariables, rootVariableTable } from './root-variables';
+export type { IRootVariable } from './root-variables';
 
 type IResolvedStyle = Partial<IViewStyle & ITextStyle>;
 
 export type IClassNameValue =
   string | IResolvedStyle | Array<string | IResolvedStyle> | undefined | null;
 
-// The scope tail our compilers emit: `card__data-v-<h>` (Vue scoped), `card__svelte-<h>`,
-// `card__module__<h>` (CSS Modules), the hash being the css-parser `hashFilePath`
-// Matched by shape as one tail, т.к. a BEM `card__title` is no scope and the module form has a `__`
+// Scope tail our compilers emit: `card__data-v-<h>` (Vue), `card__svelte-<h>`, `card__module__<h>`
+// Matched as one tail unit anchored at the end, so BEM `card__title` is no scope and
+// `badge__module__<h>` does not split at its inner `__`
 const SCOPE_TAIL_PATTERN = /__((?:data-v|svelte)-[0-9a-z]+|module__[0-9a-z]+)$/;
 
 type IScopedToken = {
@@ -41,6 +60,8 @@ export type IStyleRule = {
   /** Source order within its file; the registry adds a per-registration epoch on top. */
   readonly order: number;
   readonly style: IResolvedStyle;
+  /** Index into the `conditions` passed to `registerRules` with this rule */
+  readonly cond?: number;
 };
 
 // `order` is only meaningful inside one file, so a rule from a later import has to outrank an
@@ -49,6 +70,8 @@ export type IStyleRule = {
 type IIndexedRule = {
   readonly rule: IStyleRule;
   readonly epoch: number;
+  /** The global id of the rule's `@media` condition, when it has one */
+  readonly condId?: number;
 };
 
 // Inverted index, ONE bucket per rule rather than one per token: a rule can only match when the
@@ -58,9 +81,8 @@ type IIndexedRule = {
 const ruleIndex = new Map<string, IIndexedRule[]>();
 let ruleEpoch = 0;
 
-// `resolveClassName` runs on every class-prop write, so after warm-up it is one `Map.get`
-// Only the string branch is memoized: an object or array has no stable key
-// The same object is handed out each time, т.к. every consumer spreads it or copies it
+// Memo of `resolveClassName` by class string, since an object argument has no stable key
+// The same object is handed out each time: consumers spread it or copy it, none mutate it
 const resolvedCache = new Map<string, IResolvedStyle>();
 
 // Bounded so a screen generating unique class strings at runtime cannot grow it without limit.
@@ -82,39 +104,32 @@ export function hasRulesWithStates(): boolean {
 function invalidateResolved(): void {
   resolvedCache.clear();
   resolvedKeys.length = 0;
+  variantsCache.clear();
+  variantsKeys.length = 0;
+  forgetDependents();
 }
 
-// The victim pool of the cache: the keys it holds, so a random eviction is an index, not a scan
+// The victim pool of each cache below: a plain array of its keys, so a random eviction is an index
+// rather than a scan, and nothing about recency or order is tracked
 const resolvedKeys: string[] = [];
+const variantsKeys: string[] = [];
 
 /**
- * Memoise, evicting a RANDOM entry when full.
- *
- * WHY RANDOM, since it looks arbitrary next to the obvious answers. The policy this replaced dropped
- * the whole cache on overflow, and the reflex repair — evict the oldest — is no better on the access
- * pattern that actually hurts. A working set slightly WIDER than the cache, walked in order, is
- * Belady's worst case: FIFO and LRU each evict exactly the entry the next lookup wants, so both miss
- * on every single access, exactly as the full clear did. Measured on a 512-entry cache cycling 513
- * distinct class strings: clear 0%, FIFO 0%, random 94.7% (`cache-cliff.probe.test.ts`).
- *
- * Random also answers the objection that ruled LRU out here — it needs LESS bookkeeping, not more.
- * There is no recency to maintain; a key array and a swap-remove is the whole of it.
- *
- * The cache stays a pure memo of a pure function either way, so which entries survive changes only
- * which lookups pay the rebuild. `invalidateResolved` still drops everything when the cascade moves,
- * because then nothing resolved earlier is true any more.
+ * Memoise, evicting a RANDOM entry when full, since a working set one wider than the cache makes
+ * FIFO and LRU miss on every lookup (`cache-cliff.probe.test.ts`)
  */
-function memoise(
-  cache: Map<string, IResolvedStyle>,
+function memoise<TValue>(
+  cache: Map<string, TValue>,
   keys: string[],
   key: string,
-  value: IResolvedStyle,
+  value: TValue,
 ): void {
   if (cache.size >= RESOLVED_CACHE_LIMIT) {
     const victimAt = Math.floor(Math.random() * keys.length);
     const victim = keys[victimAt];
     if (victim !== undefined) {
       cache.delete(victim);
+      forgetIfUncached(victim);
       const last = keys.pop();
       if (last !== undefined && victimAt < keys.length) keys[victimAt] = last;
     }
@@ -123,11 +138,19 @@ function memoise(
   keys.push(key);
 }
 
-export function registerRules(rules: readonly IStyleRule[]): void {
+export function registerRules(
+  rules: readonly IStyleRule[],
+  conditions: readonly IMediaCondition[] = [],
+): void {
   invalidateResolved();
   const epoch = ruleEpoch++;
+  const conditionIds = internConditions(conditions);
 
   for (const rule of rules) {
+    const condId =
+      rule.cond === undefined ? undefined : conditionIds[rule.cond];
+    // A condition the table lacks is an unknown one, so the rule never applies
+    if (rule.cond !== undefined && condId === undefined) continue;
     if (hasVariants(rule.style)) isAnyRuleWithStates = true;
     const hook = rule.tokens[0];
     // The empty set is a subset of every element's tokens, so a token-less rule would paint
@@ -136,10 +159,10 @@ export function registerRules(rules: readonly IStyleRule[]): void {
 
     const bucket = ruleIndex.get(hook);
     if (bucket === undefined) {
-      ruleIndex.set(hook, [{ rule, epoch }]);
+      ruleIndex.set(hook, [{ rule, epoch, condId }]);
       continue;
     }
-    bucket.push({ rule, epoch });
+    bucket.push({ rule, epoch, condId });
   }
 }
 
@@ -148,19 +171,63 @@ export function clearGlobalStyles(): void {
   ruleIndex.clear();
   isAnyRuleWithStates = false;
   ruleEpoch = 0;
+  clearRootVariables();
+  resetConditions();
   invalidateResolved();
 }
 
-// A class prop arrives as `unknown` at the `routeProp` boundary, so this narrows it without `as`
-// The Vue scroll-view shares it instead of keeping a copy
+// A string no cache holds needs no tracking, so the tables follow the bound of the caches
+function forgetIfUncached(key: string): void {
+  if (!resolvedCache.has(key)) untrackDependents(key);
+}
+
+function dropCached(
+  cache: Map<string, IResolvedStyle>,
+  keys: string[],
+  key: string,
+): void {
+  if (!cache.delete(key)) return;
+  forgetIfUncached(key);
+  const at = keys.indexOf(key);
+  const last = keys.pop();
+  if (last !== undefined && at < keys.length) keys[at] = last;
+}
+
+// Hands the registry a new snapshot and returns the condition ids that flipped
+// Only the cache entries that read a flipped condition are dropped, the rest keep their identity
+export function setMediaEnvironment(env: IMediaEnvironment): readonly number[] {
+  const flipped = updateEnvironment(env);
+  for (const key of dependentKeys(flipped)) {
+    dropCached(resolvedCache, resolvedKeys, key);
+  }
+  if (flipped.length > 0) {
+    variantsCache.clear();
+    variantsKeys.length = 0;
+    publishRootVariables();
+  }
+  return flipped;
+}
+
+// The condition ids a class value read when it resolved, which is what a node subscribes to
+// A string reads its own key and an array the union of its items, an object reads nothing
+export function conditionIdsOf(className: IClassNameValue): readonly number[] {
+  if (typeof className === 'string') {
+    return [...(conditionIdsOfKey(className) ?? [])];
+  }
+  if (!Array.isArray(className)) return [];
+  return [...new Set(className.flatMap(item => conditionIdsOf(item)))];
+}
+
+// Narrows the `unknown` a `class` prop arrives as at the `routeProp` boundary, without an `as` cast
+// The Vue scroll-view helper imports this instead of keeping its own copy
 export function isClassNameValue(value: unknown): value is IClassNameValue {
   return (
     typeof value === 'string' || (typeof value === 'object' && value !== null)
   );
 }
 
-// An array of plain strings joins into one, so it takes the memoised string path
-// A mixed array carries style objects (the list components pass a style that way) and stays as is
+// An all-string array joins into one string, so it takes the memoised path and keeps identity
+// A mixed array carries style objects that wrappers pass through the class prop, not tokens
 export function canonicalClassName(
   className: IClassNameValue,
 ): IClassNameValue {
@@ -172,11 +239,19 @@ export function canonicalClassName(
     : className;
 }
 
-// The one object every "this class styles nothing" answer hands back
-// A fresh `{}` would defeat the `Object.is` check of `isAlreadyPublished` and read as a real style
+/**
+ * The one object every "this class styles nothing" answer hands back
+ *
+ * Shared, so `isAlreadyPublished` sees an unchanged slot 0 and `pushClassStyle` can tell nothing
+ * from something. Frozen, since a caller that mutated it would corrupt every such node
+ */
 export const EMPTY_STYLE: IResolvedStyle = Object.freeze({});
 
-export function resolveClassName(className: IClassNameValue): IResolvedStyle {
+// A node with a container resolves its `@container` rules by that container's size
+export function resolveClassName(
+  className: IClassNameValue,
+  containerOf?: IContainerLookup,
+): IResolvedStyle {
   if (!className) return EMPTY_STYLE;
 
   if (typeof className === 'object' && !Array.isArray(className)) {
@@ -187,20 +262,97 @@ export function resolveClassName(className: IClassNameValue): IResolvedStyle {
     // Direct callers (an adapter resolving a class prop itself) get the same canonicalisation as
     // routeProp's path, so an all-string array is memoised for them too.
     const canonical = canonicalClassName(className);
-    if (typeof canonical === 'string') return resolveClassName(canonical);
+    if (typeof canonical === 'string')
+      return resolveClassName(canonical, containerOf);
     return className.reduce<IResolvedStyle>((acc, item) => {
-      return { ...acc, ...resolveClassName(item) };
+      return { ...acc, ...resolveClassName(item, containerOf) };
     }, {});
   }
 
   const cached = resolvedCache.get(className);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined)
+    return resolveForContainer(className, cached, containerOf);
 
   const resolved = resolveClassString(className);
 
   memoise(resolvedCache, resolvedKeys, className, resolved);
 
+  return resolveForContainer(className, resolved, containerOf);
+}
+
+// The key part that tells the container-dependent variants of one class apart
+const CONTAINER_KEY_SEPARATOR = '\u0001';
+
+// `plain` is the answer with every container rule off. A class whose container conditions all fail
+// keeps handing that same object out, and the others cache one variant per set of true conditions
+function resolveForContainer(
+  className: string,
+  plain: IResolvedStyle,
+  containerOf: IContainerLookup | undefined,
+): IResolvedStyle {
+  if (containerOf === undefined) return plain;
+  const ids = [...(conditionIdsOfKey(className) ?? [])].filter(
+    isContainerCondition,
+  );
+  const bits = ids
+    .map(id => (holdsCondition(id, containerOf) ? '1' : '0'))
+    .join('');
+  if (!bits.includes('1')) return plain;
+
+  const key = `${className}${CONTAINER_KEY_SEPARATOR}${bits}`;
+  const cached = resolvedCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const deps = new Set<number>();
+  const parts = className.trim().split(/\s+/).filter(Boolean);
+  const resolved =
+    matchRules(parts, deps, id => holdsCondition(id, containerOf)) ??
+    EMPTY_STYLE;
+  memoise(resolvedCache, resolvedKeys, key, resolved);
+  trackDependents(key, deps);
   return resolved;
+}
+
+export type IContainerVariants = readonly [
+  readonly ISettledCondition[],
+  ...(readonly [number, IResolvedStyle])[],
+];
+
+// A host that evaluates container queries by itself gets 16 styles at most for one class
+const MAX_VARIANT_CONDITIONS = 4;
+const variantsCache = new Map<string, IContainerVariants | undefined>();
+
+function buildContainerVariants(
+  className: string,
+): IContainerVariants | undefined {
+  resolveClassName(className);
+  const ids = [...(conditionIdsOfKey(className) ?? [])].filter(
+    isContainerCondition,
+  );
+  if (ids.length === 0 || ids.length > MAX_VARIANT_CONDITIONS) return undefined;
+  const parts = className.trim().split(/\s+/).filter(Boolean);
+  const styles: Array<readonly [number, IResolvedStyle]> = [];
+  for (let mask = 1; mask < 1 << ids.length; mask += 1) {
+    const holds: IConditionOracle = id => {
+      const at = ids.indexOf(id);
+      return at < 0 ? holdsCondition(id) : ((mask >> at) & 1) === 1;
+    };
+    styles.push([mask, matchRules(parts, undefined, holds) ?? EMPTY_STYLE]);
+  }
+  return [ids.map(settledConditionOf), ...styles];
+}
+
+/**
+ * The conditions of the class with the window settled, then one `[mask, style]` per way they can
+ * hold; bit `i` of a mask is condition `i`. `undefined` for a class without container conditions
+ */
+export function containerVariantsOf(
+  className: string,
+): IContainerVariants | undefined {
+  if (variantsCache.has(className)) return variantsCache.get(className);
+  const built = buildContainerVariants(className);
+  memoise(variantsCache, variantsKeys, className, built);
+  return built;
 }
 
 // Класс и inline-стиль для обёртки, читающей значения в JS, т.к. один `style` не видит класс
@@ -217,7 +369,10 @@ function resolveClassString(className: string): IResolvedStyle {
   const parts = className.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return EMPTY_STYLE;
 
-  return matchRules(parts) ?? EMPTY_STYLE;
+  const deps = new Set<number>();
+  const resolved = matchRules(parts, deps) ?? EMPTY_STYLE;
+  trackDependents(className, deps);
+  return resolved;
 }
 
 // `derivedTokens` counts the rule's tokens the element does NOT literally carry — the ones it
@@ -232,24 +387,46 @@ type IRuleMatch = {
   readonly derivedTokens: number;
 };
 
+// A conditional rule is recorded in `deps` even while false, since a flip can turn it on
+function holdsRule(
+  indexed: IIndexedRule,
+  deps: Set<number> | undefined,
+  holds: IConditionOracle,
+): boolean {
+  if (indexed.condId === undefined) return true;
+  deps?.add(indexed.condId);
+  return holds(indexed.condId);
+}
+
+// Answers whether a condition holds for the node being resolved
+type IConditionOracle = (id: number) => boolean;
+
+const GLOBAL_TRUTH: IConditionOracle = id => holdsCondition(id);
+
 // `null` rather than `{}` for "nothing matched", so the caller can skip the empty-object churn on
 // every class-prop set that has no rules.
-function matchRules(parts: string[]): IResolvedStyle | null {
+function matchRules(
+  parts: string[],
+  deps?: Set<number>,
+  holds: IConditionOracle = GLOBAL_TRUTH,
+): IResolvedStyle | null {
   const literal = new Set(parts);
   const tokens = elementTokens(parts);
   let matched: IRuleMatch[] | null = null;
 
-  for (const hook of tokens) {
-    const bucket = ruleIndex.get(hook);
+  for (const token of tokens) {
+    const bucket = ruleIndex.get(token);
     if (bucket === undefined) continue;
 
     for (const indexed of bucket) {
       if (!indexed.rule.tokens.every(needed => tokens.has(needed))) continue;
+      if (!holdsRule(indexed, deps, holds)) continue;
       matched ??= [];
       matched.push({
         indexed,
-        derivedTokens: indexed.rule.tokens.filter(name => !literal.has(name))
-          .length,
+        derivedTokens: indexed.rule.tokens.filter(
+          ruleToken => !literal.has(ruleToken),
+        ).length,
       });
     }
   }
@@ -263,8 +440,8 @@ function matchRules(parts: string[]): IResolvedStyle | null {
   );
 }
 
-// A scoped token contributes its base as well, so a global `.card` still matches an element
-// whose component renamed its own `.card` to a scoped token
+// A scoped token contributes its base too, since the scope renames the token instead of adding one
+// Without the base a global `.card` would stop matching once a component defines its own `.card`
 function elementTokens(parts: string[]): ReadonlySet<string> {
   const tokens = new Set<string>();
 

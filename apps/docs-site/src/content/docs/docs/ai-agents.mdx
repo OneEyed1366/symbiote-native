@@ -70,6 +70,7 @@ https://docs.symbiote-native.dev/llms.txt
   item returns a framework element, which a tag cannot express.
 - Style with a CSS class (`className` on React, `class`/`[class]` elsewhere,
   or an SFC `<style>` block). `StyleSheet.create` from the adapter works too.
+  `@media`, `@container` and `var()` work in that CSS and resolve on the device.
 - A React Native library shipping a JS component (`react-native-*`,
   `@react-native-community/*`) runs ONLY under the React adapter — its body
   calls React hooks. On Vue/Angular/Svelte/Solid use a `@symbiote-native/*`

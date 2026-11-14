@@ -1,4 +1,7 @@
 buildscript {
+    // Detox (e2e): rninfo.gradle exposes RN version metadata Detox's AAR needs.
+    // `detox` is a direct devDep of this app, installed under ./node_modules.
+    apply from: "../node_modules/detox/android/rninfo.gradle"
     ext {
         buildToolsVersion = "36.0.0"
         minSdkVersion = 24
@@ -22,6 +25,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        // Detox AAR (resolves once `npm install` has put detox under ./node_modules).
+        maven { url "$rootDir/../node_modules/detox/Detox-android" }
     }
 }
 

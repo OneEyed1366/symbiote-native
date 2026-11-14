@@ -97,7 +97,8 @@ define. The `/*@__PURE__*/` annotation lets a tree-shaking bundler drop that lin
 importing `Tween` from `svelte/motion` can fail at import time rather than at first
 use. Reach for `Animated` from `@symbiote-native/svelte` for animation, and
 `orientation` / `createWidthQuery` / `useColorScheme` where you would have used a media
-query. Context (`setContext`/
+query. CSS `@media` and `matchMedia` also work, see the
+[media queries guide](/docs/learn/media-queries-and-vars/). Context (`setContext`/
 `getContext`) also works as-is — `@symbiote-native/navigation`'s Svelte port uses it
 internally to hand each mounted route its own navigation scope.
 

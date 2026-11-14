@@ -30,10 +30,13 @@ const {
   compileCssModule,
   compileCssToRules,
   compileScopedCss,
+  conditionsArgument,
   createCssMetroTransformer,
   hashFilePath,
+  propertiesCall,
   relabelForUpstream,
   resolveUpstreamTransformer,
+  serializeRules,
 } = require('@symbiote-native/css-parser');
 
 const upstreamTransformer = resolveUpstreamTransformer();
@@ -191,23 +194,27 @@ const SFC_COMPONENT_VAR = '__sfc__';
 
 // Each block restarts its rules at order 0, so a later one would tie an earlier one
 // Renumbering on append gives the file one monotonic sequence, as one stylesheet would
-function appendRules(target, rules) {
-  for (const rule of rules) {
-    target.push({ ...rule, order: target.length });
+// Conditions join the file's table, so a block's condition indexes shift by the ones already there
+function appendRules(sink, compiled) {
+  const offset = sink.conditions.length;
+  sink.conditions.push(...compiled.conditions);
+  for (const rule of compiled.rules) {
+    sink.rules.push({
+      ...withOffsetCond(rule, offset),
+      order: sink.rules.length,
+    });
+  }
+  // A `:root` block cascades in append order, the way one stylesheet would
+  for (const variable of compiled.rootVariables) {
+    sink.rootVariables.push(withOffsetCond(variable, offset));
+  }
+  for (const property of compiled.properties) {
+    sink.properties.push(withOffsetCond(property, offset));
   }
 }
 
-// `combinators` is compile-time-only, as the registry matches by token subset, so it is not shipped
-// Twin of css-parser's `serializeRules` (metro-css-module/index.ts) for a standalone style file
-function serializeRules(rules) {
-  return JSON.stringify(
-    rules.map(({ tokens, specificity, order, style }) => ({
-      tokens,
-      specificity,
-      order,
-      style,
-    })),
-  );
+function withOffsetCond(item, offset) {
+  return item.cond === undefined ? item : { ...item, cond: item.cond + offset };
 }
 
 // A style block's `lang` names a preprocessor (`lang="scss"`), where a file has an extension
@@ -276,7 +283,7 @@ function compileSfcStyleBlock({ style, content, filename, scopeId }) {
   if (style.module) {
     const compiled = compileCssModule(content, filename);
     const bindingName = typeof style.module === 'string' ? style.module : '$style';
-    return { rules: compiled.rules, binding: [bindingName, compiled.classMap] };
+    return { ...compiled, binding: [bindingName, compiled.classMap] };
   }
   if (style.scoped) {
     return compileScopedCss(content, {
@@ -284,7 +291,7 @@ function compileSfcStyleBlock({ style, content, filename, scopeId }) {
       pattern: `[local]__${scopeId}`,
     });
   }
-  return { rules: compileCssToRules(content, { filename }).rules };
+  return compileCssToRules(content, { filename });
 }
 
 // Blocks cascade last-wins like CSS, carried by the rules' `order` that `appendRules` renumbers
@@ -294,9 +301,14 @@ async function compileStyles(descriptor, filename, scopeId) {
   const contents = await Promise.all(
     descriptor.styles.map(style => compileStyleBlockContent(style, filename)),
   );
-  const rules = [];
-  const scopedClassNames = new Map();
-  const cssModuleBindings = new Map();
+  const sink = {
+    rules: [],
+    conditions: [],
+    rootVariables: [],
+    properties: [],
+    scopedClassNames: new Map(),
+    cssModuleBindings: new Map(),
+  };
   descriptor.styles.forEach((style, index) => {
     const block = compileSfcStyleBlock({
       style,
@@ -304,18 +316,18 @@ async function compileStyles(descriptor, filename, scopeId) {
       filename,
       scopeId,
     });
-    appendRules(rules, block.rules);
+    appendRules(sink, block);
     for (const [name, renamed] of block.names ?? [])
-      scopedClassNames.set(name, renamed);
+      sink.scopedClassNames.set(name, renamed);
     if (block.binding) {
       const [bindingName, classMap] = block.binding;
-      cssModuleBindings.set(bindingName, {
-        ...cssModuleBindings.get(bindingName),
+      sink.cssModuleBindings.set(bindingName, {
+        ...sink.cssModuleBindings.get(bindingName),
         ...classMap,
       });
     }
   });
-  return { rules, scopedClassNames, cssModuleBindings };
+  return sink;
 }
 
 // Scoped-class rewriting is skipped when nothing in the file is scoped, so it adds no runtime cost
@@ -349,20 +361,37 @@ function compileComponentScript(descriptor, scopeId, styles) {
   );
 }
 
-function withStyleRegistration(code, { rules, scopedClassNames, cssModuleBindings }) {
-  const hasCssModules = cssModuleBindings.size > 0;
-  if (rules.length === 0 && !hasCssModules) return code;
-
-  // Only a scoped file needs the runtime rename helper and its per-file map
+// The module text ahead of the component: the registration, the scope map and the module maps
+// Only a scoped file imports the rename helper, so other files leave it out
+function buildPreamble(styles) {
+  const {
+    rules,
+    conditions,
+    rootVariables,
+    properties,
+    scopedClassNames,
+    cssModuleBindings,
+  } = styles;
   const isScoped = scopedClassNames.size > 0;
-  const engineImports = isScoped
-    ? 'registerRules, renameClassTokens as __scopeClass'
-    : 'registerRules';
-
+  const hasRoot = rootVariables.length > 0;
+  const hasProperties = properties.length > 0;
+  const engineImports = [
+    'registerRules',
+    ...(hasRoot ? ['registerRootVariables'] : []),
+    ...(hasProperties ? ['registerProperties'] : []),
+    ...(isScoped ? ['renameClassTokens as __scopeClass'] : []),
+  ].join(', ');
+  const table = conditionsArgument(conditions);
   const preamble = [
     `import { ${engineImports} } from '@symbiote-native/engine';`,
-    `registerRules(${serializeRules(rules)});`,
+    `registerRules(${serializeRules(rules)}${table});`,
   ];
+  if (hasRoot) {
+    preamble.push(
+      `registerRootVariables(${JSON.stringify(rootVariables)}${table});`,
+    );
+  }
+  if (hasProperties) preamble.push(propertiesCall(properties, conditions));
   if (isScoped) {
     preamble.push(
       `const __scopedClassNames = ${JSON.stringify(Object.fromEntries(scopedClassNames))};`,
@@ -373,8 +402,19 @@ function withStyleRegistration(code, { rules, scopedClassNames, cssModuleBinding
   for (const [bindingName, classMap] of cssModuleBindings) {
     preamble.push(`const ${bindingName} = ${JSON.stringify(classMap)};`);
   }
+  return preamble.join('\n');
+}
 
-  const parts = [preamble.join('\n'), code];
+function withStyleRegistration(code, styles) {
+  const { cssModuleBindings } = styles;
+  const hasCssModules = cssModuleBindings.size > 0;
+  const hasRegistrations =
+    styles.rules.length > 0 ||
+    styles.rootVariables.length > 0 ||
+    styles.properties.length > 0;
+  if (!hasRegistrations && !hasCssModules) return code;
+
+  const parts = [buildPreamble(styles), code];
   if (hasCssModules) {
     const bindings = [...cssModuleBindings.keys()]
       .map(name => `${JSON.stringify(name)}: ${name}`)

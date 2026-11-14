@@ -358,6 +358,7 @@ iOS and Android with RN's renderer never in the path. All of this commits throug
 - every primitive (`View`, `Text`, `Image`, `ScrollView`, `TextInput`, `Pressable`, `Switch`,
   `Modal`, the `VirtualizedList` family)
 - the runtime-module layer (`Platform`, `StyleSheet`, `Dimensions`, `Alert`, `Share`)
+- runtime `@media`, `@container`, `var()` and `matchMedia` in CSS classes, shared by all five adapters, device-verified on React
 - `Animated` on both the JS and native drivers
 - Reanimated worklets (`@symbiote-native/reanimated`) on all five adapters
 - the gesture and responder lifecycle
@@ -384,9 +385,10 @@ SymbioteNative never forks the native core, so a SymbioteNative app **is** a sto
 underneath. **Any tool that hooks RN's internals works unchanged, for every adapter, for free.** We
 did not build a test framework; we inherited RN's.
 
-Detox attaches with zero SymbioteNative-specific glue, because to Detox this is just an RN app. One
-shared `canary-journeys` spec runs identically across the React, Vue and Svelte canaries, which is
-what proves each adapter paints and responds the same way on device.
+Detox attaches with zero SymbioteNative-specific glue, because to Detox this is just an RN app. Each
+canary carries its own copy of the `canary-journeys` spec. The React copy runs thirteen journeys, as
+`Image.getSize` waits for an emulator with DNS and `counter card` for an iOS hit-test cause, and the
+other three list fifteen. Their bodies are separate files that are not compared against each other.
 
 Alongside it, 93 integration fixtures drive the real C++ engine headlessly, including React's own
 Fabric renderer as a baseline arm. A second host build compiles the Android branches, so a
