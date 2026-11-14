@@ -215,7 +215,7 @@ hard failure for every clone not running Verdaccio. Guarded by
 
 ```
 pnpm run registry:setup    # once per machine
-pnpm run registry:sync     # publish everything, point every example at it, pull it in
+pnpm run registry:sync     # rebuild what changed, publish it, point every example at it, pull it in
 cd examples/<app>/ios && pod install
 ```
 
@@ -373,11 +373,11 @@ evaluating its argument.
   cheaply reimplement. Not Vite, not Re.Pack.
 - **Never make correctness depend on a module's load-time side effect when that module is
   reached only through a barrel.** The typical case is a `register*` / `set*` callback.
-  Metro turns on `inlineRequires` for production ONLY. It moves a `require()` from the top of a
+  `@react-native/metro-config` sets `inlineRequires: true` in its defaults, with no dev
+  condition; only the two svelte examples turn it off. It moves a `require()` from the top of a
   module down to the first place its binding is USED, and a barrel's
   `export { Thing } from './thing'` compiles to a lazy getter. If nothing ever names `Thing` as
-  a VALUE, `./thing` never evaluates and its registration silently never happens, in RELEASE
-  builds only.
+  a VALUE, `./thing` never evaluates and its registration silently never happens.
 
   Device-diagnosed 2026-08-14: `interpolation-node.ts` registered the factory
   `AnimatedNode.interpolate()` needed. Nothing named `AnimatedInterpolation` as a value
@@ -468,9 +468,17 @@ evaluating its argument.
   `grayscale`/`blur`/`saturate`/`contrast`/`hue-rotate` silently do nothing there. JS style
   objects via `StyleSheet.create` remain the baseline every adapter supports; the CSS path is
   additive.
-- **Runtime `@media` and `matchMedia` (issue #54) work headless in the working tree; `@container` and
-  runtime `var()` are in design**. The compiler keeps `@media` as a condition on the rule, drops
-  `@supports` and `@container`, and ships `var()` as raw text. On device a `var()` resolves against a
+- **Runtime `@media`, `matchMedia`, `@container` and `var()` (issue #54) work headless.** On an iOS
+  simulator the five lab specs of `examples/react/e2e` pass 23 of 23: `@media` in both orientations,
+  `@container` by width and axis, `var()`, `setVariable`, dark mode and a return to the screen. On
+  the Android emulator the same five pass 23 of 23 once the app handles the hardware Back key, and
+  `probe` passes 3 of 3, each in one run, and the host load was not measured for any of them.
+  `canary-journeys` of `examples/react` passes 13 of 13 on iOS and on Android, in one run each on
+  builds newer than the last engine edit, at a host load of 10.7 and 6.1. Two cases are off: `Image.getSize`
+  until the emulator has DNS, and `counter card` until the iOS `hittable=false` after one tap on a bare
+  `<view onPress>` has a cause, as a `<pressable>` is not affected. The compiler keeps
+  `@media` and `@container` as a condition on the rule, drops `@supports`, and ships `var()` as raw
+  text. On device a `var()` resolves against a
   `--x` in the style of the node or an ancestor, then `setVariable` on its surface, then `:root`.
   Longhands, `rem`, `calc()`, the box shorthands, `boxShadow`, `filter` and `transform` work after
   substitution. **Read the `symbiote-media-query-css-vars` skill before

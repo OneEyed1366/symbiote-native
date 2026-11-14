@@ -930,8 +930,7 @@ ENGINE SLICE PLAN (read from the code, decisions 5, 9, 36, 52 already cover the 
     - Style keys `containerType`, `containerName`, `container` compile in `shorthands.ts`;
       `scroll-state` drops with a warning. `containerType: normal` and `none` are kept as text so a
       later rule can cancel an earlier one.
-    - Limits: an `inline-size` container answers a height query like a `size` one (the web says
-      false); `:active` rules inside `@container` read as false (`resolveActiveClassName` has no
+    - Limits: `:active` rules inside `@container` read as false (`resolveActiveClassName` has no
       lookup); the JS path alone shows the plain style until the layout event arrives (the C++ hook
       of decision 86 styles the first commit); `em` in a query is `rem`.
     - Touched debt on the way: `sharedStylePair` (`node-style.ts`, cognitive 17), `bubble` and
@@ -1218,6 +1217,17 @@ ENGINE SLICE PLAN (read from the code, decisions 5, 9, 36, 52 already cover the 
       glass-effect, and on the `create-element-ladder` ratio. All pass alone (85 tests, 2 ladder itests).
       Assert build not run. One slip: a throwaway `sed -i` probe on a test file (banned); restored with Edit.
 
+97. **A nested `<Text>` answers to its container, 2026-11-11 (decisions 22, 37, 86).** Found after develop was merged in.
+    A text under a text commits as virtual text, which has no layout of its own, so the consumer gate never let it through.
+    - Fixed in `SymbioteTree.cpp`: `styleConsumers` asks `ancestorsIn(*node, *newRoot)` (is the node in this tree)
+      and reads the size from the container. `payloadOf` passes `node.committedTextAncestor` to `selfOf`, so a nested
+      text gets no `ellipsizeMode` or `allowFontScaling` defaults.
+    - Tests: `container-nested-text.itest.ts`, 14. The flag, the gate and the queue exit were each mutated red.
+      The log lines `container has no layout: ` and `consumers still waiting: N` are the oracles.
+    - Open, pinned as characterization with a `ВОПРОС:`: a container that is itself a nested text has no layout, so
+      its consumer keeps the plain style and leaves the queue. A consumer moved under a wider container restyles one
+      commit late, since nothing requests the next commit after `linkQueuedConsumers`. Both wait for the user.
+
 ## OPEN
 
 - MEASURED: a `var()` that names a registered `<length>` costs about 0.4 us more than an untyped one.
@@ -1269,3 +1279,28 @@ ENGINE SLICE PLAN (read from the code, decisions 5, 9, 36, 52 already cover the 
   after it. A hook sees the new tree with NO container size yet. Routes: (a) post-layout `onLayout`
   into JS then re-push (one frame late); (b) the hook runs `layoutIfNeeded` itself, restyles, lays
   out again (same frame, double layout, needs a cycle guard). Decision 22 picked a hybrid of both.
+- Device lab walk (`examples/react/e2e/lab-device.ts`, iOS simulator in landscape): the scroll view
+  is 304pt tall and the `lab-media-swatch` probe is 48pt at content y 4173. Detox calls it visible
+  at 75%, so only offsets in a 280pt window count, and a walk from the top failed at `SCROLL_STEP`
+  300 and passed at 200. With sync off one `scrollTo('top')` right after a rotation was lost (the
+  offset read 4600 for 10 s), and a walk begun below the probe never finds it.
+- On iOS `bringIntoView` does not scroll to the top: `jumpNear` reads the frames from
+  `getAttributes` and scrolls once by the distance, exact in one call and upward when negative.
+  The walk then checks visibility, and a jump at the foot of the screen throws, so it is swallowed.
+  Android takes the old path, `scrollTo('top')` and the walk: a jump without the platform check
+  made 11 of 23 cases red there.
+- After `leaveStyleShowcase` a tap while the list slides back opens nothing (the hierarchy showed
+  `hub-scroll-framework`), so it waits for the lab to go and `reopenStyleShowcase` taps until it shows.
+- On Android `device.pressBack()` from the lab left the app: right after it `topResumedActivity` was
+  the launcher. `BackRunner` in `examples/react/App.tsx` pops a route on Back, and `remount.test.ts`
+  then passed 2 of 2. Why the native back handling of react-native-screens did not pop is not looked into.
+- Detox leaves its Metro on 8081 after a run, and the next `detox test` prints `EADDRINUSE`. Angular then
+  went on to run tests and solid stopped with no `Tests:` line, and the logs do not say why. Free the
+  port before each run, count a missing `Tests:` as a failed run, and report `EADDRINUSE` beside the
+  result, as the run then used a leftover Metro.
+- After `npm install --no-save <pkg>` in one example the `navigation` fix was gone (`Array.isArray(node)`
+  count 0), and `registry:refresh` brought it back (1). The mechanism is not isolated, use `refresh`.
+- The rotation specs need landscape in `ios/Canary/Info.plist` and a rebuild. With Portrait only,
+  vue-tsx read `wide=false landscape=false changes=0`, and with the three orientations it passed.
+- A JSX slot hands `{arr.map(...)}` to a navigator as a bare nested array, not a `Fragment`.
+  `collectScreenVnodes` walks both, or `Stack` registers no hub and prunes a route right after `push`.
