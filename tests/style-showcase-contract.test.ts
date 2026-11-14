@@ -14,6 +14,7 @@ import {
   vi,
 } from 'vitest';
 import { compileCssFile } from '../core/css-parser/src/metro-css-module/index.ts';
+import { containerStyleOf } from '../core/engine/src/container-tracking.ts';
 import type { IStyleRule } from '../core/engine/src/style-registry/index.ts';
 import type {
   IMediaCondition,
@@ -36,6 +37,9 @@ const MAIN = `${SHEET_DIR}/StyleShowcase.css`;
 const MODULE = `${SHEET_DIR}/StyleShowcase.module.css`;
 const LIMITS = `${SHEET_DIR}/StyleShowcase.limits.css`;
 const MEDIA = `${SHEET_DIR}/StyleShowcase.media.css`;
+const LAB = `${SHEET_DIR}/StyleShowcase.lab.css`;
+const LAB_E2E = 'examples/react/e2e/lab-colors.ts';
+const LAB_PANELS = `${SHEET_DIR}/style-showcase/lab-panels.tsx`;
 const SCSS = `${SHEET_DIR}/showcase.scss`;
 const LESS = `${SHEET_DIR}/showcase.less`;
 const STYLUS = `${SHEET_DIR}/showcase.styl`;
@@ -91,6 +95,7 @@ let main: ICompiled;
 let cssModule: ICompiled;
 let limits: ICompiled;
 let media: ICompiled;
+let lab: ICompiled;
 let scss: ICompiled;
 let less: ICompiled;
 let stylus: ICompiled;
@@ -102,6 +107,7 @@ beforeAll(async () => {
   cssModule = await compile(MODULE);
   limits = await compile(LIMITS);
   media = await compile(MEDIA);
+  lab = await compile(LAB);
   scss = await compile(SCSS);
   less = await compile(LESS);
   stylus = await compile(STYLUS);
@@ -263,9 +269,21 @@ describe('panel 7 — SCSS, Less and Stylus really ran', () => {
   // Each padding is a variable times two, so the number appears nowhere in the source: seeing it
   // proves the preprocessor evaluated, not merely that the file was found.
   it.each([
-    ['scss', () => scss, { token: 'scss-tile', paddingRight: 26, borderRadius: 14 }],
-    ['less', () => less, { token: 'less-tile', paddingRight: 22, borderRadius: 18 }],
-    ['stylus', () => stylus, { token: 'styl-tile', paddingRight: 18, borderRadius: 22 }],
+    [
+      'scss',
+      () => scss,
+      { token: 'scss-tile', paddingRight: 26, borderRadius: 14 },
+    ],
+    [
+      'less',
+      () => less,
+      { token: 'less-tile', paddingRight: 22, borderRadius: 18 },
+    ],
+    [
+      'stylus',
+      () => stylus,
+      { token: 'styl-tile', paddingRight: 18, borderRadius: 22 },
+    ],
   ])('%s emits arithmetic and a mixin result', (_language, get, expected) => {
     const { token, ...style } = expected;
     expect(ruleFor(get(), token)?.style).toMatchObject(style);
@@ -383,10 +401,139 @@ describe('panel 9 — @media, evaluated at runtime', () => {
   });
 
   it('gets an amber border in landscape and keeps its fill', () => {
-    setMediaEnvironment({ ...PHONE, width: 844, height: 390, orientation: 'landscape' });
+    setMediaEnvironment({
+      ...PHONE,
+      width: 844,
+      height: 390,
+      orientation: 'landscape',
+    });
     expect(tileStyle()).toMatchObject({
       borderColor: '#e0a23a',
       backgroundColor: '#2f7d4f',
     });
+  });
+});
+
+describe('panels 10 to 12 - the device lab', () => {
+  const boxOf = (width: number) => () => ({ width, height: 112 });
+
+  it('paints rose below 600 wide and teal from 600, with no warning', () => {
+    registerRules(lab.rules, lab.conditions);
+
+    setMediaEnvironment({ ...PHONE, width: 599 });
+    expect(resolveClassName('lab-media-swatch').backgroundColor).toBe(
+      '#e63946',
+    );
+
+    setMediaEnvironment({ ...PHONE, width: 600 });
+    expect(resolveClassName('lab-media-swatch').backgroundColor).toBe(
+      '#2a9d8f',
+    );
+    expect(lab.warnings).toEqual([]);
+  });
+
+  it.each([
+    ['lab-consumer-swatch', 'backgroundColor', '#f4a261', '#264653'],
+    ['lab-nested-inner', 'color', '#e76f51', '#6a4c93'],
+    ['lab-first-swatch', 'backgroundColor', '#ff006e', '#3a86ff'],
+    ['lab-first-nested-inner', 'color', '#fb5607', '#06d6a0'],
+  ])(
+    '%s is plain below 240 wide and held from 240',
+    (token, property, plain, held) => {
+      setMediaEnvironment(PHONE);
+      registerRules(lab.rules, lab.conditions);
+
+      expect(resolveClassName(token, boxOf(239))).toMatchObject({
+        [property]: plain,
+      });
+      expect(resolveClassName(token, boxOf(240))).toMatchObject({
+        [property]: held,
+      });
+    },
+  );
+
+  it('makes a container of each box and fixes the first one at 320', () => {
+    expect(ruleFor(lab, 'lab-container')?.style).toMatchObject({
+      containerType: 'size',
+    });
+    expect(ruleFor(lab, 'lab-container-first')?.style).toMatchObject({
+      containerType: 'size',
+      width: 320,
+    });
+  });
+
+  it('ships the var() raw, since the value comes from the token or the surface', () => {
+    expect(ruleFor(lab, 'lab-var-swatch')?.style.backgroundColor).toBe(
+      'var(--lab-accent)',
+    );
+  });
+
+  it('keeps the light colour on a light device and takes indigo on a dark one', () => {
+    registerRules(lab.rules, lab.conditions);
+
+    setMediaEnvironment({ ...PHONE, 'prefers-color-scheme': 'light' });
+    expect(resolveClassName('lab-scheme-swatch').backgroundColor).toBe(
+      '#ff9f1c',
+    );
+
+    setMediaEnvironment({ ...PHONE, 'prefers-color-scheme': 'dark' });
+    expect(resolveClassName('lab-scheme-swatch').backgroundColor).toBe(
+      '#5e60ce',
+    );
+  });
+
+  it('reads the precedence token with var() and declares it on a :root token and a node class', () => {
+    expect(ruleFor(lab, 'lab-prec-swatch')?.style.backgroundColor).toBe(
+      'var(--lab-prec)',
+    );
+    expect(ruleFor(lab, 'lab-prec-node')?.style).toMatchObject({
+      '--lab-prec': '#9ef01a',
+    });
+  });
+
+  it('makes an inline-size container, and a height query in it never holds', () => {
+    setMediaEnvironment(PHONE);
+    registerRules(lab.rules, lab.conditions);
+    const open = containerStyleOf(
+      ruleFor(lab, 'lab-axis-box')?.style,
+      undefined,
+    )?.open;
+    const inlineSize = () => ({ width: 320, height: 112, open });
+
+    expect(ruleFor(lab, 'lab-axis-box')?.style).toMatchObject({
+      containerType: 'inline-size',
+    });
+    expect(resolveClassName('lab-axis-width', inlineSize).backgroundColor).toBe(
+      '#4361ee',
+    );
+    expect(
+      resolveClassName('lab-axis-height', inlineSize).backgroundColor,
+    ).toBe('#fcbf49');
+  });
+
+  it('leaves the container box plain, since its own query asks a container above it', () => {
+    setMediaEnvironment(PHONE);
+    registerRules(lab.rules, lab.conditions);
+
+    expect(
+      resolveClassName('lab-axis-box', () => undefined).backgroundColor,
+    ).toBe('#6d597a');
+  });
+
+  it('declares every colour the device test counts, each once', () => {
+    // The amber override is written by the panel at runtime, every other colour by the sheet
+    const sheet = [LAB, LAB_PANELS]
+      .map(file => readFileSync(path.join(REPO_ROOT, file), 'utf8'))
+      .join('\n')
+      .replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '')
+      .toLowerCase();
+    const spec = readFileSync(path.join(REPO_ROOT, LAB_E2E), 'utf8');
+    const counted = [...spec.matchAll(/hexToRgb\('(#[0-9a-f]{6})'\)/gi)].map(
+      match => match[1].toLowerCase(),
+    );
+
+    expect(counted).toHaveLength(23);
+    expect(counted.filter(color => !sheet.includes(color))).toEqual([]);
+    expect(new Set(counted).size).toBe(counted.length);
   });
 });
