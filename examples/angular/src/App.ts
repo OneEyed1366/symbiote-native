@@ -8,6 +8,7 @@ import { NgComponentOutlet } from '@angular/common';
 import {
   AfterViewInit,
   Component,
+  DestroyRef,
   Injector,
   OnInit,
   ViewChild,
@@ -20,6 +21,7 @@ import {
   injectLinkingIntegration,
 } from '@symbiote-native/navigation/angular';
 import type { IAngularScreenOptions } from '@symbiote-native/navigation/angular';
+import { BackHandler } from '@symbiote-native/angular';
 import { hide } from '@symbiote-native/splash-screen/angular';
 import { MenuScreen } from './screens/MenuScreen';
 import { CanaryScreen } from './screens/CanaryScreen';
@@ -158,6 +160,7 @@ function darkHeader(title: string, tint: string): IAngularScreenOptions {
 export class AppComponent implements OnInit, AfterViewInit {
   @ViewChild('nav') private readonly nav!: Stack;
   private readonly injector = inject(Injector);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly hubs = HUB_SCREENS;
   readonly demos = DEMO_SCREENS;
@@ -228,5 +231,20 @@ export class AppComponent implements OnInit, AfterViewInit {
     runInInjectionContext(this.injector, () => {
       injectLinkingIntegration(APP_LINKING_CONFIG, this.nav);
     });
+    this.handleHardwareBack();
+  }
+
+  // Without a handler the Android Back key on the lab screen took the app to the launcher
+  // At the root `canGoBack` is false and the system leaves the app as usual
+  private handleHardwareBack(): void {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (!this.nav.canGoBack()) return false;
+        this.nav.pop();
+        return true;
+      },
+    );
+    this.destroyRef.onDestroy(() => subscription.remove());
   }
 }

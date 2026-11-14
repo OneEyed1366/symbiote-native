@@ -10,23 +10,26 @@ import { ShowcaseTile } from './parts';
   template: `
     <view class="sc-panel">
       <text class="sc-panel-title">
-        8 · Deliberately not supported — and one that is wrong, not absent
+        8 · Limits: dropped, held behind a condition, and one that is wrong
       </text>
       <text class="sc-panel-note">
-        Each of these prints a warning into the Metro output under the
-        [@symbiote-native/css-parser] prefix, naming this file (and, for a
-        parse error, line:column). If a tile below misbehaves, that log is
-        where the reason is.
+        The dropped and wrong ones print a warning into the Metro output under
+        the [@symbiote-native/css-parser] prefix, naming this file (and, for a
+        parse error, line:column). If a tile below misbehaves, that log is where
+        the reason is.
       </text>
 
-      <text class="sc-tile-label">@SUPPORTS · @CONTAINER</text>
+      <text class="sc-tile-label">
+        NO @SUPPORTS · @CONTAINER NEEDS A CONTAINER
+      </text>
       <view class="sc-limit-cond" testID="sc-limit-cond">
         <text class="sc-combo-text">must stay slate</text>
       </view>
       <text class="sc-tile-caption">
-        Both are dropped whole, rules included — React Native has no feature
-        query and no container query yet. Each one here would repaint this tile
-        red. Branch in JS instead: Platform.
+        @supports is dropped whole, rules included, since React Native has no
+        feature query. @container is kept, but it holds only below an ancestor
+        with container-type, and this tile has none. Each rule here would
+        repaint this tile red. For @supports, branch in JS instead: Platform.
       </text>
 
       <text class="sc-tile-label">CALC() ACROSS UNIT FAMILIES</text>
@@ -43,9 +46,9 @@ import { ShowcaseTile } from './parts';
       <text class="sc-tile-caption">
         RN has no unit meaning "a percentage minus points", so the declaration
         is refused rather than approximated — the red box has no width at all
-        and shrinks to its text. It used to become width: 100, which RN reads
-        as 100 POINTS. Use flex or parent padding; calc() within one unit
-        family still evaluates.
+        and shrinks to its text. It used to become width: 100, which RN reads as
+        100 POINTS. Use flex or parent padding; calc() within one unit family
+        still evaluates.
       </text>
 
       <text class="sc-tile-label">THE COMBINATOR — WRONG, NOT MISSING</text>
@@ -64,8 +67,8 @@ import { ShowcaseTile } from './parts';
       <text class="sc-tile-caption">
         \`.sc-combo-parent .sc-combo-child\` keeps only its class tokens, so it
         matches exactly like \`.a.b\`. A descendant rule therefore never fires
-        where it was meant to and does fire where it was not. Give the child
-        its own class; never write a descendant, child, or sibling rule.
+        where it was meant to and does fire where it was not. Give the child its
+        own class; never write a descendant, child, or sibling rule.
       </text>
 
       <text class="sc-tile-label">VAR() ACROSS FILES</text>

@@ -15,7 +15,7 @@ import { ACCENT, overlayTunnel } from './canary-shared';
   imports: [ActionButton, Modal, SYMBIOTE_ELEMENTS],
   template: `
     <ActionButton
-      testID="angular-open-modal"
+      testID="modal-open"
       title="Open modal"
       (press)="isOpen.set(true)"
       [color]="accent"
@@ -28,14 +28,14 @@ import { ACCENT, overlayTunnel } from './canary-shared';
       (requestClose)="isOpen.set(false)"
     >
       <view class="modal-overlay">
-        <view testID="angular-modal-card" class="modal-card">
+        <view testID="modal-card" class="modal-card">
           <text class="modal-title">Angular Modal</text>
           <text class="modal-body"
             >Committed through the same Fabric childSet from the Angular
             adapter.</text
           >
           <ActionButton
-            testID="angular-close-modal"
+            testID="modal-close"
             title="Close"
             (press)="isOpen.set(false)"
             [color]="accent"

@@ -22,13 +22,13 @@ async function scrollUntilVisible(
       .withTimeout(400);
   } catch (error) {
     if (stepsLeft <= 0) throw error;
-    await element(by.id('angular-canary-scroll')).scroll(500, 'down');
+    await element(by.id('canary-scroll')).scroll(500, 'down');
     return scrollUntilVisible(id, stepsLeft - 1);
   }
 }
 
 async function bringIntoView(id: string): Promise<void> {
-  await element(by.id('angular-canary-scroll')).scrollTo('top');
+  await element(by.id('canary-scroll')).scrollTo('top');
   await scrollUntilVisible(id, MAX_SCROLL_STEPS);
   await sleep(300);
 }
@@ -73,29 +73,23 @@ describe('Angular symbiote canary controls', () => {
       .withTimeout(10_000);
 
     // The first test scrolls at once, so wait for the ScrollView to have real bounds
-    await waitFor(element(by.id('angular-canary-scroll')))
+    await waitFor(element(by.id('canary-scroll')))
       .toBeVisible()
       .withTimeout(10_000);
     await sleep(300);
   });
 
   it('toggles the Angular Switch component and its value round-trips', async () => {
-    await bringIntoView('angular-spinner-switch');
+    await bringIntoView('spinner-switch');
     // `spinning` starts true, so the switch mounts on
-    await expect(element(by.id('angular-spinner-switch'))).toHaveToggleValue(
-      true,
-    );
+    await expect(element(by.id('spinner-switch'))).toHaveToggleValue(true);
     // `toHaveToggleValue` cannot chain off `waitFor`, so settle by hand and assert directly
-    await element(by.id('angular-spinner-switch')).tap();
+    await element(by.id('spinner-switch')).tap();
     await sleep(300);
-    await expect(element(by.id('angular-spinner-switch'))).toHaveToggleValue(
-      false,
-    );
-    await element(by.id('angular-spinner-switch')).tap();
+    await expect(element(by.id('spinner-switch'))).toHaveToggleValue(false);
+    await element(by.id('spinner-switch')).tap();
     await sleep(300);
-    await expect(element(by.id('angular-spinner-switch'))).toHaveToggleValue(
-      true,
-    );
+    await expect(element(by.id('spinner-switch'))).toHaveToggleValue(true);
   });
 
   it('adjusts the Angular Slider component and its native position round-trips', async () => {
@@ -140,7 +134,7 @@ describe('Angular symbiote canary controls', () => {
   });
 
   // SKIPPED: Detox reports `angular-retention-pressable` non-hittable at any scroll or delay
-  // Same upstream limit as `angular-open-modal` in `probe.test.ts`, and a tap never drags
+  // Same upstream limit as `modal-open` in `probe.test.ts`, and a tap never drags
   // The pass condition is a down-drag keeping the highlight, which is a visual check anyway
   it.skip('taps the Angular retention-pressable responder-chain demo', async () => {
     await bringIntoView('angular-retention-pressable');
@@ -153,14 +147,11 @@ describe('Angular symbiote canary controls', () => {
   // `.badge.loud` layers over `.badge` and has no rule of its own
   // The label never changes, so only the compound rule resolving can alter the pixels
   it('repaints the badge when the second class is added (compound rule resolves)', async () => {
-    await bringIntoView('angular-compound-badge-toggle');
-    await expect(element(by.id('angular-compound-badge-plain'))).toBeVisible();
-    await expect(element(by.id('angular-compound-badge-loud'))).toBeVisible();
-    await assertTapRepaints(
-      'angular-compound-badge-toggle',
-      'angular-compound-badge-dynamic',
-    );
+    await bringIntoView('compound-badge-toggle');
+    await expect(element(by.id('compound-badge-plain'))).toBeVisible();
+    await expect(element(by.id('compound-badge-loud'))).toBeVisible();
+    await assertTapRepaints('compound-badge-toggle', 'compound-badge-dynamic');
     // Restore, so a later test does not inherit the toggled state
-    await element(by.id('angular-compound-badge-toggle')).tap();
+    await element(by.id('compound-badge-toggle')).tap();
   });
 });

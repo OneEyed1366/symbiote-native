@@ -20,13 +20,13 @@ async function scrollUntilVisible(
       .withTimeout(400);
   } catch (error) {
     if (stepsLeft <= 0) throw error;
-    await element(by.id('angular-canary-scroll')).scroll(500, 'down');
+    await element(by.id('canary-scroll')).scroll(500, 'down');
     return scrollUntilVisible(id, stepsLeft - 1);
   }
 }
 
 async function bringIntoView(id: string): Promise<void> {
-  await element(by.id('angular-canary-scroll')).scrollTo('top');
+  await element(by.id('canary-scroll')).scrollTo('top');
   await scrollUntilVisible(id, MAX_SCROLL_STEPS);
   await sleep(300);
 }
@@ -77,7 +77,7 @@ describe('Angular canary lists & scroll', () => {
       .toExist()
       .withTimeout(10_000);
     // The first test scrolls at once, so wait for the ScrollView to have real bounds
-    await waitFor(element(by.id('angular-canary-scroll')))
+    await waitFor(element(by.id('canary-scroll')))
       .toBeVisible()
       .withTimeout(10_000);
     await sleep(300);
@@ -85,7 +85,7 @@ describe('Angular canary lists & scroll', () => {
 
   it('renders a RefreshControl on the outer ScrollView', async () => {
     // The pull gesture cannot be driven reliably with sync off, so assert it is mounted
-    await element(by.id('angular-canary-scroll')).scrollTo('top');
+    await element(by.id('canary-scroll')).scrollTo('top');
     await waitFor(element(by.id('angular-refresh-control')))
       .toExist()
       .withTimeout(10_000);
@@ -109,8 +109,8 @@ describe('Angular canary lists & scroll', () => {
   it('renders the Angular chips FlatList nested in the ScrollView', async () => {
     // A nested FlatList trips the Detox hittability bug (see `probe.test.ts`)
     // So check visibility only, a tap or an inner scroll can fail the pre-check on screen
-    await bringIntoView('angular-chips-list');
-    await waitFor(element(by.id('angular-chips-list')))
+    await bringIntoView('chips-list');
+    await waitFor(element(by.id('chips-list')))
       .toBeVisible()
       .withTimeout(5_000);
   });
@@ -154,7 +154,7 @@ describe('Angular canary lists & scroll', () => {
     await waitFor(element(by.id('angular-parity-scroll-box')))
       .toExist()
       .withTimeout(10_000);
-    await element(by.id('angular-canary-scroll')).scrollTo('top');
+    await element(by.id('canary-scroll')).scrollTo('top');
     await waitFor(element(by.id('angular-safe-area')))
       .toExist()
       .withTimeout(10_000);

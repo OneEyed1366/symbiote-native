@@ -1,48 +1,26 @@
 import { by, device, element, waitFor } from 'detox';
 
-// Go/no-go probe: a Fabric view from the Angular template reaches the native tree with its `testID`
-// The app boots on the Menu, so the probe opens the Framework hub and pushes into `Canary` first
-
-const MAX_SCROLL_STEPS = 15;
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Sync is off, so a below-the-fold target exists but is not hittable until it is scrolled to
-// Steps down by a fixed distance, `scrollTo('bottom')` overshoots targets above the screen end
-async function scrollUntilVisible(
-  id: string,
-  stepsLeft: number,
-): Promise<void> {
-  try {
-    await waitFor(element(by.id(id)))
-      .toBeVisible()
-      .withTimeout(400);
-  } catch (error) {
-    if (stepsLeft <= 0) throw error;
-    await element(by.id('angular-canary-scroll')).scroll(500, 'down');
-    return scrollUntilVisible(id, stepsLeft - 1);
-  }
-}
-
-// Momentum keeps drifting after the scroll resolves, so a settle delay follows
-async function bringIntoView(id: string): Promise<void> {
-  await element(by.id('angular-canary-scroll')).scrollTo('top');
-  await scrollUntilVisible(id, MAX_SCROLL_STEPS);
-  await sleep(300);
-}
-
-describe('Angular symbiote attach probe', () => {
+// The go/no-go probe: Detox must attach to a symbiote-driven tree at the stock RN host
+// `launchApp()` completes the New-Arch startup sync (the #4506 bridgeless-deadlock gate)
+// Then a native view with the canary's `resp-chip-${index}` testID is visible and survives a tap
+// App.tsx boots on the navigation demo Menu screen (@symbiote-native/navigation's Stack) — the
+// probe pushes into "Canary" first, the screen carrying resp-chip-0/canary-scroll.
+describe('symbiote attach probe', () => {
   beforeAll(async () => {
+    // The canary runs a perpetual native-driven Animated.loop heartbeat (App.tsx), so the app
+    // never reports idle. Detox cannot sync against an infinite animation (true
+    // on stock RN too). launchApp itself waits for idle, so sync must be off from the FIRST launch
+    // via launchArgs (disableSynchronization() after launch is both too late and undone by the
+    // new-instance re-enable). This probe verifies attach + visibility, not quiescence.
     await device.launchApp({
       newInstance: true,
       launchArgs: { detoxEnableSynchronization: 0 },
-    });
+    }); // ← the go/no-go gate
   });
 
   it('navigates from the menu into the Canary screen through Fabric', async () => {
-    // `toExist` races the layout pass, the row can exist a beat before it is hittable
+    // toExist alone races the Menu screen's own layout pass — the row can exist in the tree
+    // a beat before it's laid out/hittable. toBeVisible waits for that to settle.
     await waitFor(element(by.id('menu-row-FrameworkHub')))
       .toBeVisible()
       .withTimeout(10_000);
@@ -51,75 +29,30 @@ describe('Angular symbiote attach probe', () => {
       .toBeVisible()
       .withTimeout(10_000);
     await element(by.id('menu-row-Canary')).tap();
-    await waitFor(element(by.id('angular-safe-area')))
+    await waitFor(element(by.id('canary-scroll')))
       .toExist()
       .withTimeout(10_000);
   });
 
-  it('renders Angular text content through Fabric', async () => {
-    await waitFor(element(by.id('angular-platform')))
+  // Attach proof: a symbiote-rendered native view exists in the hierarchy carrying the canary's
+  // testID. This proves the renderer drove nativeFabricUIManager AND propagated testID through to
+  // Fabric. toExist, not toBeVisible: the chip sits below the launch fold inside the ScrollView.
+  it('renders a symbiote-driven native view with its testID', async () => {
+    await waitFor(element(by.id('resp-chip-0')))
       .toExist()
       .withTimeout(10_000);
   });
 
-  it('renders an Angular Image component through Fabric', async () => {
-    await waitFor(element(by.id('angular-image')))
-      .toExist()
-      .withTimeout(10_000);
-  });
-
-  it('renders an additional Angular host intrinsic through Fabric', async () => {
-    await waitFor(element(by.id('angular-spinner-indicator')))
-      .toExist()
-      .withTimeout(10_000);
-  });
-
-  it('renders the Angular Switch component through Fabric', async () => {
-    await waitFor(element(by.id('angular-spinner-switch')))
-      .toExist()
-      .withTimeout(10_000);
-  });
-
-  it('recommits after an Angular press handler updates state', async () => {
-    await bringIntoView('angular-counter-card');
-    await element(by.id('angular-counter-card')).tap();
-    await waitFor(element(by.text('tapped 1×')))
-      .toExist()
-      .withTimeout(10_000);
-  });
-
-  // SKIPPED: Detox reports `angular-open-modal` non-hittable, a raw coordinate tap reaches it
-  // Upstream issue (wix/Detox #3130, #4747, #2229), likely worsened by the nested FlatLists
-  // Re-enable once it is fixed upstream or the FlatLists leave the ScrollView
-  it.skip('opens and closes an Angular Modal through Fabric', async () => {
-    await bringIntoView('angular-open-modal');
-    await element(by.id('angular-open-modal')).tap();
-    await waitFor(element(by.id('angular-modal-card')))
-      .toExist()
-      .withTimeout(10_000);
-    await element(by.id('angular-close-modal')).tap();
-    await waitFor(element(by.id('angular-modal-card')))
-      .not.toExist()
-      .withTimeout(10_000);
-  });
-
-  it('renders the Angular KeyboardAvoidingView toggle demo through Fabric', async () => {
-    await waitFor(element(by.id('angular-kav-switch')))
-      .toExist()
-      .withTimeout(10_000);
-  });
-
-  it('edits an Angular TextInput and echoes the controlled value', async () => {
-    await bringIntoView('angular-greeting-input');
-    await element(by.id('angular-greeting-input')).typeText('hi');
-    await waitFor(element(by.text('Hello, hi')))
-      .toExist()
-      .withTimeout(10_000);
-  });
-
-  it('renders an Angular ImageBackground with children on top', async () => {
-    await waitFor(element(by.id('angular-image-bg-label')))
-      .toExist()
+  // Recommit proof: scroll the chip on-screen, tap it (native touch → symbiote event → recommit),
+  // and confirm the tree survives: the chip is still there after the event-driven recommit.
+  it('survives a symbiote recommit from a native tap', async () => {
+    await waitFor(element(by.id('resp-chip-0')))
+      .toBeVisible()
+      .whileElement(by.id('canary-scroll'))
+      .scroll(240, 'down');
+    await element(by.id('resp-chip-0')).tap();
+    await waitFor(element(by.id('resp-chip-0')))
+      .toBeVisible()
       .withTimeout(10_000);
   });
 });

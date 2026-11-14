@@ -67,7 +67,7 @@ import { ACCENT, LOGO_URI, overlayTunnel } from './canary-shared';
   template: `
     <safe-area-view testID="angular-safe-area" class="screen">
       <scroll-view
-        testID="angular-canary-scroll"
+        testID="canary-scroll"
         class="screen"
         contentContainerStyle="scroll-content"
       >

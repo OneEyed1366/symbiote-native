@@ -5,6 +5,7 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 import './StyleShowcase.css';
 import './StyleShowcase.limits.css';
 import './StyleShowcase.media.css';
+import './StyleShowcase.lab.css';
 import './showcase.scss';
 import './showcase.less';
 import './showcase.styl';
@@ -13,6 +14,11 @@ import {
   ShowcaseDeclarationsPanel,
   ShowcaseSpecificityPanel,
 } from './style-showcase/compiler-panels';
+import {
+  ShowcaseContainerLab,
+  ShowcaseMediaLab,
+  ShowcaseVarLab,
+} from './style-showcase/lab-panels';
 import {
   ShowcaseLimitsPanel,
   ShowcaseMediaPanel,
@@ -40,6 +46,9 @@ import {
     ShowcasePreprocessorsPanel,
     ShowcaseLimitsPanel,
     ShowcaseMediaPanel,
+    ShowcaseMediaLab,
+    ShowcaseContainerLab,
+    ShowcaseVarLab,
     SYMBIOTE_ELEMENTS,
   ],
   template: `
@@ -77,6 +86,9 @@ import {
         <ShowcasePreprocessorsPanel></ShowcasePreprocessorsPanel>
         <ShowcaseLimitsPanel></ShowcaseLimitsPanel>
         <ShowcaseMediaPanel></ShowcaseMediaPanel>
+        <ShowcaseMediaLab></ShowcaseMediaLab>
+        <ShowcaseContainerLab></ShowcaseContainerLab>
+        <ShowcaseVarLab></ShowcaseVarLab>
       </scroll-view>
     </safe-area-view>
   `,
