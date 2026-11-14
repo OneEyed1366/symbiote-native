@@ -1,14 +1,6 @@
-// Two independent properties, and they need separate assertions because neither can see the other's
-// failure.
-//
-// WHAT RUNS: the registration installs a behavior on each tag it claims, and none on the tags it
-// deliberately leaves alone. Checked through the engine's own registry.
-//
-// WHAT THE BARREL LOOKS LIKE: `index.ts` must reach `./register` as a bare side-effect import and
-// never as a re-export. That one is a SYNTACTIC property and cannot be checked by importing —
-// vitest evaluates ESM eagerly, so `export * from './register'` would satisfy every runtime
-// assertion below while being dead in a release bundle, which is the exact failure the shape exists
-// to prevent (Metro's inlineRequires; see register.ts).
+// Поведения ставятся на свои теги и не трогают остальные, проверка через реестр движка
+// Импорт в `index.ts` и `bootstrap.ts` голый, не re-export, проверка по тексту: vitest грузит ESM
+// сразу, а re-export мёртв в release под `inlineRequires` (см. register.ts)
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -40,6 +32,10 @@ function withoutComments(source: string): string {
 
 const BARREL = withoutComments(
   readFileSync(join(__dirname, 'index.ts'), 'utf8'),
+);
+
+const BOOTSTRAP = withoutComments(
+  readFileSync(join(__dirname, 'bootstrap.ts'), 'utf8'),
 );
 
 describe('the React adapter registration', () => {
@@ -75,6 +71,15 @@ describe('the React adapter registration', () => {
 
   it('reaches the registration from the barrel as a side effect', () => {
     expect(BARREL).toContain("import './register';");
+  });
+
+  // An app written in intrinsic tags never imports the barrel, so on Android nothing else reached
+  // the registry before the first mount and its scroll view hosted several native children
+  it('reaches the registration from the app entry as a side effect', () => {
+    expect(BOOTSTRAP).toContain("import './register';");
+    expect(BOOTSTRAP).not.toMatch(
+      new RegExp(String.raw`export[\s\S]{0,80}from\s*'\.\/register'`),
+    );
   });
 
   // why: `export * from './register'` and `export { x } from './register'` both compile to a lazy

@@ -1,8 +1,6 @@
-// Zero-config app entry: wires the four RN-backed host seams (via @symbiote-native/components's
-// bootstrapHost) plus this adapter's own AppRegistry host-registrar bridge, then registers the
-// root component in one call. Lives OUTSIDE the package's main barrel (package.json's
-// "./bootstrap" export) because it imports react-native directly, which Vitest's Flow-unaware
-// transform can't parse (see @symbiote-native/components/bootstrap for the full reason).
+// Zero-config app entry: `bootstrapHost` wires the RN-backed host seams, then the root registers
+// Lives outside the barrel (the "./bootstrap" export) since it imports react-native, which Vitest
+// cannot parse (see @symbiote-native/components/bootstrap)
 
 import type { ComponentType } from 'react';
 import { AppRegistry as RNAppRegistry } from 'react-native';
@@ -11,6 +9,10 @@ import {
   type IBootstrapHostOptions,
 } from '@symbiote-native/components/bootstrap';
 import { AppRegistry, setHostRegistrar } from './modules/app-registry';
+
+// Голый import: приложение на intrinsic-тегах не трогает barrel, а без поведений
+// ScrollView на Android монтируется без content view
+import './register';
 
 export type { IBootstrapHostOptions } from '@symbiote-native/components/bootstrap';
 
