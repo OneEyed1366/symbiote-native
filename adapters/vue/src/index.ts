@@ -246,6 +246,7 @@ export {
   useAnimatedValueXY,
 } from './composables/use-animated-value';
 export { useWindowDimensions } from './composables/use-window-dimensions';
+export { useRootTag } from './composables/use-root-tag';
 export { createPermissionHook } from './composables/create-permission-hook';
 export { createResourceHook } from './composables/create-resource-hook';
 export { defineNativeViewComponent } from './composables/define-native-view-component';

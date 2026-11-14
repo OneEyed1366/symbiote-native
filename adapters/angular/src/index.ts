@@ -242,6 +242,7 @@ export {
   connectWatchedSignal,
   PermissionsServiceBase,
 } from './services';
+export { ROOT_TAG, injectRootTag } from './root-tag';
 export {
   createAnimatedColor as injectAnimatedColor,
   createAnimatedValue as injectAnimatedValue,

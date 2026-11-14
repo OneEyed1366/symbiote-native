@@ -23,6 +23,7 @@
 import './register';
 
 export { mount, unmount } from './render';
+export { RootTagContext } from './root-tag-context';
 export { findNodeHandle } from './host-instance';
 export type { IHostInstance } from './host-instance';
 

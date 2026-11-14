@@ -316,6 +316,7 @@ export { Portal, type IPortalProps, type IPortalTarget } from './create-portal';
 // bucket is named `runes/`, not `hooks/`/`composables/`.
 export { useWindowDimensions } from './runes/use-window-dimensions.svelte';
 export { useColorScheme } from './runes/use-color-scheme.svelte';
+export { useRootTag } from './runes/use-root-tag';
 export {
   useAnimatedColor,
   useAnimatedValue,
