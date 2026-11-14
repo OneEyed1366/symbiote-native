@@ -2,9 +2,16 @@
 // A query RN cannot answer reads `matches: false` for good, as a browser reads an unknown feature
 
 import { ensureMediaEnvironment } from '../media-environment';
-import { holdsCondition, holdsOnce, internConditions } from '../style-registry/media-conditions';
+import {
+  holdsCondition,
+  holdsOnce,
+  internConditions,
+} from '../style-registry/media-conditions';
 import type { IMediaCondition } from '../style-registry/media-evaluate';
-import { callIsolated, onConditionFlip } from '../style-registry/media-subscriptions';
+import {
+  callIsolated,
+  onConditionFlip,
+} from '../style-registry/media-subscriptions';
 import { parseMediaQueryList } from './parse-media-query';
 
 type IChangeHandler = (event: MediaQueryListEvent) => void;
@@ -83,7 +90,9 @@ export class MediaQueryList extends EventTarget {
       isOnce: typeof options === 'object' && options.once === true,
     };
     this.registrations.push(entry);
-    userSignal?.addEventListener('abort', () => this.drop(entry), { once: true });
+    userSignal?.addEventListener('abort', () => this.drop(entry), {
+      once: true,
+    });
     super.addEventListener(type, listener, { once: entry.isOnce });
     this.sync();
   }
@@ -96,7 +105,9 @@ export class MediaQueryList extends EventTarget {
   // A `once` listener leaves with its first delivery, so the count follows the dispatch
   override dispatchEvent(event: Event): boolean {
     const isDelivered = super.dispatchEvent(event);
-    for (const entry of this.registrations.filter(held => held.isOnce && held.type === event.type)) {
+    for (const entry of this.registrations.filter(
+      held => held.isOnce && held.type === event.type,
+    )) {
       this.drop(entry);
     }
     return isDelivered;
@@ -121,7 +132,9 @@ export class MediaQueryList extends EventTarget {
   }
 
   private find(type: string, listener: IListener): IRegistration | undefined {
-    return this.registrations.find(held => held.type === type && held.listener === listener);
+    return this.registrations.find(
+      held => held.type === type && held.listener === listener,
+    );
   }
 
   private drop(entry: IRegistration): void {

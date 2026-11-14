@@ -150,7 +150,10 @@ function collectStyleRule(
   { value: rule }: { value: StyleRule },
 ): void {
   // `selectorsToMatches` announces every drop reason but `root`, which only this level can judge
-  const { matches, dropped } = selectorsToMatches(rule.selectors, state.filename);
+  const { matches, dropped } = selectorsToMatches(
+    rule.selectors,
+    state.filename,
+  );
   // `importantDeclarations` last, so a later entry wins when both name the same RN property
   const declarations = [
     ...(rule.declarations?.declarations ?? []),
@@ -200,8 +203,8 @@ function reportWarnings(
 // Sorted, since the Rust HashMap order is random per process and this lands in a generated module
 function exportedNames(result: TransformResult): Record<string, string> {
   const names: Record<string, string> = {};
-  const entries = Object.entries(result.exports ?? {}).sort(([left], [right]) =>
-    left < right ? -1 : 1,
+  const entries = Object.entries(result.exports ?? {}).sort(
+    ([left], [right]) => (left < right ? -1 : 1),
   );
   for (const [local, entry] of entries) names[local] = entry.name;
   return names;
@@ -287,7 +290,10 @@ function toRules(
   // A rule with no declaration left only adds a candidate for the registry to weigh per lookup
   const painting = rules.filter(rule => Object.keys(rule.style).length > 0);
   const carrier = keyframesCarrier(keyframes, names, rules.length);
-  return { rules: carrier === null ? painting : [...painting, carrier], globals };
+  return {
+    rules: carrier === null ? painting : [...painting, carrier],
+    globals,
+  };
 }
 
 // Kept apart from `compileCssToRules` so the transform call reads on its own
@@ -386,7 +392,9 @@ export function compileCssToRules(
     const first = compilePass(css, options, warned);
     // A second pass over the source, since lightningcss loses the declarations before a broken one
     const repaired = cssWithoutBrokenDeclarations(css, first.warnings);
-    return repaired === null ? first.compiled : compilePass(repaired, options, warned).compiled;
+    return repaired === null
+      ? first.compiled
+      : compilePass(repaired, options, warned).compiled;
   } catch (error) {
     // `lightningcss` overflows its stack on absurd nesting and throws a bare error
     if (!(error instanceof RangeError)) throw error;

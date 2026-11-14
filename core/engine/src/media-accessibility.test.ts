@@ -58,12 +58,25 @@ async function prepareMotionNode() {
   const { getPublishedStyle } = await import('./node-style');
   registry.registerRules(
     [
-      { tokens: ['card'], specificity: [0, 1, 0], order: 0, style: { padding: 4 } },
-      { tokens: ['card'], specificity: [0, 1, 0], order: 1, style: { padding: 8 }, cond: 0 },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 4 },
+      },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { padding: 8 },
+        cond: 0,
+      },
     ],
     [['=', 'prefers-reduced-motion', 'reduce']],
   );
-  subscriptions.setMediaAccessibilityStarter(accessibility.startMediaAccessibility);
+  subscriptions.setMediaAccessibilityStarter(
+    accessibility.startMediaAccessibility,
+  );
   // Mounted synchronously, so no microtask runs before the first assertion
   return () => {
     const node = createElement('RCTView');
@@ -90,12 +103,24 @@ describe('prefers-reduced-motion from the accessibility module', () => {
     const { getPublishedStyle } = await import('./node-style');
     registry.registerRules(
       [
-        { tokens: ['card'], specificity: [0, 1, 0], order: 0, style: { padding: 4 } },
-        { tokens: ['card'], specificity: [0, 1, 0], order: 1, style: { padding: 8 }, cond: 0 },
+        {
+          tokens: ['card'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { padding: 4 },
+        },
+        {
+          tokens: ['card'],
+          specificity: [0, 1, 0],
+          order: 1,
+          style: { padding: 8 },
+          cond: 0,
+        },
       ],
       [['=', 'prefers-reduced-motion', 'reduce']],
     );
-    const { installRecordingFabric } = await import('@symbiote-native/test-utils');
+    const { installRecordingFabric } =
+      await import('@symbiote-native/test-utils');
     installRecordingFabric();
     createSurface(8_400);
     const node = createElement('RCTView');

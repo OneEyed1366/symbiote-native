@@ -262,14 +262,16 @@ export function resolveClassName(
     // Direct callers (an adapter resolving a class prop itself) get the same canonicalisation as
     // routeProp's path, so an all-string array is memoised for them too.
     const canonical = canonicalClassName(className);
-    if (typeof canonical === 'string') return resolveClassName(canonical, containerOf);
+    if (typeof canonical === 'string')
+      return resolveClassName(canonical, containerOf);
     return className.reduce<IResolvedStyle>((acc, item) => {
       return { ...acc, ...resolveClassName(item, containerOf) };
     }, {});
   }
 
   const cached = resolvedCache.get(className);
-  if (cached !== undefined) return resolveForContainer(className, cached, containerOf);
+  if (cached !== undefined)
+    return resolveForContainer(className, cached, containerOf);
 
   const resolved = resolveClassString(className);
 
@@ -289,8 +291,12 @@ function resolveForContainer(
   containerOf: IContainerLookup | undefined,
 ): IResolvedStyle {
   if (containerOf === undefined) return plain;
-  const ids = [...(conditionIdsOfKey(className) ?? [])].filter(isContainerCondition);
-  const bits = ids.map(id => (holdsCondition(id, containerOf) ? '1' : '0')).join('');
+  const ids = [...(conditionIdsOfKey(className) ?? [])].filter(
+    isContainerCondition,
+  );
+  const bits = ids
+    .map(id => (holdsCondition(id, containerOf) ? '1' : '0'))
+    .join('');
   if (!bits.includes('1')) return plain;
 
   const key = `${className}${CONTAINER_KEY_SEPARATOR}${bits}`;
@@ -300,7 +306,8 @@ function resolveForContainer(
   const deps = new Set<number>();
   const parts = className.trim().split(/\s+/).filter(Boolean);
   const resolved =
-    matchRules(parts, deps, id => holdsCondition(id, containerOf)) ?? EMPTY_STYLE;
+    matchRules(parts, deps, id => holdsCondition(id, containerOf)) ??
+    EMPTY_STYLE;
   memoise(resolvedCache, resolvedKeys, key, resolved);
   trackDependents(key, deps);
   return resolved;
@@ -315,9 +322,13 @@ export type IContainerVariants = readonly [
 const MAX_VARIANT_CONDITIONS = 4;
 const variantsCache = new Map<string, IContainerVariants | undefined>();
 
-function buildContainerVariants(className: string): IContainerVariants | undefined {
+function buildContainerVariants(
+  className: string,
+): IContainerVariants | undefined {
   resolveClassName(className);
-  const ids = [...(conditionIdsOfKey(className) ?? [])].filter(isContainerCondition);
+  const ids = [...(conditionIdsOfKey(className) ?? [])].filter(
+    isContainerCondition,
+  );
   if (ids.length === 0 || ids.length > MAX_VARIANT_CONDITIONS) return undefined;
   const parts = className.trim().split(/\s+/).filter(Boolean);
   const styles: Array<readonly [number, IResolvedStyle]> = [];
@@ -335,7 +346,9 @@ function buildContainerVariants(className: string): IContainerVariants | undefin
  * The conditions of the class with the window settled, then one `[mask, style]` per way they can
  * hold; bit `i` of a mask is condition `i`. `undefined` for a class without container conditions
  */
-export function containerVariantsOf(className: string): IContainerVariants | undefined {
+export function containerVariantsOf(
+  className: string,
+): IContainerVariants | undefined {
   if (variantsCache.has(className)) return variantsCache.get(className);
   const built = buildContainerVariants(className);
   memoise(variantsCache, variantsKeys, className, built);

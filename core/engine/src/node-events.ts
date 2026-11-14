@@ -68,8 +68,14 @@ function listenersOf(node: ISymbioteNode): Map<string, IListener> {
 }
 
 // A container keeps its `layout` gate for its own size reading, whatever the app listens for
-function gateValue(node: ISymbioteNode, name: string, isHandler: boolean): true | undefined {
-  return isHandler || (name === LAYOUT_EVENT && isContainer(node)) ? true : undefined;
+function gateValue(
+  node: ISymbioteNode,
+  name: string,
+  isHandler: boolean,
+): true | undefined {
+  return isHandler || (name === LAYOUT_EVENT && isContainer(node))
+    ? true
+    : undefined;
 }
 
 // Arm (or release, with `undefined`) the shared handler a behavior dispatches through, instead of

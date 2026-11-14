@@ -7,7 +7,12 @@ import { resetContainerTracking } from '../container-tracking';
 import { deliverDirect } from '../events/delivery';
 import { resetMediaEnvironment } from '../media-environment';
 import { resetMutationBuffer } from '../mutation-buffer';
-import { appendChild, createElement, routeProp, type ISymbioteNode } from '../node';
+import {
+  appendChild,
+  createElement,
+  routeProp,
+  type ISymbioteNode,
+} from '../node';
 import { getPublishedStyle } from '../node-style';
 import { createSurface } from '../surface';
 import { clearGlobalStyles, registerRules } from './index';
@@ -18,7 +23,9 @@ const PLAIN_CARD = 4;
 
 function paddingOf(node: ISymbioteNode): unknown {
   const style: unknown = getPublishedStyle(node)[0];
-  return typeof style === 'object' && style !== null ? Reflect.get(style, 'padding') : undefined;
+  return typeof style === 'object' && style !== null
+    ? Reflect.get(style, 'padding')
+    : undefined;
 }
 
 function layOut(container: ISymbioteNode, width: number, height = 80): void {
@@ -43,8 +50,19 @@ function mountCard(containerStyle: Record<string, unknown>): {
 function registerCard(condition: unknown): void {
   registerRules(
     [
-      { tokens: ['card'], specificity: [0, 1, 0], order: 0, style: { padding: PLAIN_CARD } },
-      { tokens: ['card'], specificity: [0, 1, 0], order: 1, style: { padding: WIDE_CARD }, cond: 0 },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: PLAIN_CARD },
+      },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { padding: WIDE_CARD },
+        cond: 0,
+      },
     ],
     [condition],
   );
@@ -105,7 +123,11 @@ describe('a container whose width depends on its content', () => {
     ['flexBasis', { flexBasis: 100 }],
     ['aspectRatio', { aspectRatio: 2 }],
   ])('counts `%s` as a definite width', (_name, definite) => {
-    const { container, card } = mountCard({ containerType: 'size', height: 80, ...definite });
+    const { container, card } = mountCard({
+      containerType: 'size',
+      height: 80,
+      ...definite,
+    });
 
     layOut(container, 500);
 
@@ -113,7 +135,10 @@ describe('a container whose width depends on its content', () => {
   });
 
   it('asks an inline-size container for a width only', () => {
-    const { container, card } = mountCard({ containerType: 'inline-size', width: 300 });
+    const { container, card } = mountCard({
+      containerType: 'inline-size',
+      width: 300,
+    });
 
     layOut(container, 500);
 
@@ -126,7 +151,10 @@ describe('a container whose height depends on its content', () => {
 
   it('reads false for a height query when only the width is fixed', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { container, card } = mountCard({ containerType: 'size', width: 300 });
+    const { container, card } = mountCard({
+      containerType: 'size',
+      width: 300,
+    });
 
     layOut(container, 300, 80);
 
@@ -134,7 +162,11 @@ describe('a container whose height depends on its content', () => {
   });
 
   it('answers a height query once the height is fixed', () => {
-    const { container, card } = mountCard({ containerType: 'size', width: 300, height: 80 });
+    const { container, card } = mountCard({
+      containerType: 'size',
+      width: 300,
+      height: 80,
+    });
 
     layOut(container, 300, 80);
 
@@ -144,7 +176,40 @@ describe('a container whose height depends on its content', () => {
   it('reads false for an aspect-ratio query while one axis is open', () => {
     registerCard(['@', null, ['>=', 'aspect-ratio', 1]]);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { container, card } = mountCard({ containerType: 'size', width: 300 });
+    const { container, card } = mountCard({
+      containerType: 'size',
+      width: 300,
+    });
+
+    layOut(container, 300, 80);
+
+    expect(paddingOf(card)).toBe(PLAIN_CARD);
+  });
+});
+
+describe('an inline-size container', () => {
+  it('reads false for a height query although its own height is fixed', () => {
+    registerCard(['@', null, ['>=', 'height', 50]]);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { container, card } = mountCard({
+      containerType: 'inline-size',
+      width: 300,
+      height: 80,
+    });
+
+    layOut(container, 300, 80);
+
+    expect(paddingOf(card)).toBe(PLAIN_CARD);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('reads false for an orientation query too, since that reads the height', () => {
+    registerCard(['@', null, ['=', 'orientation', 'landscape']]);
+    const { container, card } = mountCard({
+      containerType: 'inline-size',
+      width: 300,
+      flex: 1,
+    });
 
     layOut(container, 300, 80);
 
@@ -160,7 +225,11 @@ describe('a container whose style fixes the missing axis later', () => {
     layOut(container, 500);
     expect(paddingOf(card)).toBe(PLAIN_CARD);
 
-    routeProp(container, 'style', { containerType: 'size', width: 500, height: 80 });
+    routeProp(container, 'style', {
+      containerType: 'size',
+      width: 500,
+      height: 80,
+    });
 
     expect(paddingOf(card)).toBe(WIDE_CARD);
   });

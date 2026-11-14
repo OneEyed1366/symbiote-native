@@ -37,13 +37,11 @@ export type ICommittedRecord = {
   familyGeneration?: number;
 };
 
-// A structural census of the host's tree: how many nodes it holds, how many the commit skips, and
-// the width of every parent with a skipped child — exactly what the child-set build re-scans
-// every time that parent reconciles.
+// A structural census of the host's tree: nodes held, nodes the commit skips, and the width of
+// every parent with a skipped child, which the child-set build re-scans per reconcile
 
-// Anchor count is an adapter property, not an app one: Angular's components bind to a host element
-// and always allocate one, where React/Vue/Svelte/Solid don't — the same screen is anchor-free
-// under four adapters and carries one per instance under the fifth.
+// Anchor count depends on the adapter, not the app, т.к. Angular always allocates a host element
+// per component and React, Vue, Svelte and Solid do not
 export type ITreeCensus = {
   nodes: number;
   anchors: number;
@@ -72,7 +70,8 @@ export const EMPTY_CENSUS: ITreeCensus = {
 // `parentsOf`, `subtreesOf` and `ancestorsOf` are that fix, one crossing each
 // They serve the three walks sized by the tree: teardown down, dispatch and responder up
 export type ITreeHost = {
-  applyOps: (batch: IMutationBatch) => void;
+  // `true` when the commit left views to be styled by the next one, which JS then makes
+  applyOps: (batch: IMutationBatch) => boolean | void;
   propOf: (handle: object, key: string) => unknown;
   // The whole bag, for the callers that fold over it rather than ask for one name — every host
   // behavior's payload fold. Kept beside `propOf` rather than derived from it: the host holds the
@@ -244,6 +243,31 @@ export function flushOps(): void {
   host.applyOps(takeBatch());
 }
 
+// Android mounts a commit's views from what they were allocated with, so native holds a style set
+// in the commit that inserts them back for the next one. That commit comes after the frames below
+const FOLLOW_UP_FRAMES = 2;
+const FOLLOW_UP_LIMIT = 3;
+
+function commitAfterMount(
+  rootTag: IRootTag,
+  surface: IMutationHandle,
+  attempt: number,
+  framesLeft: number = FOLLOW_UP_FRAMES,
+): void {
+  if (framesLeft > 0) {
+    requestAnimationFrame(() =>
+      commitAfterMount(rootTag, surface, attempt, framesLeft - 1),
+    );
+    return;
+  }
+  if (host === undefined) return;
+  recordCommit(rootTag, surface);
+  const isFollowUpWanted = host.applyOps(takeBatch());
+  if (isFollowUpWanted === true && attempt < FOLLOW_UP_LIMIT) {
+    commitAfterMount(rootTag, surface, attempt + 1);
+  }
+}
+
 // Commits this window, for readCommitProfile below.
 let commits = 0;
 
@@ -287,8 +311,11 @@ export function commitSurfaceOps(
     recordCommit(rootTag, surface);
     lastCommittedTag = rootTag;
   }
-  host.applyOps(takeBatch());
+  const isFollowUpWanted = host.applyOps(takeBatch());
   noteCommitDrained();
+  if (isFollowUpWanted === true && rootTag !== undefined) {
+    commitAfterMount(rootTag, surface, 1);
+  }
 }
 
 // What the commit path cost on this host since the last read. Reading zeroes the accumulator, so

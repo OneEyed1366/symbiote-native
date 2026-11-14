@@ -32,21 +32,25 @@ export function isContainer(node: object): boolean {
   return infoByContainer.has(node);
 }
 
+// `unfixed` is the open axes its type asked to be fixed, which is what the warning names
 export function declareContainer(
   node: object,
   names: readonly string[],
   open: readonly IContainerAxis[] = NONE_OPEN,
+  unfixed: readonly IContainerAxis[] = open,
 ): void {
   const known = infoByContainer.get(node);
   infoByContainer.set(node, { names, open });
-  if (open.length > 0 && !warnedContainers.has(node)) {
+  if (unfixed.length > 0 && !warnedContainers.has(node)) {
     warnedContainers.add(node);
     console.warn(
-      `[@symbiote-native/engine] a container leaves its ${open.join(' and ')} to its content, ` +
+      `[@symbiote-native/engine] a container leaves its ${unfixed.join(' and ')} to its content, ` +
         'so a query on it reads false. Set width, height, flex or aspectRatio on the container.',
     );
   }
-  const isSameAxes = known?.open.length === open.length && open.every(axis => known.open.includes(axis));
+  const isSameAxes =
+    known?.open.length === open.length &&
+    open.every(axis => known.open.includes(axis));
   if (known !== undefined && !isSameAxes) restyleConsumersOf(node);
 }
 
@@ -81,7 +85,10 @@ export function linkConsumer(consumer: object, chain: readonly object[]): void {
 }
 
 /** Answers whether the size moved, which is when the consumers of the container restyled */
-export function reportContainerSize(container: object, size: IContainerSize): boolean {
+export function reportContainerSize(
+  container: object,
+  size: IContainerSize,
+): boolean {
   const known = sizeByContainer.get(container);
   if (known?.width === size.width && known.height === size.height) return false;
   sizeByContainer.set(container, size);
@@ -98,21 +105,34 @@ function isFixed(value: unknown): boolean {
   return value !== undefined && value !== null && value !== 'auto';
 }
 
+const WIDTH_AXIS: IContainerAxis = 'width';
+const HEIGHT_AXIS: IContainerAxis = 'height';
+
 // An axis is fixed by its own length or by a flex or aspect ratio, never by what the node holds
 // Only `size` contains the height, so an `inline-size` container is asked for its width alone
+// `open` is what no query may read, `unfixed` the part of it the container's type asked to be set
 function openAxesOf(
   style: Record<string, unknown>,
   containsHeight: boolean,
-): readonly IContainerAxis[] {
-  if (SIZING_KEYS.some((key: ISizingKey) => isFixed(style[key]))) return NONE_OPEN;
-  const open: IContainerAxis[] = [];
-  if (!isFixed(style.width)) open.push('width');
-  if (containsHeight && !isFixed(style.height)) open.push('height');
-  return open;
+): { open: readonly IContainerAxis[]; unfixed: readonly IContainerAxis[] } {
+  const isSized = SIZING_KEYS.some((key: ISizingKey) => isFixed(style[key]));
+  const widthLeft = !isSized && !isFixed(style.width) ? [WIDTH_AXIS] : [];
+  const heightLeft = !isSized && !isFixed(style.height) ? [HEIGHT_AXIS] : [];
+  return {
+    open: containsHeight
+      ? [...widthLeft, ...heightLeft]
+      : [...widthLeft, HEIGHT_AXIS],
+    unfixed: containsHeight ? [...widthLeft, ...heightLeft] : widthLeft,
+  };
 }
 
 /** The names a `container-name` lists and the axes it leaves open, `undefined` if no container */
-export function containerStyleOf(base: unknown, explicit: unknown): IContainerInfo | undefined {
+export function containerStyleOf(
+  base: unknown,
+  explicit: unknown,
+):
+  | (IContainerInfo & { readonly unfixed: readonly IContainerAxis[] })
+  | undefined {
   // An `undefined` mentions a key without setting it, which is how the host payload reads it too
   const style = Object.fromEntries(
     [base, explicit]
@@ -126,19 +146,26 @@ export function containerStyleOf(base: unknown, explicit: unknown): IContainerIn
     typeof name === 'string'
       ? name.split(/\s+/).filter(each => each !== '' && each !== NO_NAME)
       : [];
-  return { names, open: openAxesOf(style, type === 'size') };
+  return { names, ...openAxesOf(style, type === 'size') };
 }
 
-function readLayoutSize(nativeEvent: Record<string, unknown>): IContainerSize | undefined {
+function readLayoutSize(
+  nativeEvent: Record<string, unknown>,
+): IContainerSize | undefined {
   const { layout } = nativeEvent;
   if (typeof layout !== 'object' || layout === null) return undefined;
   const width: unknown = Reflect.get(layout, 'width');
   const height: unknown = Reflect.get(layout, 'height');
-  return typeof width === 'number' && typeof height === 'number' ? { width, height } : undefined;
+  return typeof width === 'number' && typeof height === 'number'
+    ? { width, height }
+    : undefined;
 }
 
 /** Runs before the app's own `layout` listener, so descendants restyle from the same event */
-export function noteContainerLayout(node: object, nativeEvent: Record<string, unknown>): void {
+export function noteContainerLayout(
+  node: object,
+  nativeEvent: Record<string, unknown>,
+): void {
   if (!infoByContainer.has(node)) return;
   const size = readLayoutSize(nativeEvent);
   if (size !== undefined) reportContainerSize(node, size);
@@ -154,7 +181,10 @@ export function noteMoved(root: object): void {
 }
 
 /** A node whose class reads a container condition, linked to its containers after the commit */
-export function queueConsumer(consumer: object, restyle: (node: object) => void): void {
+export function queueConsumer(
+  consumer: object,
+  restyle: (node: object) => void,
+): void {
   if (chainByConsumer.has(consumer)) return;
   setContainerRestyler(restyle);
   pending.add(consumer);
@@ -189,9 +219,12 @@ export function containerLookup(consumer: object): IContainerLookup {
   return name => {
     for (const container of chainByConsumer.get(consumer) ?? []) {
       const info = infoByContainer.get(container);
-      if (info === undefined || !(name === null || info.names.includes(name))) continue;
+      if (info === undefined || !(name === null || info.names.includes(name)))
+        continue;
       const size = sizeByContainer.get(container);
-      return size === undefined || info.open.length === 0 ? size : { ...size, open: info.open };
+      return size === undefined || info.open.length === 0
+        ? size
+        : { ...size, open: info.open };
     }
     return undefined;
   };

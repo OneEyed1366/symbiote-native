@@ -61,7 +61,7 @@ export type INativeEngineBindings = {
     values: readonly unknown[],
     instanceHandles: readonly unknown[],
     handles: readonly object[],
-  ) => void;
+  ) => boolean | void;
   // The tree reads of ITreeHost, taking the same placeholder object applyOps put the node on. None
   // is on a commit path — they run at gesture or lifecycle rate, so the crossing cost is
   // irrelevant. undefined/empty is an ordinary answer from all of them.

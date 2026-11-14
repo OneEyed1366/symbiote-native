@@ -25,7 +25,10 @@ import {
   hasContainerConditions,
   isContainerCondition,
 } from './style-registry/media-conditions';
-import { recordSetContainerVariants, recordSetReleaseMark } from './mutation-buffer';
+import {
+  recordSetContainerVariants,
+  recordSetReleaseMark,
+} from './mutation-buffer';
 import { ensureMediaEnvironment } from './media-environment';
 import { watchMediaClass } from './style-registry/media-subscriptions';
 import { slotPropNameFor } from './host-behavior';
@@ -155,9 +158,13 @@ function envelopeOf(variants: IContainerVariants): string {
 }
 
 // The host styles a node by its container in the first commit, from what this sends
-function shipContainerVariants(node: ISymbioteNode, className: IClassNameValue): void {
+function shipContainerVariants(
+  node: ISymbioteNode,
+  className: IClassNameValue,
+): void {
   if (!hasContainerConditions()) return;
-  const variants = typeof className === 'string' ? containerVariantsOf(className) : undefined;
+  const variants =
+    typeof className === 'string' ? containerVariantsOf(className) : undefined;
   const envelope = variants === undefined ? undefined : envelopeOf(variants);
   if (envelope === shippedEnvelopes.get(node)) return;
   recordSetContainerVariants(node, envelope);
@@ -171,7 +178,10 @@ function subscribeClass(node: ISymbioteNode, className: IClassNameValue): void {
   if (watchMediaClass(node, className, restyleClass)) {
     recordSetReleaseMark(node);
   }
-  if (hasContainerConditions() && conditionIdsOf(className).some(isContainerCondition)) {
+  if (
+    hasContainerConditions() &&
+    conditionIdsOf(className).some(isContainerCondition)
+  ) {
     queueConsumer(node, restyleClass);
   }
   shipContainerVariants(node, className);
@@ -196,10 +206,14 @@ function syncContainer(node: ISymbioteNode, parts: IClassStyleParts): void {
   if (container === undefined) {
     if (!was) return;
     revokeContainer(node);
-    setProp(node, LAYOUT_FLAG, hasListenerFor(node, LAYOUT_EVENT) ? true : undefined);
+    setProp(
+      node,
+      LAYOUT_FLAG,
+      hasListenerFor(node, LAYOUT_EVENT) ? true : undefined,
+    );
     return;
   }
-  declareContainer(node, container.names, container.open);
+  declareContainer(node, container.names, container.open, container.unfixed);
   if (!was) setProp(node, LAYOUT_FLAG, true);
 }
 

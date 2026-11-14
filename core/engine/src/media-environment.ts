@@ -16,9 +16,7 @@ import {
 } from './style-registry/media-subscriptions';
 
 export type IAccessibilityFlag =
-  | 'reducedMotion'
-  | 'moreContrast'
-  | 'reducedTransparency';
+  'reducedMotion' | 'moreContrast' | 'reducedTransparency';
 
 // Accessibility reads return Promises, so every feature starts at its `no-preference` value
 // and flips once when the read lands (ledger decision 41)

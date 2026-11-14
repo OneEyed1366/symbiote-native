@@ -94,9 +94,12 @@ describe('a hostile query string', () => {
     'constructor',
     '__proto__',
     'toString',
-  ])('does not read the inherited key in %s as a known feature or type', query => {
-    expect(matchMedia(query).matches).toBe(false);
-  });
+  ])(
+    'does not read the inherited key in %s as a known feature or type',
+    query => {
+      expect(matchMedia(query).matches).toBe(false);
+    },
+  );
 
   it('answers false for a long run of opening brackets instead of overflowing the stack', () => {
     const list = matchMedia('('.repeat(NESTING));
@@ -106,7 +109,9 @@ describe('a hostile query string', () => {
   });
 
   it('answers false for a deep balanced nesting instead of overflowing the stack', () => {
-    const list = matchMedia(`${'('.repeat(NESTING)}min-width: 1px${')'.repeat(NESTING)}`);
+    const list = matchMedia(
+      `${'('.repeat(NESTING)}min-width: 1px${')'.repeat(NESTING)}`,
+    );
 
     expect(list.matches).toBe(false);
     expect(list.media).toBe('not all');
@@ -115,11 +120,16 @@ describe('a hostile query string', () => {
   it('still reads a nesting a real stylesheet could hold', () => {
     const depth = 10;
 
-    expect(matchMedia(`${'('.repeat(depth)}min-width: 1px${')'.repeat(depth)}`).matches).toBe(true);
+    expect(
+      matchMedia(`${'('.repeat(depth)}min-width: 1px${')'.repeat(depth)}`)
+        .matches,
+    ).toBe(true);
   });
 
   it('survives a long chain of `not`', () => {
-    expect(() => matchMedia(`${'not '.repeat(DEEP)}(min-width: 1px)`).matches).not.toThrow();
+    expect(
+      () => matchMedia(`${'not '.repeat(DEEP)}(min-width: 1px)`).matches,
+    ).not.toThrow();
   });
 
   it('answers false for a deep `calc()` nesting, in bounded time', () => {
@@ -131,23 +141,31 @@ describe('a hostile query string', () => {
   });
 
   it('parses a long `and` chain in linear time', () => {
-    const query = Array.from({ length: DEEP }, () => '(min-width: 1px)').join(' and ');
+    const query = Array.from({ length: DEEP }, () => '(min-width: 1px)').join(
+      ' and ',
+    );
 
     expect(elapsedMs(() => matchMedia(query).matches)).toBeLessThan(SLOW_MS);
   });
 
   it('parses a long comma list in linear time', () => {
-    const query = Array.from({ length: DEEP }, () => '(min-width: 1px)').join(', ');
+    const query = Array.from({ length: DEEP }, () => '(min-width: 1px)').join(
+      ', ',
+    );
 
     expect(elapsedMs(() => matchMedia(query).matches)).toBeLessThan(SLOW_MS);
   });
 
   it('parses a very long identifier in linear time', () => {
-    expect(elapsedMs(() => matchMedia(`(${'a'.repeat(1_000_000)})`).matches)).toBeLessThan(SLOW_MS);
+    expect(
+      elapsedMs(() => matchMedia(`(${'a'.repeat(1_000_000)})`).matches),
+    ).toBeLessThan(SLOW_MS);
   });
 
   it('answers a booleans for two thousand distinct queries', () => {
-    const lists = Array.from({ length: 2_000 }, (_, at) => matchMedia(`(min-width: ${at}px)`));
+    const lists = Array.from({ length: 2_000 }, (_, at) =>
+      matchMedia(`(min-width: ${at}px)`),
+    );
 
     expect(lists.every(list => typeof list.matches === 'boolean')).toBe(true);
   });
@@ -167,7 +185,8 @@ describe('a render that asks for a new query every time', () => {
 
 describe('a screen that asks for a new query on every frame', () => {
   it('does not intern the condition of a list nobody listens to', () => {
-    for (let at = 0; at < DISTINCT; at += 1) matchMedia(`(min-width: ${at + 1}px)`);
+    for (let at = 0; at < DISTINCT; at += 1)
+      matchMedia(`(min-width: ${at + 1}px)`);
 
     const [next] = internConditions([['>=', 'width', DISTINCT * 2]]);
 
@@ -316,13 +335,18 @@ describe('a hostile window', () => {
     ['-Infinity', Number.NEGATIVE_INFINITY],
     ['zero', 0],
     ['negative', -1],
-  ])('answers booleans and does not throw for a %s window width', (_name, width) => {
-    windowAt(width);
+  ])(
+    'answers booleans and does not throw for a %s window width',
+    (_name, width) => {
+      windowAt(width);
 
-    expect(typeof matchMedia('(min-width: 600px)').matches).toBe('boolean');
-    expect(typeof matchMedia('(width < 100px)').matches).toBe('boolean');
-    expect(typeof matchMedia('(orientation: landscape)').matches).toBe('boolean');
-  });
+      expect(typeof matchMedia('(min-width: 600px)').matches).toBe('boolean');
+      expect(typeof matchMedia('(width < 100px)').matches).toBe('boolean');
+      expect(typeof matchMedia('(orientation: landscape)').matches).toBe(
+        'boolean',
+      );
+    },
+  );
 
   it('never calls a NaN window wider than any breakpoint', () => {
     windowAt(Number.NaN);
@@ -390,7 +414,8 @@ describe('a hostile listener', () => {
   it('survives a flood of flips on a list with many listeners', () => {
     const list = matchMedia('(min-width: 600px)');
     const heard = vi.fn();
-    for (let at = 0; at < 500; at += 1) list.addEventListener('change', () => heard());
+    for (let at = 0; at < 500; at += 1)
+      list.addEventListener('change', () => heard());
 
     const spent = elapsedMs(() => {
       for (let at = 0; at < 200; at += 1) windowAt(at % 2 === 0 ? 700 : 500);

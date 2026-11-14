@@ -8,12 +8,25 @@ import { Dimensions } from '../react-native-host';
 import { deliverDirect } from '../events/delivery';
 import { resetMediaEnvironment } from '../media-environment';
 import { resetMutationBuffer } from '../mutation-buffer';
-import { appendChild, createElement, routeProp, type ISymbioteNode } from '../node';
+import {
+  appendChild,
+  createElement,
+  routeProp,
+  type ISymbioteNode,
+} from '../node';
 import { getPublishedStyle } from '../node-style';
 import { createSurface } from '../surface';
-import { clearGlobalStyles, containerVariantsOf, registerRules, resolveClassName } from './index';
+import {
+  clearGlobalStyles,
+  containerVariantsOf,
+  registerRules,
+  resolveClassName,
+} from './index';
 import { conditionIdsOfKey, dependentKeys } from './media-conditions';
-import { releaseMediaNode, resetMediaSubscriptions } from './media-subscriptions';
+import {
+  releaseMediaNode,
+  resetMediaSubscriptions,
+} from './media-subscriptions';
 import { registerRootVariables, rootVariableTable } from './root-variables';
 
 const SLOW_MS = 2_000;
@@ -29,11 +42,15 @@ const CLASS_CACHE_SIZE = 512;
 
 function paddingOf(node: ISymbioteNode): unknown {
   const style: unknown = getPublishedStyle(node)[0];
-  return typeof style === 'object' && style !== null ? Reflect.get(style, 'padding') : undefined;
+  return typeof style === 'object' && style !== null
+    ? Reflect.get(style, 'padding')
+    : undefined;
 }
 
 function layOut(container: ISymbioteNode, width: number): void {
-  deliverDirect(container, 'layout', { layout: { x: 0, y: 0, width, height: 80 } });
+  deliverDirect(container, 'layout', {
+    layout: { x: 0, y: 0, width, height: 80 },
+  });
 }
 
 function elapsedMs(run: () => void): number {
@@ -45,8 +62,19 @@ function elapsedMs(run: () => void): number {
 function registerCard(query: unknown): void {
   registerRules(
     [
-      { tokens: ['card'], specificity: [0, 1, 0], order: 0, style: { padding: PLAIN_CARD } },
-      { tokens: ['card'], specificity: [0, 1, 0], order: 1, style: { padding: WIDE_CARD }, cond: 0 },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: PLAIN_CARD },
+      },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { padding: WIDE_CARD },
+        cond: 0,
+      },
     ],
     [query],
   );
@@ -97,7 +125,14 @@ describe('a consumer released before its first commit', () => {
 describe('a container whose width comes from a class and is then unset inline', () => {
   it('reads the class width while the inline style does not mention it', () => {
     registerRules(
-      [{ tokens: ['box'], specificity: [0, 1, 0], order: 0, style: { width: 300, height: 80 } }],
+      [
+        {
+          tokens: ['box'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { width: 300, height: 80 },
+        },
+      ],
       [],
     );
     const container = createElement('RCTView');
@@ -114,7 +149,14 @@ describe('a container whose width comes from a class and is then unset inline', 
 
   it('keeps the class width when an inline `undefined` mentions it', () => {
     registerRules(
-      [{ tokens: ['box'], specificity: [0, 1, 0], order: 0, style: { width: 300, height: 80 } }],
+      [
+        {
+          tokens: ['box'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { width: 300, height: 80 },
+        },
+      ],
       [],
     );
     const container = createElement('RCTView');
@@ -179,19 +221,23 @@ describe('a thousand consumers moved under another container in one commit', () 
 
 describe('a `:root` variable declared inside an `@container` rule', () => {
   it('never reaches the table, since no container sits above the root', () => {
-    registerRootVariables([{ name: '--x', value: '7px', cond: 0 }], [
-      ['@', null, ['>=', 'width', 0]],
-    ]);
+    registerRootVariables(
+      [{ name: '--x', value: '7px', cond: 0 }],
+      [['@', null, ['>=', 'width', 0]]],
+    );
 
     expect(rootVariableTable().get('--x')).toBe(undefined);
   });
 
   it('is kept out of the table after a window flip too', () => {
-    registerRootVariables([{ name: '--x', value: '7px', cond: 0 }], [
-      ['@', null, ['>=', 'width', 0]],
-    ]);
+    registerRootVariables(
+      [{ name: '--x', value: '7px', cond: 0 }],
+      [['@', null, ['>=', 'width', 0]]],
+    );
 
-    Dimensions.set({ window: { width: 900, height: 800, scale: 2, fontScale: 1 } });
+    Dimensions.set({
+      window: { width: 900, height: 800, scale: 2, fontScale: 1 },
+    });
 
     expect(rootVariableTable().get('--x')).toBe(undefined);
   });
@@ -202,7 +248,8 @@ describe('a screen that generates a unique class string per row', () => {
     const first = containerVariantsOf('card');
     expect(first).toBeDefined();
 
-    for (let row = 0; row < UNIQUE_CLASSES; row += 1) containerVariantsOf(`card row-${row}`);
+    for (let row = 0; row < UNIQUE_CLASSES; row += 1)
+      containerVariantsOf(`card row-${row}`);
 
     expect(containerVariantsOf('card')).not.toBe(first);
   });
@@ -212,15 +259,29 @@ describe('unique class strings under a rule that reads a window condition', () =
   it('keeps the strings a flip must revisit within what the class cache holds', () => {
     registerRules(
       [
-        { tokens: ['wide'], specificity: [0, 1, 0], order: 0, style: { padding: PLAIN_CARD } },
-        { tokens: ['wide'], specificity: [0, 1, 0], order: 1, style: { padding: WIDE_CARD }, cond: 0 },
+        {
+          tokens: ['wide'],
+          specificity: [0, 1, 0],
+          order: 0,
+          style: { padding: PLAIN_CARD },
+        },
+        {
+          tokens: ['wide'],
+          specificity: [0, 1, 0],
+          order: 1,
+          style: { padding: WIDE_CARD },
+          cond: 0,
+        },
       ],
       [['>=', 'width', 600]],
     );
 
-    for (let row = 0; row < UNIQUE_CLASSES; row += 1) resolveClassName(`wide row-${row}`);
+    for (let row = 0; row < UNIQUE_CLASSES; row += 1)
+      resolveClassName(`wide row-${row}`);
 
-    const keys = dependentKeys([...(conditionIdsOfKey(`wide row-${UNIQUE_CLASSES - 1}`) ?? [])]);
+    const keys = dependentKeys([
+      ...(conditionIdsOfKey(`wide row-${UNIQUE_CLASSES - 1}`) ?? []),
+    ]);
 
     expect(keys.size).toBeGreaterThan(0);
     expect(keys.size).toBeLessThanOrEqual(CLASS_CACHE_SIZE);
@@ -260,7 +321,8 @@ describe('a storm of layouts across the threshold', () => {
     commitUnder(container);
 
     const spent = elapsedMs(() => {
-      for (let round = 0; round < 100; round += 1) layOut(container, round % 2 === 0 ? 500 : 300);
+      for (let round = 0; round < 100; round += 1)
+        layOut(container, round % 2 === 0 ? 500 : 300);
     });
 
     expect(spent).toBeLessThan(SLOW_MS);
@@ -274,9 +336,17 @@ describe('a container named like a member of `Object.prototype`', () => {
     name => {
       registerCard(['@', name, ['>=', 'width', 400]]);
       const container = createElement('RCTView');
-      routeProp(container, 'style', { containerType: 'size', containerName: name, ...FIXED });
+      routeProp(container, 'style', {
+        containerType: 'size',
+        containerName: name,
+        ...FIXED,
+      });
       const other = createElement('RCTView');
-      routeProp(other, 'style', { containerType: 'size', containerName: 'other', ...FIXED });
+      routeProp(other, 'style', {
+        containerType: 'size',
+        containerName: 'other',
+        ...FIXED,
+      });
       const card = makeCard();
       appendChild(other, card);
       appendChild(container, other);
@@ -293,9 +363,16 @@ describe('a container named like a member of `Object.prototype`', () => {
 describe('a container listing fifty thousand names', () => {
   it('still answers a query in bounded time', () => {
     registerCard(['@', 'last', ['>=', 'width', 400]]);
-    const names = [...Array.from({ length: NAMES }, (_, at) => `n${at}`), 'last'].join(' ');
+    const names = [
+      ...Array.from({ length: NAMES }, (_, at) => `n${at}`),
+      'last',
+    ].join(' ');
     const container = createElement('RCTView');
-    routeProp(container, 'style', { containerType: 'size', containerName: names, ...FIXED });
+    routeProp(container, 'style', {
+      containerType: 'size',
+      containerName: names,
+      ...FIXED,
+    });
     const card = makeCard();
     appendChild(container, card);
 

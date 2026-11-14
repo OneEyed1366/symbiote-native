@@ -41,14 +41,18 @@ describe('matches', () => {
 
   it('answers a compound query', () => {
     windowAt(700, 400);
-    expect(matchMedia('(min-width: 600px) and (orientation: landscape)').matches).toBe(true);
+    expect(
+      matchMedia('(min-width: 600px) and (orientation: landscape)').matches,
+    ).toBe(true);
     expect(matchMedia('not (min-width: 600px)').matches).toBe(false);
   });
 });
 
 describe('media', () => {
   it('reports the serialized query, as a browser does', () => {
-    expect(matchMedia('  ( MIN-width:600px )  ').media).toBe('(min-width: 600px)');
+    expect(matchMedia('  ( MIN-width:600px )  ').media).toBe(
+      '(min-width: 600px)',
+    );
     expect(matchMedia('print').media).toBe('print');
   });
 });

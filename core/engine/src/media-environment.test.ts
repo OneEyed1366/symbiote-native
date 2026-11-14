@@ -21,9 +21,26 @@ beforeEach(() => {
   globalThis.RN$registerCallableModule = (): void => {};
   registerRules(
     [
-      { tokens: ['card'], specificity: [0, 1, 0], order: 0, style: { padding: 4 } },
-      { tokens: ['card'], specificity: [0, 1, 0], order: 1, style: { padding: 8 }, cond: 0 },
-      { tokens: ['card'], specificity: [0, 1, 0], order: 2, style: { margin: 2 }, cond: 1 },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { padding: 4 },
+      },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 1,
+        style: { padding: 8 },
+        cond: 0,
+      },
+      {
+        tokens: ['card'],
+        specificity: [0, 1, 0],
+        order: 2,
+        style: { margin: 2 },
+        cond: 1,
+      },
     ],
     [
       ['>=', 'width', 600],
