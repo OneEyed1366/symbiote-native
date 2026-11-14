@@ -1,7 +1,8 @@
 <!-- Canary app entry: the native stack navigator over every demo screen, starting at Menu -->
 <!-- Menu lists four sections, each opens a hub with its stops; Details is reached by deep link -->
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onScopeDispose } from 'vue';
+import { BackHandler } from '@symbiote-native/vue';
 import {
   Screen,
   Stack,
@@ -35,6 +36,16 @@ import { LINE_COLOR } from './navigation-lines';
 // The linking hook takes the Ref of the Stack, as children mount before `onMounted` runs
 const stackHandle = ref<INavigatorHandle | null>(null);
 useLinkingIntegration(APP_LINKING_CONFIG, stackHandle);
+
+// Without a handler the Android Back key on the lab screen took the app to the launcher
+// At the root `canGoBack` is false and the system leaves the app as usual
+const backSubscription = BackHandler.addEventListener('hardwareBackPress', () => {
+  const handle = stackHandle.value;
+  if (handle === null || !handle.canGoBack()) return false;
+  handle.pop();
+  return true;
+});
+onScopeDispose(() => backSubscription.remove());
 
 onMounted(() => hide());
 </script>

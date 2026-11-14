@@ -5,17 +5,21 @@ import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
 import './StyleShowcase.css';
 import './StyleShowcase.limits.css';
 import './StyleShowcase.media.css';
+import './StyleShowcase.lab.css';
 import './showcase.scss';
 import './showcase.less';
 import './showcase.styl';
 import AnimationPanel from './style-showcase/AnimationPanel.vue';
 import CompoundPanel from './style-showcase/CompoundPanel.vue';
+import ContainerLab from './style-showcase/ContainerLab.vue';
 import DeclarationsPanel from './style-showcase/DeclarationsPanel.vue';
 import LimitsPanel from './style-showcase/LimitsPanel.vue';
+import MediaLab from './style-showcase/MediaLab.vue';
 import MergePanel from './style-showcase/MergePanel.vue';
 import ModulesPanel from './style-showcase/ModulesPanel.vue';
 import PreprocessorsPanel from './style-showcase/PreprocessorsPanel.vue';
 import SpecificityPanel from './style-showcase/SpecificityPanel.vue';
+import VarLab from './style-showcase/VarLab.vue';
 
 const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StyleShowcase];
 </script>
@@ -74,6 +78,9 @@ const lineInfo = ROUTE_LINE_INFO[ROUTE_NAME.StyleShowcase];
           Query the state from JS with matchMedia.
         </text>
       </view>
+      <MediaLab />
+      <ContainerLab />
+      <VarLab />
     </scroll-view>
   </safe-area-view>
 </template>
