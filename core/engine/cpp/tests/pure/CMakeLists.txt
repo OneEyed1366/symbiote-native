@@ -34,6 +34,7 @@ add_executable(symbiote_pure_tests
   container-query.test.cpp
   container-variants.test.cpp
   computed-value.test.cpp
+  deferred-consumers.test.cpp
   adversarial.test.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../SymbioteContainerQuery.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/../../SymbioteComputedValue.cpp

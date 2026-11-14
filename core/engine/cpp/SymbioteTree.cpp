@@ -2,6 +2,7 @@
 
 #include "SymbioteContainerQuery.h"
 #include "SymbioteDebug.h"
+#include "SymbioteDeferredConsumers.h"
 #include "SymbioteFabricProps.h"
 #include "SymbioteGlobalVariables.h"
 #include "SymbioteRegisteredProperties.h"
@@ -1426,6 +1427,13 @@ double millisBetween(
 
 // Consumers whose variants arrived and that no commit hook pass has styled yet
 std::vector<std::weak_ptr<Node>> pendingConsumers_;
+// What each surface's last hook pass left for a later commit, which `applyOps` reports to JS
+DeferredConsumers<Node> deferredConsumers_;
+// Whether a commit on the surface is owed a follow-up by its own deferred consumers
+bool hasDeferredConsumers(react::SurfaceId surfaceId) {
+  return deferredConsumers_.hasAny(
+      surfaceId, [](const Node &node) { return node.containerVariants != nullptr; });
+}
 // One parse per envelope text, shared by every node of a class
 std::unordered_map<std::string, std::shared_ptr<const ContainerVariants>> variantsByEnvelope_;
 
@@ -1483,11 +1491,13 @@ bool isFixedLength(const folly::dynamic *value) {
 // An axis is fixed by its own length, a flex or an aspect ratio, never by what the node holds
 // Only `size` contains the height, so an `inline-size` container is asked for its width alone
 void markOpenAxes(const folly::dynamic &style, bool containsHeight, ContainerDeclaration &declaration) {
+  // Set before the early return, т.к. a flex or aspect ratio fixes the sizes but contains no height
+  declaration.isHeightOpen = !containsHeight;
   for (const char *key : {"flex", "flexGrow", "flexBasis", "aspectRatio"}) {
     if (isFixedLength(styleValue(style, key))) return;
   }
   declaration.isWidthOpen = !isFixedLength(styleValue(style, "width"));
-  declaration.isHeightOpen = containsHeight && !isFixedLength(styleValue(style, "height"));
+  declaration.isHeightOpen = !containsHeight || !isFixedLength(styleValue(style, "height"));
 }
 
 // `nullopt` for a node that makes no container, else its names and the axes it leaves open
@@ -1503,16 +1513,21 @@ std::optional<ContainerDeclaration> containerDeclarationOf(const Node &node) {
   return declaration;
 }
 
+// The path from `root` to the node, empty when it is not committed or not in that tree
+react::ShadowNode::AncestorList ancestorsIn(const Node &node, const react::RootShadowNode &root) {
+  if (node.committed == nullptr) return {};
+  return node.committed->getFamily().getAncestors(root);
+}
+
 // The frame size `root` laid the node out at, `nullopt` when the node is not in that tree
 std::optional<ContainerSize> laidOutSize(const Node &node, const react::RootShadowNode &root) {
-  if (node.committed == nullptr) return std::nullopt;
-  const react::ShadowNode::AncestorList ancestors = node.committed->getFamily().getAncestors(root);
+  const react::ShadowNode::AncestorList ancestors = ancestorsIn(node, root);
   if (ancestors.empty()) return std::nullopt;
   const auto &[parent, index] = ancestors.back();
   const auto *layoutable = dynamic_cast<const react::LayoutableShadowNode *>(
       parent.get().getChildren().at(static_cast<size_t>(index)).get());
   if (layoutable == nullptr) {
-    SYMBIOTE_DLOG(std::string("container consumer has no layout: ") + node.committed->getComponentName());
+    SYMBIOTE_DLOG(std::string("container has no layout: ") + node.committed->getComponentName());
     return std::nullopt;
   }
   const react::Size size = layoutable->getLayoutMetrics().frame.size;
@@ -1533,6 +1548,12 @@ ContainerLookup containerLookupFor(const Node &consumer, const react::RootShadow
         size->isWidthOpen = declared->isWidthOpen;
         size->isHeightOpen = declared->isHeightOpen;
       }
+      SYMBIOTE_DLOG(
+          std::string("container ") + above->viewName +
+          (size.has_value()
+               ? " width=" + std::to_string(size->width) + " height=" + std::to_string(size->height) +
+                   (size->isWidthOpen ? " widthOpen" : "") + (size->isHeightOpen ? " heightOpen" : "")
+               : std::string(" no size")));
       return size;
     }
     return std::nullopt;
@@ -1582,12 +1603,13 @@ class ContainerCommitHook : public react::UIManagerCommitHook {
 
   react::RootShadowNode::Unshared shadowTreeWillCommit(
       const react::ShadowTree &shadowTree,
-      const react::RootShadowNode::Shared &,
+      const react::RootShadowNode::Shared &oldRoot,
       const react::RootShadowNode::Unshared &newRoot,
       const react::ShadowTreeCommitOptions &) noexcept override {
     if (runtime_ == nullptr || shadowTree.getSurfaceId() != surfaceId_) return newRoot;
+    SYMBIOTE_DLOG(std::string("commit hook, pending: ") + std::to_string(pendingConsumers_.size()));
     try {
-      return styleConsumers(newRoot);
+      return styleConsumers(newRoot, oldRoot);
     } catch (...) {
       return newRoot;
     }
@@ -1607,11 +1629,15 @@ class ContainerCommitHook : public react::UIManagerCommitHook {
     const ContainerVariants &variants = *node->containerVariants;
     const uint32_t mask = holdingMask(variants, containerLookupFor(*node, root));
     const std::optional<std::string> styleJson = styleJsonForMask(variants, mask);
+    SYMBIOTE_DLOG(
+        std::string("restyle ") + node->viewName + " mask=" + std::to_string(mask) +
+        (styleJson.has_value() ? " variant" : " plain"));
     if (!styleJson.has_value()) return std::nullopt;
     applyVariantStyle(*node, folly::parseJson(*styleJson));
     folly::dynamic next = payloadOf(*runtime_, *node, surfaceId_);
     folly::dynamic payload = diffProps(node->committedProps, next);
     node->committedProps = std::move(next);
+    SYMBIOTE_DLOG(std::string("restyle diff ") + folly::toJson(payload));
     if (payload.empty()) return std::nullopt;
     return ConsumerChange{node, std::move(payload)};
   }
@@ -1626,25 +1652,43 @@ class ContainerCommitHook : public react::UIManagerCommitHook {
               react::ShadowNodeFragment::childrenPlaceholder(),
               react::RawProps(change.payload));
         });
+    SYMBIOTE_DLOG(std::string("restyle clone ") + (cloned == nullptr ? "lost" : "kept"));
     return cloned == nullptr ? root : std::static_pointer_cast<react::RootShadowNode>(cloned);
   }
 
-  react::RootShadowNode::Unshared styleConsumers(const react::RootShadowNode::Unshared &newRoot) {
+  react::RootShadowNode::Unshared styleConsumers(
+      const react::RootShadowNode::Unshared &newRoot,
+      [[maybe_unused]] const react::RootShadowNode::Shared &oldRoot) {
     newRoot->layoutIfNeeded();
     std::vector<ConsumerChange> changes;
     std::vector<std::weak_ptr<Node>> waiting;
+    std::vector<std::weak_ptr<Node>> deferred;
     for (const std::weak_ptr<Node> &entry : pendingConsumers_) {
       const NodePtr node = entry.lock();
       if (node == nullptr || node->containerVariants == nullptr) continue;
-      if (!laidOutSize(*node, *newRoot).has_value()) {
+      // It reads its container's size, so a virtual text with no layout of its own is ready
+      if (ancestorsIn(*node, *newRoot).empty()) {
         waiting.push_back(entry);
         continue;
       }
+#if defined(__ANDROID__)
+      // Android allocates a view before the commit that inserts it and never sends the props set
+      // in that commit, so a view new to this commit is styled by the next one
+      const bool isNewView = oldRoot != nullptr && ancestorsIn(*node, *oldRoot).empty() &&
+          node->committed->getTraits().check(react::ShadowNodeTraits::Trait::FormsView);
+      if (isNewView) {
+        waiting.push_back(entry);
+        deferred.push_back(entry);
+        continue;
+      }
+#endif
       if (std::optional<ConsumerChange> change = restyle(node, *newRoot)) {
         changes.push_back(std::move(*change));
       }
     }
     pendingConsumers_ = std::move(waiting);
+    deferredConsumers_.replace(surfaceId_, std::move(deferred));
+    SYMBIOTE_DLOG(std::string("consumers still waiting: ") + std::to_string(pendingConsumers_.size()));
     react::RootShadowNode::Unshared root = newRoot;
     for (const ConsumerChange &change : changes) root = withPayload(root, change);
     return root;
@@ -1699,6 +1743,8 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
 
   const auto applyStartedAt = ISteadyClock::now();
   walkCost_.applyCalls += 1;
+  // Returned to JS, which commits again once the views this commit left for the next are mounted
+  bool isFollowUpWanted = false;
   auto &uiManager = uiManagerFor(runtime, "applyOps");
 
   size_t opsLength = 0;
@@ -2064,7 +2110,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         walkCost_.walkNs += nanosSince(walkStartedAt);
         // SKIPPED when the root child set comes back identical, which is what makes the JS side's
         // commit fan-out free. See the skill, "kOpCommit"
-        if (surface->hasCommittedRenderable &&
+        if (!hasDeferredConsumers(surfaceId) && surface->hasCommittedRenderable &&
             sameNodes(surface->committedRenderable, *childSet)) {
           break;
         }
@@ -2091,6 +2137,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
                 adoptCommitted(*rootOwners.nodes[index], landedRoot[index]);
               }
             });
+        isFollowUpWanted = hasDeferredConsumers(surfaceId);
         break;
       }
       default:
@@ -2099,7 +2146,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
   }
 
   walkCost_.applyNs += nanosSince(applyStartedAt);
-  return jsi::Value::undefined();
+  return jsi::Value(isFollowUpWanted);
 }
 
 jsi::Value Tree::getProp(jsi::Runtime &runtime, const jsi::Value *arguments, size_t count) {
