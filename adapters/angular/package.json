@@ -90,6 +90,7 @@
     "@babel/core": "catalog:",
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
+    "@symbiote-native/web": "workspace:*",
     "@types/babel__core": "catalog:",
     "@types/node": "catalog:",
     "typescript": "catalog:"

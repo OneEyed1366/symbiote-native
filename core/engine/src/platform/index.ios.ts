@@ -2,7 +2,7 @@
 // is the static 'ios'; everything else derives from the PlatformConstants native module
 // (RN spec NativePlatformConstantsIOS.js), read lazily and cached via the shared
 // resolver. Metro picks this on an iOS host; it is also the base re-export target
-// (platform.ts) so tsc / tsx / web (no Metro) land here too.
+// (platform.ts) so tsc / tsx (no Metro) land here too
 
 import {
   createConstantsResolver,
@@ -28,7 +28,7 @@ const OS_IOS = 'ios';
 
 // The shape of PlatformConstants.getConstants() on iOS (mirrors the RN spec). Fields
 // optional-on-native stay optional so the runtime guard below is the only voucher.
-export interface IPlatformConstantsIOS {
+export type IPlatformConstantsIOS = {
   forceTouchAvailable: boolean;
   interfaceIdiom: string;
   isTesting: boolean;
@@ -42,7 +42,7 @@ export interface IPlatformConstantsIOS {
     prerelease?: number | string | null;
   };
   isMacCatalyst?: boolean;
-}
+};
 
 function isPlatformConstantsIOS(
   value: unknown,

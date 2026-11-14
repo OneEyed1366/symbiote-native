@@ -19,25 +19,15 @@ import type {
   ITreeCensus,
   ITreeHost,
 } from '@symbiote-native/engine';
-import { createRecordedTree, type IRecordedTree } from './recorded-tree';
+import { createTreeReads } from '@symbiote-native/engine/retained-tree';
+import { installInertFabricSlot } from '@symbiote-native/engine/inert-fabric-slot';
+import {
+  createRecordedTree,
+  type IRecorded,
+  type IRecordedTree,
+} from './recorded-tree';
 
-export type IRecorded = {
-  handle: ISymbioteNode;
-  instanceHandle: unknown;
-  viewName: string;
-  tagName: string;
-  ownedListeners: Record<string, boolean>;
-  underlayShown: boolean;
-  props: Record<string, unknown>;
-  parent: IRecorded | undefined;
-  children: IRecorded[];
-  // Set at the commit that first lands this node, never cleared by a later removal
-  // So a parting write in the teardown sweep still reaches a node `removeChild` detached
-
-  // The numeric root tag `createSurface` was called with, not the native Fabric `tag`
-  // `requestCommitForRoot` reads it to pick the surface, one shared sentinel named the wrong one
-  committedRootTag: number | undefined;
-};
+export type { IRecorded };
 
 export type IRecordingHost = ITreeHost & {
   /** How many commits the engine asked for, the op stream's own count */
@@ -116,20 +106,7 @@ export type IAuthoredNode = {
  */
 export function installRecordingFabric(): IRecordingHost {
   const host = createRecordingHost();
-  Object.assign(globalThis, {
-    nativeFabricUIManager: {
-      registerEventHandler(handler: IEventHandler): void {
-        host.registerEventHandler(handler);
-      },
-      dispatchCommand(): void {},
-      setIsJSResponder(): void {},
-      sendAccessibilityEvent(): void {},
-      configureNextLayoutAnimation(): void {},
-      measure(): void {},
-      measureInWindow(): void {},
-      measureLayout(): void {},
-    },
-  });
+  installInertFabricSlot(handler => host.registerEventHandler(handler));
   setTreeHost(host);
   return host;
 }
@@ -186,12 +163,7 @@ export function createRecordingHost(): IRecordingHost {
     responderHandovers,
     accessibilityEvents,
     applyOps: tree.applyOps,
-    propOf(handle: object, key: string): unknown {
-      return nodeOf(handle, 'propOf').props[key];
-    },
-    propsOf(handle: object): Readonly<Record<string, unknown>> {
-      return nodeOf(handle, 'propsOf').props;
-    },
+    ...createTreeReads(nodeOf),
     // Nothing is memoized here, so there is nothing to invalidate
     markPropsDirty(): void {},
     // Read off `committedRootTag`, т.к. `removeChild` cuts the parent link before the sweep
@@ -211,60 +183,6 @@ export function createRecordingHost(): IRecordingHost {
       throw new Error(
         'recording host: committedPayloadOf needs the real payload builder — move this to an itest',
       );
-    },
-    parentOf(handle: object): object | undefined {
-      return nodeOf(handle, 'parentOf').parent?.handle;
-    },
-    childrenOf(handle: object): readonly object[] {
-      return nodeOf(handle, 'childrenOf').children.map(child => child.handle);
-    },
-    firstChildOf(handle: object): object | undefined {
-      return nodeOf(handle, 'firstChildOf').children[0]?.handle;
-    },
-    nextSiblingOf(handle: object): object | undefined {
-      const node = nodeOf(handle, 'nextSiblingOf');
-      const siblings = node.parent?.children;
-      if (siblings === undefined) return undefined;
-      return siblings[siblings.indexOf(node) + 1]?.handle;
-    },
-    parentsOf(handles: readonly object[]): readonly (object | undefined)[] {
-      return handles.map(handle => nodeOf(handle, 'parentsOf').parent?.handle);
-    },
-    subtreesOf(roots: readonly object[]): readonly object[] {
-      const out: object[] = [];
-      const walk = (node: IRecorded): void => {
-        out.push(node.handle);
-        for (const child of node.children) walk(child);
-      };
-      for (const root of roots) walk(nodeOf(root, 'subtreesOf'));
-      return out;
-    },
-    // Narrows like the engine's walk, else the sweep cases would pass whatever the engine does
-    teardownSubtreesOf(roots: readonly object[]): readonly object[] {
-      const out: object[] = [];
-      const walk = (node: IRecorded, isRoot: boolean): boolean => {
-        const reserved = out.length;
-        out.push(node.handle);
-        let isWanted = isRoot || node.tagName !== '';
-        for (const child of node.children) {
-          if (walk(child, false)) isWanted = true;
-        }
-        if (!isWanted) out.length = reserved;
-        return isWanted;
-      };
-      for (const root of roots) walk(nodeOf(root, 'teardownSubtreesOf'), true);
-      return out;
-    },
-    ancestorsOf(handle: object): readonly object[] {
-      const chain: object[] = [];
-      for (
-        let node: IRecorded | undefined = nodeOf(handle, 'ancestorsOf');
-        node !== undefined;
-        node = node.parent
-      ) {
-        chain.push(node.handle);
-      }
-      return chain;
     },
     census(roots: readonly object[]): ITreeCensus {
       let nodes = 0;

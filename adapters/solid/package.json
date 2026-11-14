@@ -90,6 +90,7 @@
     "@babel/core": "catalog:",
     "@symbiote-native/engine": "workspace:*",
     "@symbiote-native/test-utils": "workspace:*",
+    "@symbiote-native/web": "workspace:*",
     "solid-js": "catalog:"
   }
 }

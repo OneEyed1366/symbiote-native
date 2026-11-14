@@ -38,6 +38,7 @@ export {
   isSymbioteEvent,
   RAW_TEXT_COMPONENT,
   TEXT_COMPONENT,
+  VIRTUAL_TEXT_COMPONENT,
   debugNodeId,
   takePropKeyTally,
 } from './node';

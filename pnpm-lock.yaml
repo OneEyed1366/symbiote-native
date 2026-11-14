@@ -315,6 +315,9 @@ catalogs:
     globals:
       specifier: ^17.7.0
       version: 17.7.0
+    happy-dom:
+      specifier: 20.14.5
+      version: 20.14.5
     husky:
       specifier: ^9.1.7
       version: 9.1.7
@@ -455,6 +458,9 @@ importers:
       globals:
         specifier: 'catalog:'
         version: 17.7.0
+      happy-dom:
+        specifier: 'catalog:'
+        version: 20.14.5
       husky:
         specifier: 'catalog:'
         version: 9.1.7
@@ -496,7 +502,7 @@ importers:
         version: 2.11.14(solid-js@1.9.14)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.7)(sass@1.101.0)(stylus@0.64.0)(terser@5.48.0)(yaml@2.9.0))
       vitest:
         specifier: 'catalog:'
-        version: 4.1.10(@types/node@26.1.0)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.7)(sass@1.101.0)(stylus@0.64.0)(terser@5.48.0)(yaml@2.9.0))
+        version: 4.1.10(@types/node@26.1.0)(happy-dom@20.14.5)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.7)(sass@1.101.0)(stylus@0.64.0)(terser@5.48.0)(yaml@2.9.0))
 
   adapters/angular:
     dependencies:
@@ -534,6 +540,9 @@ importers:
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
+      '@symbiote-native/web':
+        specifier: workspace:*
+        version: link:../../core/web
       '@types/babel__core':
         specifier: 'catalog:'
         version: 7.20.5
@@ -565,6 +574,9 @@ importers:
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
+      '@symbiote-native/web':
+        specifier: workspace:*
+        version: link:../../core/web
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.0
@@ -605,6 +617,9 @@ importers:
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
+      '@symbiote-native/web':
+        specifier: workspace:*
+        version: link:../../core/web
       solid-js:
         specifier: 'catalog:'
         version: 1.9.14
@@ -636,6 +651,9 @@ importers:
       '@symbiote-native/vue':
         specifier: workspace:*
         version: link:../vue
+      '@symbiote-native/web':
+        specifier: workspace:*
+        version: link:../../core/web
       '@vue/runtime-core':
         specifier: 'catalog:'
         version: 3.5.39
@@ -685,6 +703,9 @@ importers:
       '@symbiote-native/test-utils':
         specifier: workspace:*
         version: link:../../core/test-utils
+      '@symbiote-native/web':
+        specifier: workspace:*
+        version: link:../../core/web
 
   apps/docs-site:
     dependencies:
@@ -717,6 +738,9 @@ importers:
       '@symbiote-native/engine':
         specifier: workspace:*
         version: link:../engine
+      '@symbiote-native/web':
+        specifier: workspace:*
+        version: link:../web
       '@types/node':
         specifier: 'catalog:'
         version: 26.1.0
@@ -773,6 +797,16 @@ importers:
       '@symbiote-native/engine':
         specifier: workspace:*
         version: link:../engine
+
+  core/web:
+    dependencies:
+      '@symbiote-native/engine':
+        specifier: workspace:*
+        version: link:../engine
+    devDependencies:
+      '@symbiote-native/test-utils':
+        specifier: workspace:*
+        version: link:../test-utils
 
   packages/age-range:
     dependencies:
@@ -7457,6 +7491,12 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
+  '@types/whatwg-mimetype@3.0.2':
+    resolution: {integrity: sha512-c2AKvDT8ToxLIOUlN51gTiHXflsfIFisS4pO7pDPoKouJCESkhZnEy623gwP9laCy5lnLDAw1vAzu2vM2YLOrA==}
+
+  '@types/ws@8.18.2':
+    resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
+
   '@types/yargs-parser@21.0.3':
     resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
 
@@ -7945,6 +7985,10 @@ packages:
 
   buffer-from@1.1.2:
     resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
+
+  buffer-image-size@0.6.4:
+    resolution: {integrity: sha512-nEh+kZOPY1w+gcCMobZ6ETUp9WfibndnosbpwB1iJk/8Gt5ZF2bhS6+B6bPYz424KtwsR6Rflc3tCz1/ghX2dQ==}
+    engines: {node: '>=4.0'}
 
   buffer@5.7.1:
     resolution: {integrity: sha512-EHcyIPBQ4BSGlvjB16k5KgAJ27CIsHY/2JBmCRReo48y9rQ3MaUzWX3KVlBa4U7MyX02HdVj0K7C3WaB3ju7FQ==}
@@ -9229,6 +9273,10 @@ packages:
 
   h3@1.15.11:
     resolution: {integrity: sha512-L3THSe2MPeBwgIZVSH5zLdBBU90TOxarvhK9d04IDY2AmVS8j2Jz2LIWtwsGOU3lu2I5jCN7FNvVfY2+XyF+mg==}
+
+  happy-dom@20.14.5:
+    resolution: {integrity: sha512-x/RzkpWO40bTjIoT30iQtt64FLLmH/iRcUCN2X//bLx7H3ifkdfPXyqsro/OYtqzIAhiLMMA7mmiOR9C3NOKjQ==}
+    engines: {node: '>=20.0.0'}
 
   has-flag@3.0.0:
     resolution: {integrity: sha512-sKJf1+ceQBr4SMkvQnBDNDtf4TXpVhVGateu0t918bl30FnbE2m4vNLX+VWe/dpjlb+HugGYzW7uQXH98HPEYw==}
@@ -11844,6 +11892,10 @@ packages:
 
   whatwg-fetch@3.6.20:
     resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
+
+  whatwg-mimetype@3.0.0:
+    resolution: {integrity: sha512-nt+N2dzIutVRxARx1nghPKGv1xHikU7HKdfafKkLNLindmPU/ch3U31NOCGGA/dmPcmb1VlofO0vnKAcsm0o/Q==}
+    engines: {node: '>=12'}
 
   whatwg-url-minimum@0.1.2:
     resolution: {integrity: sha512-XPEm0XFQWNVG292lII1PrRRJl3sItrs7CettZ4ncYxuDVpLyy+NwlGyut2hXI0JswcJUxeCH+CyOJK0ZzAXD6A==}
@@ -14617,6 +14669,12 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
+  '@types/whatwg-mimetype@3.0.2': {}
+
+  '@types/ws@8.18.2':
+    dependencies:
+      '@types/node': 26.1.0
+
   '@types/yargs-parser@21.0.3': {}
 
   '@types/yargs@17.0.35':
@@ -15327,6 +15385,10 @@ snapshots:
       node-int64: 0.4.0
 
   buffer-from@1.1.2: {}
+
+  buffer-image-size@0.6.4:
+    dependencies:
+      '@types/node': 26.1.0
 
   buffer@5.7.1:
     dependencies:
@@ -16676,6 +16738,19 @@ snapshots:
       radix3: 1.1.2
       ufo: 1.6.4
       uncrypto: 0.1.3
+
+  happy-dom@20.14.5:
+    dependencies:
+      '@types/node': 26.1.0
+      '@types/whatwg-mimetype': 3.0.2
+      '@types/ws': 8.18.2
+      buffer-image-size: 0.6.4
+      entities: 7.0.1
+      whatwg-mimetype: 3.0.0
+      ws: 8.21.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   has-flag@3.0.0: {}
 
@@ -19778,7 +19853,7 @@ snapshots:
     optionalDependencies:
       vite: 8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.7)(sass@1.101.0)(stylus@0.64.0)(terser@5.48.0)(yaml@2.9.0)
 
-  vitest@4.1.10(@types/node@26.1.0)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.7)(sass@1.101.0)(stylus@0.64.0)(terser@5.48.0)(yaml@2.9.0)):
+  vitest@4.1.10(@types/node@26.1.0)(happy-dom@20.14.5)(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.7)(sass@1.101.0)(stylus@0.64.0)(terser@5.48.0)(yaml@2.9.0)):
     dependencies:
       '@vitest/expect': 4.1.10
       '@vitest/mocker': 4.1.10(vite@8.1.3(@types/node@26.1.0)(esbuild@0.28.1)(jiti@2.7.0)(less@4.6.7)(sass@1.101.0)(stylus@0.64.0)(terser@5.48.0)(yaml@2.9.0))
@@ -19802,6 +19877,7 @@ snapshots:
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 26.1.0
+      happy-dom: 20.14.5
     transitivePeerDependencies:
       - msw
 
@@ -19939,6 +20015,8 @@ snapshots:
     optional: true
 
   whatwg-fetch@3.6.20: {}
+
+  whatwg-mimetype@3.0.0: {}
 
   whatwg-url-minimum@0.1.2: {}
 

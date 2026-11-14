@@ -65,6 +65,7 @@
     "eslint-plugin-react-hooks": "catalog:",
     "eslint-plugin-svelte": "catalog:",
     "globals": "catalog:",
+    "happy-dom": "catalog:",
     "husky": "catalog:",
     "lint-staged": "catalog:",
     "pkg-pr-new": "catalog:",

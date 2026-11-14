@@ -17,6 +17,7 @@ const { backHandlerLoaded } = vi.hoisted(() => ({
 // No `Image` member: the bootstrap must not reach for the component, it loads React's renderer
 vi.mock('react-native', () => ({
   UIManager: { measure: vi.fn() },
+  AppRegistry: { isNativeRegistry: true },
   processColor: vi.fn(),
   get BackHandler() {
     backHandlerLoaded();
@@ -41,8 +42,9 @@ vi.mock('@symbiote-native/engine', () => ({
   setPressabilityLoader,
 }));
 
-const { bootstrapHost } = await import('./index');
-const { processColor } = await import('react-native');
+const { bootstrapHost, startApp } = await import('./index');
+const { processColor, AppRegistry: NativeAppRegistry } =
+  await import('react-native');
 const { default: resolveAssetSource } =
   await import('react-native/Libraries/Image/resolveAssetSource');
 const hostWiredAtImport = setReactNativeHost.mock.calls.length;
@@ -59,6 +61,50 @@ describe('importing the bootstrap module', () => {
   // `Dimensions.get('window')` at the top of an app file runs before `registerApp` is called
   it('hands react-native to the engine before any app module can read it', () => {
     expect(hostWiredAtImport).toBe(1);
+  });
+});
+
+describe('startApp', () => {
+  const registryOf = (): {
+    registerComponent: ReturnType<typeof vi.fn>;
+    runApplication: ReturnType<typeof vi.fn>;
+  } => ({ registerComponent: vi.fn(), runApplication: vi.fn() });
+
+  it('wires the host, hands the native registrar to the adapter and registers the app', () => {
+    const AppRegistry = registryOf();
+    const setHostRegistrar = vi.fn();
+    const provider = (): string => 'App';
+
+    startApp({ AppRegistry, setHostRegistrar }, 'canary', provider);
+
+    expect(setColorProcessor).toHaveBeenCalledTimes(1);
+    expect(setHostRegistrar).toHaveBeenCalledWith(NativeAppRegistry);
+    expect(AppRegistry.registerComponent).toHaveBeenCalledWith(
+      'canary',
+      provider,
+    );
+  });
+
+  // The native host calls the runnable itself once the surface exists
+  it('leaves running the app to the native host', () => {
+    const AppRegistry = registryOf();
+
+    startApp({ AppRegistry, setHostRegistrar: vi.fn() }, 'canary', () => 'App');
+
+    expect(AppRegistry.runApplication).not.toHaveBeenCalled();
+  });
+
+  it('forwards the host options to the bootstrap', () => {
+    const colorProcessor = (): unknown => 'color';
+
+    startApp(
+      { AppRegistry: registryOf(), setHostRegistrar: vi.fn() },
+      'canary',
+      () => 'App',
+      { colorProcessor },
+    );
+
+    expect(setColorProcessor).toHaveBeenCalledWith(colorProcessor);
   });
 });
 

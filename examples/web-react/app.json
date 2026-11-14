@@ -1,0 +1,10 @@
+{
+  "name": "Canary",
+  "displayName": "Canary",
+  "expo": {
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
+  }
+}

@@ -12,9 +12,11 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev": "react-native start --reset-cache",
-    "start": "react-native start"
+    "start": "react-native start",
+    "web": "expo start --web"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~57.0.3",
     "@symbiote-native/android": "latest",
     "@symbiote-native/components": "latest",
     "@symbiote-native/engine": "latest",
@@ -23,9 +25,12 @@
     "@symbiote-native/slider": "latest",
     "@symbiote-native/solid": "latest",
     "@symbiote-native/splash-screen": "latest",
+    "expo": "57.0.14",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-native": "0.86.0",
     "react-native-reanimated": "4.7.1",
+    "react-native-web": "~0.21.0",
     "react-native-worklets": "0.13.0",
     "solid-js": "^1.9.14"
   },

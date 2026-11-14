@@ -1,46 +1,27 @@
 // The authored tree an op batch describes, and the walk that builds it. Apart from
 // `recording-host` so that file holds the `ITreeHost` surface and this one the mechanism
 
+import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
+import type { IMutationBatch } from '@symbiote-native/engine/mutation-buffer';
+import { walkOps } from '@symbiote-native/engine/mutation-walk';
 import {
-  NO_VALUE,
-  OP_APPEND_CHILD,
-  OP_COMMIT,
-  OP_CREATE_ANCHOR,
-  OP_CREATE_ELEMENT,
-  OP_CREATE_RAW_TEXT,
-  OP_INSERT_BEFORE,
-  OP_REMOVE_CHILD,
-  OP_SET_COMPONENT,
-  OP_SET_OWNED_LISTENER,
-  OP_SET_TAG,
-  OP_SET_UNDERLAY_SHOWN,
-  OP_SET_PROP,
-  OP_SET_TEXT,
-  OP_STRIDE,
-  type IMutationBatch,
-} from '@symbiote-native/engine/mutation-buffer';
-import { isSymbioteNode } from '@symbiote-native/engine';
-import type { IRecorded } from './recording-host';
+  createRetainedVisitor,
+  type IRetainedCreate,
+} from '@symbiote-native/engine/retained-visitor';
 
-/** The five words one op occupies, named, so an applier takes two parameters instead of six. */
-type IOpWords = {
-  code: number;
-  a: number;
-  b: number;
-  c: number;
-  d: number;
-};
-
-type IApplyContext = {
-  batch: IMutationBatch;
-  at: (slot: number) => IRecorded;
-  create: (
-    slot: number,
-    viewName: string,
-    props: Record<string, unknown>,
-    instanceHandle?: unknown,
-  ) => void;
-  onCommit: (rootTag: number, node: IRecorded) => void;
+export type IRecorded = {
+  handle: ISymbioteNode;
+  instanceHandle: unknown;
+  viewName: string;
+  tagName: string;
+  ownedListeners: Record<string, boolean>;
+  underlayShown: boolean;
+  props: Record<string, unknown>;
+  parent: IRecorded | undefined;
+  children: IRecorded[];
+  // The numeric root tag `createSurface` was called with, not the native Fabric `tag`
+  // Set at the first commit that lands the node, never cleared by a later removal
+  committedRootTag: number | undefined;
 };
 
 export type IRecordedTree = {
@@ -55,127 +36,7 @@ export type IRecordedTree = {
   forget: () => void;
 };
 
-function detach(node: IRecorded): void {
-  const { parent } = node;
-  if (parent === undefined) return;
-  const at = parent.children.indexOf(node);
-  if (at >= 0) parent.children.splice(at, 1);
-  node.parent = undefined;
-}
-
-// Lands a `rootTag` onto a whole subtree, the moment the real engine hands every node in the walk
-// its own `ShadowNode`. Never cleared afterwards, see `IRecorded.committedRootTag`
-function markCommitted(node: IRecorded, rootTag: number): void {
-  node.committedRootTag = rootTag;
-  for (const child of node.children) markCommitted(child, rootTag);
-}
-
-function applyStructureOp(ctx: IApplyContext, op: IOpWords): boolean {
-  const { strings, instanceHandles } = ctx.batch;
-  switch (op.code) {
-    case OP_CREATE_ELEMENT:
-      // Slot 4 indexes `instanceHandles`, the object Fabric would hand back with an event, which is
-      // what a test firing one has to name
-      ctx.create(op.a, strings[op.b], {}, instanceHandles[op.d]);
-      return true;
-    case OP_CREATE_RAW_TEXT:
-      ctx.create(op.a, 'RCTRawText', { text: strings[op.b] });
-      return true;
-    case OP_CREATE_ANCHOR:
-      ctx.create(op.a, '', {});
-      return true;
-    case OP_APPEND_CHILD: {
-      const parent = ctx.at(op.a);
-      const child = ctx.at(op.b);
-      detach(child);
-      child.parent = parent;
-      parent.children.push(child);
-      return true;
-    }
-    case OP_INSERT_BEFORE: {
-      const parent = ctx.at(op.a);
-      const child = ctx.at(op.b);
-      const before = ctx.at(op.c);
-      detach(child);
-      child.parent = parent;
-      const index = parent.children.indexOf(before);
-      const landing = index < 0 ? parent.children.length : index;
-      parent.children.splice(landing, 0, child);
-      return true;
-    }
-    case OP_REMOVE_CHILD:
-      detach(ctx.at(op.b));
-      return true;
-    default:
-      return false;
-  }
-}
-
-// `OP_SET_TAG`, `OP_SET_OWNED_LISTENER` and `OP_SET_UNDERLAY_SHOWN` are RECORDED and not acted on,
-// т.к. what each one means is resolved in `SymbioteFabricProps.cpp`, and this host must not grow a
-// second copy of those rules. A test that needs the resolved key reads a committed payload instead
-function applyValueOp(ctx: IApplyContext, op: IOpWords): boolean {
-  const { strings, values } = ctx.batch;
-  switch (op.code) {
-    case OP_SET_PROP: {
-      const node = ctx.at(op.a);
-      if (op.c === NO_VALUE) delete node.props[strings[op.b]];
-      else node.props[strings[op.b]] = values[op.c];
-      return true;
-    }
-    case OP_SET_TEXT:
-      ctx.at(op.a).props.text = strings[op.b];
-      return true;
-    case OP_SET_COMPONENT:
-      ctx.at(op.a).viewName = strings[op.b];
-      return true;
-    case OP_SET_TAG:
-      ctx.at(op.a).tagName = strings[op.b];
-      return true;
-    case OP_SET_OWNED_LISTENER:
-      ctx.at(op.a).ownedListeners[strings[op.b]] = op.c !== 0;
-      return true;
-    case OP_SET_UNDERLAY_SHOWN:
-      ctx.at(op.a).underlayShown = op.b !== 0;
-      return true;
-    case OP_COMMIT:
-      ctx.onCommit(op.a, ctx.at(op.b));
-      return true;
-    default:
-      return false;
-  }
-}
-
-function walkBatch(ctx: IApplyContext): void {
-  const { ops } = ctx.batch;
-  for (let cursor = 0; cursor + OP_STRIDE <= ops.length; cursor += OP_STRIDE) {
-    const op: IOpWords = {
-      code: ops[cursor],
-      a: ops[cursor + 1],
-      b: ops[cursor + 2],
-      c: ops[cursor + 3],
-      d: ops[cursor + 4],
-    };
-    if (applyStructureOp(ctx, op)) continue;
-    if (applyValueOp(ctx, op)) continue;
-    throw new Error(`applyOps: unknown opcode ${String(op.code)}`);
-  }
-}
-
-function handleAt(batch: IMutationBatch, slot: number): object {
-  const handle = batch.handles[slot];
-  if (handle === undefined) {
-    throw new Error(`applyOps: slot ${slot} is outside this batch's handles`);
-  }
-  return handle;
-}
-
-function newRecord(
-  handle: object,
-  viewName: string,
-  props: Record<string, unknown>,
-  instanceHandle: unknown,
-): IRecorded {
+function newRecord(handle: object, spec: IRetainedCreate): IRecorded {
   // Checked rather than assumed: the batch types handles as `object`, and the whole value of
   // holding the node is being able to hand it back to the engine's own API
   if (!isSymbioteNode(handle)) {
@@ -183,12 +44,12 @@ function newRecord(
   }
   return {
     handle,
-    instanceHandle,
-    viewName,
+    instanceHandle: spec.instanceHandle,
+    viewName: spec.viewName,
     tagName: '',
     ownedListeners: {},
     underlayShown: false,
-    props,
+    props: spec.text === undefined ? {} : { text: spec.text },
     parent: undefined,
     children: [],
     committedRootTag: undefined,
@@ -209,31 +70,30 @@ export function createRecordedTree(): IRecordedTree {
     return node;
   };
 
+  // `setTag`, `setOwnedListener` and `setUnderlayShown` are RECORDED and not acted on, т.к. what
+  // each one means is resolved in `SymbioteFabricProps.cpp` and this host must not grow a copy
+  const visitor = createRetainedVisitor<IRecorded>(
+    {
+      at: handle => nodeOf(handle, 'applyOps'),
+      create: (handle, spec) => {
+        const node = newRecord(handle, spec);
+        recorded.set(node.handle, node);
+        authored.push(node);
+      },
+    },
+    {
+      committed: () => {
+        tree.commits += 1;
+      },
+    },
+  );
+
   const tree: IRecordedTree = {
     commits: 0,
     authored,
     recordedOf: handle => recorded.get(handle),
     nodeOf,
-    applyOps(batch: IMutationBatch): void {
-      walkBatch({
-        batch,
-        at: slot => nodeOf(handleAt(batch, slot), 'applyOps'),
-        create: (slot, viewName, props, instanceHandle) => {
-          const node = newRecord(
-            handleAt(batch, slot),
-            viewName,
-            props,
-            instanceHandle,
-          );
-          recorded.set(node.handle, node);
-          authored.push(node);
-        },
-        onCommit: (rootTag, node) => {
-          tree.commits += 1;
-          markCommitted(node, rootTag);
-        },
-      });
-    },
+    applyOps: batch => walkOps(batch, visitor),
     reset(): void {
       authored.length = 0;
       tree.commits = 0;
