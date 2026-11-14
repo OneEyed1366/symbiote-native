@@ -4,6 +4,7 @@ import { ROUTE_NAME } from '../routes';
 import './StyleShowcase.css';
 import './StyleShowcase.limits.css';
 import './StyleShowcase.media.css';
+import './StyleShowcase.lab.css';
 import './showcase.scss';
 import './showcase.less';
 import './showcase.styl';
@@ -12,6 +13,11 @@ import {
   DeclarationsPanel,
   SpecificityPanel,
 } from './style-showcase/compiler-panels';
+import {
+  ContainerLab,
+  MediaLab,
+  VarLab,
+} from './style-showcase/lab-panels';
 import { LimitsPanel, MediaPanel } from './style-showcase/limits-panels';
 import {
   AnimationPanel,
@@ -65,6 +71,9 @@ export const StyleShowcaseScreen = defineComponent({
           <PreprocessorsPanel />
           <LimitsPanel />
           <MediaPanel />
+          <MediaLab />
+          <ContainerLab />
+          <VarLab />
         </scroll-view>
       </safe-area-view>
     );

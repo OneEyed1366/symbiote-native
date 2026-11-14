@@ -7,23 +7,26 @@ export const LimitsPanel = defineComponent({
     return () => (
       <view class="sc-panel">
         <text class="sc-panel-title">
-          8 · Deliberately not supported — and one that is wrong, not absent
+          8 · Limits: dropped, held behind a condition, and one that is wrong
         </text>
         <text class="sc-panel-note">
-          Each of these prints a warning into the Metro output under the
-          [@symbiote-native/css-parser] prefix, naming this file (and, for a
+          The dropped and wrong ones print a warning into the Metro output under
+          the [@symbiote-native/css-parser] prefix, naming this file (and, for a
           parse error, line:column). If a tile below misbehaves, that log is
           where the reason is.
         </text>
 
-        <text class="sc-tile-label">@SUPPORTS · @CONTAINER</text>
+        <text class="sc-tile-label">
+          NO @SUPPORTS · @CONTAINER NEEDS A CONTAINER
+        </text>
         <view class="sc-limit-cond" testID="sc-limit-cond">
           <text class="sc-combo-text">must stay slate</text>
         </view>
         <text class="sc-tile-caption">
-          Both are dropped whole, rules included — React Native has no feature
-          query and no container query yet. Each one here would repaint this
-          tile red. Branch in JS instead: Platform.
+          @supports is dropped whole, rules included, since React Native has no
+          feature query. @container is kept, but it holds only below an ancestor
+          with container-type, and this tile has none. Each rule here would
+          repaint this tile red. For @supports, branch in JS instead: Platform.
         </text>
 
         <text class="sc-tile-label">CALC() ACROSS UNIT FAMILIES</text>
