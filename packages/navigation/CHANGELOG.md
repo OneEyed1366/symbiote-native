@@ -1,5 +1,14 @@
 # @symbiote-native/navigation
 
+## 5.1.1
+
+### Patch Changes
+
+- [#104](https://github.com/OneEyed1366/symbiote-native/pull/104) [`9bff70c`](https://github.com/OneEyed1366/symbiote-native/commit/9bff70c94ca9e0a26ae9c236492d592f6e46459d) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Vue `<Screen>` children are found inside nested slot arrays, so a navigator whose screens come from a JSX slot no longer renders empty and ignores touches.
+
+- Updated dependencies []:
+  - @symbiote-native/components@3.3.0
+
 ## 5.1.0
 
 ### Minor Changes

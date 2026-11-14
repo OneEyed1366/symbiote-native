@@ -1,5 +1,15 @@
 # @symbiote-native/engine
 
+## 1.8.0
+
+### Minor Changes
+
+- [#104](https://github.com/OneEyed1366/symbiote-native/pull/104) [`9bff70c`](https://github.com/OneEyed1366/symbiote-native/commit/9bff70c94ca9e0a26ae9c236492d592f6e46459d) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - On Android, a view allocated in the commit that inserts it gets no props from that commit. `@media`, `matchMedia` and `@container` styles are now re-applied by a follow-up commit, so the first visible frame is styled.
+
+### Patch Changes
+
+- [#104](https://github.com/OneEyed1366/symbiote-native/pull/104) [`9bff70c`](https://github.com/OneEyed1366/symbiote-native/commit/9bff70c94ca9e0a26ae9c236492d592f6e46459d) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - On Android a container query that had to wait for its first layout kept its waiting nodes in one list for the whole process, so a second surface could clear or reuse the first one's. The waiting nodes now live per surface in `SymbioteDeferredConsumers.h`.
+
 ## 1.7.0
 
 ### Minor Changes
