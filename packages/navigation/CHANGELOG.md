@@ -1,5 +1,20 @@
 # @symbiote-native/navigation
 
+## 5.1.1
+
+### Patch Changes
+
+- [#104](https://github.com/OneEyed1366/symbiote-native/pull/104) [`9bff70c`](https://github.com/OneEyed1366/symbiote-native/commit/9bff70c94ca9e0a26ae9c236492d592f6e46459d) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Vue `<Screen>` children are found inside nested slot arrays, so a navigator whose screens come from a JSX slot no longer renders empty and ignores touches.
+
+- Updated dependencies []:
+  - @symbiote-native/components@3.3.0
+
+## 5.1.0
+
+### Minor Changes
+
+- [`2cf2ff4`](https://github.com/OneEyed1366/symbiote-native/commit/2cf2ff41ae41d5d26ab78ed2e758eea7d663169a) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Port `react-native-screens` 4.30.0 to every adapter: native tabs with bottom accessory, header views and bar buttons, search bar, transition progress, overlay containers and the stack options that came with it. Vue `Stack`, `Tab`, `Drawer` and `NativeTab` now read their attributes on every render, so an option changed after the first paint reaches the native view
+
 ## 5.0.8
 
 ### Patch Changes

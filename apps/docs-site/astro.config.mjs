@@ -158,14 +158,9 @@ export default defineConfig({
           },
         },
         {
-          // Restores the bonded framework before paint, AND aligns Starlight's own
-          // <Tabs syncKey="framework"> restore mechanism to the same preference:
-          // Starlight persists the synced tab under `starlight-synced-tabs__framework`
-          // keyed by the tab's LABEL TEXT ("React"/"Vue"/"Angular"), read by its own
-          // inline restore script the instant each <starlight-tabs> connects — before
-          // this page's body finishes parsing. Writing it here, synchronously in
-          // <head>, keeps the two preferences (this site's `symbiote` id and
-          // Starlight's own label-keyed store) always in lockstep on load.
+          // Runs in <head> before paint: sets the bonded framework and mirrors it into
+          // Starlight's label-keyed `starlight-synced-tabs__framework`, which its own
+          // restore script reads when each <starlight-tabs> connects
           tag: 'script',
           content: `
             try {
@@ -178,20 +173,9 @@ export default defineConfig({
           `,
         },
         {
-          // The favicon (public/symbiote.svg) is a static file, so it always renders
-          // React's default cyan — mismatched against the bonded accent the head script
-          // above already applies to text/borders. Same brand-mark shape, recolored to
-          // match, once the nav DOM exists (unlike the script above, this can't run
-          // pre-paint — the tab icon has no CSS-var equivalent to starlight.css's
-          // .site-title::before, which is why the sidebar logo uses that instead).
-          //
-          // Docs pages carry no chip switcher of their own — the only way the
-          // preference changes there is clicking a synced <Tabs syncKey="framework">
-          // tab (see docs/packages/*.mdx). The click listener below mirrors that
-          // choice back into the site-wide `symbiote` key + `data-symbiote` attribute
-          // (which the CSS brand-color variables already react to) and re-runs the
-          // same favicon recolor, so leaving to another page — or back to the
-          // landing page — keeps the same bonded framework everywhere.
+          // The static favicon is React cyan, so it is recolored once the nav DOM exists
+          // A click on a synced framework tab is mirrored into the `symbiote` key and
+          // `data-symbiote`, which the brand-color variables read
           tag: 'script',
           content: `
             (function () {
@@ -293,6 +277,7 @@ export default defineConfig({
             { label: 'Svelte guide', slug: 'docs/learn/svelte' },
             { label: 'Solid guide', slug: 'docs/learn/solid' },
             { label: 'Styling', slug: 'docs/learn/styling' },
+            { label: 'Media queries and variables', slug: 'docs/learn/media-queries-and-vars' },
             { label: 'Animations', slug: 'docs/learn/animations' },
             { label: 'Events', slug: 'docs/learn/events' },
           ],

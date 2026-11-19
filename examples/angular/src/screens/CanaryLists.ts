@@ -31,7 +31,7 @@ const PREPEND_COUNT = 5;
   template: `
     <text class="section-label"> FlatList · 24 chips, windowed </text>
     <FlatList
-      testID="angular-chips-list"
+      testID="chips-list"
       [horizontal]="true"
       [data]="chips"
       [keyExtractor]="keyOf"

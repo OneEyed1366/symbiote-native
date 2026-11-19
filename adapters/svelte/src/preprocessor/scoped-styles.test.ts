@@ -1,12 +1,8 @@
-// The build-time half of `<style>` support: what the preprocessor hands to `compile()`.
-// The runtime proof — a real mounted component whose committed Fabric node carries the resolved
-// style, and two components' `.card` rules not bleeding into each other — lives in
-// `../components/scoped-styles.smoke.test.ts`.
-//
-// No Negative group in the usual "guard rejects an illegal input" sense — this preprocessor's
-// job is to REWRITE, and for almost every input the correct behavior is a successful rewrite (or
-// a pass-through when there is nothing to rewrite). It has exactly one throwing path (an
-// unsupported `<style lang>`), grouped on its own below rather than invented elsewhere.
+// The build-time half of `<style>` support: what the preprocessor hands to `compile()`
+// The runtime proof lives in `../components/scoped-styles.smoke.test.ts`
+
+// No Negative group in the usual sense, since the preprocessor rewrites or passes through
+// Its one throwing path, an unsupported `<style lang>`, is grouped on its own below
 
 import { describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -47,10 +43,8 @@ describe('scopedStyles preprocessor', () => {
       expect(await run(source)).toBe(source);
     });
 
-    // why: a static class value made only of :global(...) names has nothing this file owns to
-    // rewrite on the CLASS attribute itself — re-quoting it anyway would be a needless diff that
-    // is not actually risk-free (it moves offsets). The <style> block is still consumed and
-    // registered; only the untouched attribute is the claim here.
+    // A class made only of `:global(...)` names has nothing of this file to rewrite
+    // Re-quoting it would move offsets for no gain, the block itself is still registered
     it('leaves a class attribute untouched when nothing in it is locally scoped', async () => {
       const code = await run(
         '<View class="reset" />\n<style>:global(.reset) { margin: 0; }</style>\n',
@@ -79,12 +73,8 @@ describe('scopedStyles preprocessor', () => {
       expect(code).not.toContain('combinators');
     });
 
-    // why: a compound rule carries the TOKEN SET its selector was written with, renamed per token
-    // (lightningcss renames per token, never the compound), and the registry matches an element
-    // whose class list is a superset. Before the lightningcss migration the selector collapsed
-    // into ONE key with the suffix appended once (`cardBig__<scope>`) which the registry had to
-    // factor back out to match — the two operations did not commute, and that is the trap the
-    // token set closes.
+    // A compound rule keeps the token set of its selector, each token renamed on its own
+    // The registry then matches any element whose class list is a superset of that set
     it('scopes both tokens of a compound selector whose parts have no standalone rule', async () => {
       const code = await run(
         '<View class="card big" />\n<style>\n  .card.big { padding: 16px; }\n</style>\n',
@@ -107,9 +97,8 @@ describe('scopedStyles preprocessor', () => {
       expect(first).not.toBe(second);
     });
 
-    // why: :global(...) is the documented escape hatch out of file-scoping (mirrors Vue's <style
-    // scoped>) — it must register unsuffixed and its markup token must stay untouched, or a class
-    // meant to be shared across files silently becomes file-local.
+    // `:global(...)` is the escape hatch out of file scoping, as in Vue's `<style scoped>`
+    // It registers unsuffixed and its markup token stays, or a shared class turns file-local
     it('leaves a :global(...) selector unsuffixed and its markup token untouched', async () => {
       const code = await run(
         '<View class="reset card" />\n' +
@@ -124,11 +113,8 @@ describe('scopedStyles preprocessor', () => {
       expect(code).not.toContain(`reset__${scopeId}`);
     });
 
-    // why: `:global()` around PART of a selector is the escape hatch for reaching markup this file
-    // does not own. Exempting by registered key alone left `legacy` in the local set (it is a
-    // token of the scoped `cardLegacy` key), so the markup's `legacy` was suffixed anyway and
-    // matched nothing — the escape hatch silently did the opposite of what it says. The Vue
-    // transformer's suite pins the identical claim; one registry serves both.
+    // `:global()` around part of a selector reaches markup this file does not own
+    // The markup token must stay unsuffixed too, or it matches nothing, the Vue suite pins the same
     it('leaves a partial :global() token unsuffixed while the rest of its chain is suffixed', async () => {
       const code = await run(
         '<View class="card legacy" />\n' +
@@ -178,10 +164,8 @@ describe('scopedStyles preprocessor', () => {
       expect(code).toContain(`class="card__${scopeIdOf(code)} global-thing"`);
     });
 
-    // why: a kebab-authored class registers under the name it was AUTHORED with — nothing
-    // camelCases any more, in either half. The old pipeline normalized the registry key, which is
-    // what mangled a scope tail whose hash began with a letter; this cell pins that the markup
-    // token and the rule's token are one string, kebab included.
+    // A kebab-authored class registers under its authored name, no `camelCase` step in either half
+    // The markup token and the rule token must be one string, kebab included
     it('keeps a kebab-authored token kebab on both sides', async () => {
       const code = await run(
         '<View class="card-title" />\n<style>.card-title { color: red; }</style>\n',
@@ -254,9 +238,8 @@ describe('scopedStyles preprocessor', () => {
       expect(code).toContain(`class="card__${scopeIdOf(code)}"`);
     });
 
-    // why: Svelte rejects a second <script module> block — the injected registration code must
-    // splice into an existing one rather than duplicate the tag, or every styled component that
-    // also happens to export a module-level constant fails to compile.
+    // Svelte rejects a second `<script module>`, so the registration splices into an existing one
+    // Duplicating the tag would break every styled component with a module-level export
     it('splices into an existing <script module> instead of adding a second one', async () => {
       const code = await run(
         '<script module>\n  export const NAME = "card";\n</script>\n' +
@@ -267,9 +250,8 @@ describe('scopedStyles preprocessor', () => {
       expect(() => compile(code, COMPILE_OPTIONS)).not.toThrow();
     });
 
-    // why: no source map is emitted (matching the sibling guard), so line-preserving edits are
-    // the only thing keeping a svelte-check diagnostic pointed at the right source line — a
-    // shifted line number silently misdirects every future error in the file.
+    // No source map is emitted, so only line-preserving edits keep a diagnostic on its line
+    // A shifted line number would misdirect every later error in the file
     it('keeps every original line at its original number', async () => {
       const source = [
         '<script>',
@@ -324,14 +306,9 @@ describe('scopedStyles preprocessor', () => {
       expect(result.warnings.map(warning => warning.code)).toEqual([]);
     });
 
-    // A REGRESSION GUARD, not a nicety. Vitest resolves this module through Vite, which happily
-    // follows an extensionless relative import; plain Node — which is what actually loads
-    // svelte.config.js for svelte-check and the language server — does not, and dies with
-    // ERR_MODULE_NOT_FOUND. So the whole preprocessor could be broken for every consuming app's
-    // editor tooling with every other test in this file still green. This spawns real Node
-    // against the real config. It is why `../scope-token` exists as an import-free module reached
-    // through the package's own `exports` map: adding a bare relative import anywhere in the
-    // preprocessor's graph breaks this and nothing else.
+    // Vite follows an extensionless relative import, plain Node loading `svelte.config.js` does not
+    // So editor tooling could break with every other test here green, hence a real Node spawn
+    // This is why `../scope-token` is an import-free module reached through the `exports` map
     it('loads and runs from svelte.config.js under plain Node', () => {
       const packageRoot = join(__dirname, '../..');
       const script = [
@@ -353,6 +330,64 @@ describe('scopedStyles preprocessor', () => {
       expect(output).toContain(
         '__symbioteRegisterRules([{"tokens":["card__svelte-',
       );
+    });
+  });
+
+  describe('Positive — an @media rule keeps its condition', () => {
+    // Без `cond` и таблицы правило регистрируется безусловным и красится на всех устройствах
+    it('ships the condition table and the rule cond index', async () => {
+      const code = await run(
+        '<View class="card" />\n<style>.card { padding: 4px; } @media (min-width: 600px) { .card { padding: 8px; } }</style>\n',
+      );
+      expect(code).toContain('"cond":0');
+      expect(code).toContain('[[">=","width",600]]);');
+    });
+
+    // Файл без `@media` должен выдавать прежний текст, без пустого аргумента с таблицей
+    it('emits no condition table for a file without @media', async () => {
+      const code = await run(
+        '<View class="card" />\n<style>.card { padding: 4px; }</style>\n',
+      );
+      expect(code).not.toContain('"cond"');
+      expect(code).toMatch(/__symbioteRegisterRules\(\[.*\]\);/);
+    });
+  });
+
+  describe('Positive — a :root block registers its custom properties', () => {
+    it('imports and calls the registration next to the rules', async () => {
+      const code = await run(
+        '<View class="card" />\n<style>:root { --gap: 8px; } .card { padding: var(--gap); }</style>\n',
+      );
+      expect(code).toContain(
+        'registerRootVariables as __symbioteRegisterRootVariables',
+      );
+      expect(code).toContain(
+        '__symbioteRegisterRootVariables([{"name":"--gap","value":"8px"}]);',
+      );
+    });
+
+    // Без вызова файл, где есть только токены, терял бы их молча
+    it('registers a file whose only content is :root', async () => {
+      const code = await run(
+        '<View />\n<style>:root { --gap: 8px; }</style>\n',
+      );
+      expect(code).toContain('__symbioteRegisterRootVariables(');
+    });
+
+    it('shares the condition table with the rules', async () => {
+      const code = await run(
+        '<View />\n<style>@media (min-width: 600px) { :root { --gap: 16px; } }</style>\n',
+      );
+      expect(code).toContain(
+        '__symbioteRegisterRootVariables([{"name":"--gap","value":"16px","cond":0}], [[">=","width",600]]);',
+      );
+    });
+
+    it('emits nothing for a file without :root variables', async () => {
+      const code = await run(
+        '<View class="card" />\n<style>.card { padding: 4px; }</style>\n',
+      );
+      expect(code).not.toContain('RootVariables');
     });
   });
 

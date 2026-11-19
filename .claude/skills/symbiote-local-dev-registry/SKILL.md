@@ -101,8 +101,8 @@ above are blind to it — and it is tracked in **all thirteen** examples, `bare-
 The two facts are one fact. Untracking the JS lock removed the pin on THIRD-PARTY versions too, so
 a caret range is free to float on any reinstall; `Podfile.lock` sits downstream of that resolution
 and is the only tracked file that records the drift. The local loop therefore still dirties tracked
-state — just one layer further down than the channel that was closed, and through a file whose diff
-reads as an ordinary dependency bump rather than as local dev residue.
+state, one layer further down than the channel that was closed. Its diff reads as an ordinary
+dependency bump rather than as local dev residue.
 
 Not necessarily a defect: a floating third-party version is what an untracked lock MEANS, and the
 untracking was deliberate and correct for its own reason. What is wrong is that it is invisible —
@@ -156,8 +156,8 @@ check-packed-consumer-bundles CI only. Packs every direct internal dependency, i
 
 **`overlay-local-packages.mjs` and `check-bundle-framework-isolation.mjs` were deleted
 2026-09-02.** The overlay swapped folder contents without running an install, so it could not carry
-a newly added dependency and left most adapters on registry builds — the self-confirming-probe trap
-in `.claude/rules/example-shared-package-staleness.md`. Anything still naming it is stale; use
+a newly added dependency. It left most adapters on registry builds, the self-confirming-probe trap
+in `.claude/rules/example-shared-package-staleness.md`. Anything still naming it is stale, use
 `registry:refresh`.
 
 ## Why not a real npm dist-tag
@@ -225,9 +225,9 @@ can be deleted.
 
 **Two things generalise, and the second is the one that cost the time.**
 
-A long-lived container is a snapshot of the paths that existed when it was CREATED. Any repo
+A long-lived container is a snapshot of the paths that existed when it was CREATED. A repo
 reorganisation that moves a mounted file leaves a container that works until its next restart and
-then never again — so after moving anything a container binds, recreate it rather than trusting the
+then never again. After moving anything a container binds, recreate it rather than trusting the
 running one.
 
 And **`docker logs` is the wrong instrument for a container that failed to START.** The logs are the
@@ -277,14 +277,13 @@ A `file:` specifier was never the committed state; it was always a working-tree 
 somebody had to remember not to commit. So the fix is not "swap the specifier", it is "stop needing
 one".
 
-Worth stating because the obvious migration is to rewrite the manifests, and it was written and
-then reverted here: turning `^0.3.0` into `0.3.0` looks tidier and silently changes resolution
-semantics — a clone would stop picking up a published patch. If a manifest diff appears while doing
-this, that is a signal to stop, not a step.
+The obvious migration is to rewrite the manifests, and it was written and then reverted here.
+Turning `^0.3.0` into `0.3.0` looks tidier but silently changes resolution: a clone would stop
+picking up a published patch. A manifest diff appearing during this is a signal to stop, not a step.
 
 ## A long step that prints on COMPLETION is indistinguishable from a hang
 
-`registry:publish` with no arguments packs **36** packages. Each one runs `pnpm pack` (which for
+On 2026-09-02 `registry:publish` with no arguments packed 36 packages (77 by 2026-11-11). Each one runs `pnpm pack` (which for
 Angular and the other `ng:build` packages runs a real compiler), then `npm unpublish`, then `npm
 publish` — all three with `stdio: 'ignore'`. The per-package line was printed AFTER the publish
 succeeded, so the run showed `publishing every package ...` and then nothing for minutes.
@@ -313,11 +312,10 @@ person will wait, name the in-flight item.
   so pulling it into another script to reuse `publishablePackageEntries()` runs a command as a side
   effect (observed: importing it printed a full `status`). Import the helper it uses, not the
   script.
-- **`examples/bare-rn` gets an `.npmrc` from `registry:on` with no argument.** Harmless — it
-  declares nothing in the `@symbiote-native` scope, so there is nothing to redirect — but it is the
-  one example that by design must not know these packages exist
-  (`<examples_vs_dot_examples>`), and every other audit in the repo excludes it explicitly. If a
-  future change makes the pointer do anything, exclude it here too.
+- **`examples/bare-rn` gets an `.npmrc` from `registry:on` with no argument.** Harmless, since it
+  declares nothing in the `@symbiote-native` scope and there is nothing to redirect. It is the one
+  example that by design must not know these packages exist (`<examples_vs_dot_examples>`), and every
+  other audit in the repo excludes it. If a change makes the pointer do anything, exclude it here too.
 
 ## A rebuild is part of "update the registry", and `tsc --build` is not that rebuild
 
@@ -327,16 +325,18 @@ between those steps produces a tarball that installs and then fails at runtime o
 specifiers. Angular is the exception that hides this — it carries `prepack: ng:build`, so it
 rebuilds itself and looks fine while its neighbours do not.
 
-**SUPERSEDED 2026-09-11 — `commandPublish` now runs `pnpm run prepublish-build` itself, always,
-before packing anything.** A manual pre-step was a step someone eventually skipped — the same
-"a list you have to remember is a list that goes stale" reasoning `commandPublish` already applies
-to naming packages, now applied to remembering the build. `registry:publish` and `registry:sync`
-(which calls `commandPublish` internally) are a single command again: `pnpm run registry:sync`
-alone rebuilds everything, publishes it, points every example at the registry, and refreshes them.
-The full build costs ~27s (`stale-build-output.md`) and runs unconditionally — there is no flag to
-skip it, on purpose, because a skippable build is a build someone skips under a deadline. If the
-build itself fails (a type error), `commandPublish` aborts before packing anything, which is the
-correct failure: a broken build must never reach the registry.
+**SUPERSEDED 2026-09-11: `commandPublish` runs the build itself before packing anything.**
+A manual pre-step was a step someone eventually skipped, the same "a list you have to remember goes
+stale" reasoning it already applies to naming packages. So `registry:sync` is a single command: it
+rebuilds, publishes, points every example at the registry and refreshes them.
+
+**SUPERSEDED 2026-11-11: the build follows what changed, and `--full` is the old behaviour.**
+`commandPublish` runs `typecheck`, `fix-esm-extensions` and `copy-svelte-sources` every time.
+`emit-svelte-declarations` runs only when a changed package holds a `.svelte` source.
+`ng:build` runs only for the packages with a source newer than their stamp, `build/` and `build-ngc/` not counting.
+`--fast` skips both of those, and `--full` runs `prepublish-build` with `clean:build` first.
+This reverses the earlier "no flag to skip the build, on purpose" decision.
+A failing build (a type error) still aborts before packing anything: a broken build must never reach the registry.
 
 ## Diagnosing "the example is running old code"
 
@@ -399,13 +399,15 @@ and re-run the probe to confirm the debug flavor landed BEFORE spending another 
 reach for `RCT_USE_PREBUILT_RNCORE=0` first — that costs a 30-minute from-source build to work
 around a stale download.
 
-**But first check there is anything to fix at all: the probe reading "debug" is the normal resting
-state.** The podspec's `source` is hardcoded to the `-debug` tarball, so a fresh `pod install` always
-leaves the debug flavor extracted, whatever you intend to build. RN then swaps it per build —
-`React-Core-prebuilt` carries a `before_compile` phase, `[RNCore] Replace React Native Core for the
-right configuration`, reading `DEBUG=1` out of `GCC_PREPROCESSOR_DEFINITIONS` and running
-`react-native/scripts/replace-rncore-version.js`. Both tarballs sit side by side in
-`Pods/ReactNativeCore-artifacts/`, so the swap is local — no network. Verified on `examples/react`:
+**But first check there is anything to fix at all.**
+The probe reading "debug" is the normal resting state. The podspec's `source` is hardcoded to the
+`-debug` tarball, so a fresh `pod install` always leaves the debug flavor extracted.
+
+RN then swaps it per build in a `before_compile` phase of `React-Core-prebuilt`, named `[RNCore]
+Replace React Native Core for the right configuration`. The phase reads `DEBUG=1` out of
+`GCC_PREPROCESSOR_DEFINITIONS` and runs `react-native/scripts/replace-rncore-version.js`. Both
+tarballs sit side by side in `Pods/ReactNativeCore-artifacts/`, so the swap is local, no network.
+Verified on `examples/react`:
 probe before a Release build 131MB/80 symbols, after 24MB/0. **"Pods holds debug while I build
 Release" is NOT the bug**, and clearing pods over it wastes a build. The failure above is
 specifically a stale or missing download, and its signature is the LINKER error, not a probe result.
@@ -413,11 +415,13 @@ specifically a stale or missing download, and its signature is the LINKER error,
 ### `examples/expo-*/node_modules` at 2.2-2.3GB each
 
 89MB × ~25 duplicated `expo` copies, one per `@symbiote-native/*` Expo wrapper. None of the six
-`expo-*` examples declares `expo` itself — every wrapper reaches it transitively via
-`expo-sensors`/`expo-battery`/etc. With no root-level request anchoring a version, npm's arborist
-nests a separate `expo` copy inside every wrapper's own `node_modules`, even though all ~25 resolve
-to the SAME version. (`expo-modules-core`, depended on identically, hoists fine — the difference is
-specifically that nothing requests `expo` from the root, not a generic dedup failure.)
+`expo-*` examples declares `expo` itself. Every wrapper reaches it transitively via
+`expo-sensors`/`expo-battery`/etc.
+
+With no root-level request anchoring a version, npm's arborist nests a separate `expo` copy inside
+every wrapper's own `node_modules`, even though all ~25 resolve to the SAME version.
+`expo-modules-core`, depended on identically, hoists fine. The difference is that nothing requests
+`expo` from the root, so this is not a generic dedup failure.
 
 Fix, which is also the CORRECT shape — a real `create-expo-app` project always declares `expo`
 directly: add `"expo": "<pinned SDK version>"` to the example's `package.json`, then
@@ -434,3 +438,28 @@ next `npm install` then errors `EINTEGRITY … wanted <old> but got <new>` even 
 project's own lockfile, not in npm's cache. `rm -f package-lock.json` before retrying. Same failure
 shape as the lockfile short-circuit above (stale integrity vs changed bytes), just triggered by a
 failed install instead of a re-publish.
+
+## `registry:sync` is incremental since 2026-11-11, `--full` is the old loop
+
+Measured on `examples/react`: the first sync published 77 and replaced 10 declared packages in 379 s.
+A second sync on the same tree held all 77 and replaced nothing in 106 s. The killed-refresh case is untested.
+A C++-only edit in `core/engine` built 0 packages, published 1 and replaced 1 in 23 s.
+A TS edit in `core/engine/src` built 74 packages (the engine and its dependents) and published 1 in 128 s.
+
+Measured on 77 publishable packages: a full sync took ~6 min. An unchanged incremental build is
+~70 s (`emit-svelte-declarations` 31 s, `ng:build` 35 s, the rest ~3 s), `--fast` is ~2 s. A
+sequential `npm pack --dry-run` loop is 97 s, 29 s in batches of 8 (12 cores).
+
+- build: steps are chosen in `buildChanged` from the packages whose sources moved since their stamp;
+  a package never stamped counts as moved, and so does one built by hand after its source changed
+  only until the next sync, since the stamp is taken after the build
+- publish: a package with no file newer than its stored stamp (a gitignored JSON beside the Verdaccio
+  config) and still in the registry is skipped without a pack; the others are compared by
+  `npm pack --dry-run --json --ignore-scripts` integrity and version; a named package is always sent
+- refresh: `npm install --no-save <name>@<version>` for the declared packages whose stamped integrity
+  differs from the claim an install writes into the example's `node_modules` once it finishes, so a
+  killed refresh is redone, not trusted;
+  a full reinstall when `node_modules` is missing, a moved package is only transitive, or the
+  targeted install fails (a stale lockfile hash raises `EINTEGRITY`)
+- `--full` = clean build, publish all, clean reinstall; use it after a branch switch or a killed run
+- native-only edits (`core/engine/cpp`, `android/`) still need `e2e:build:android` / `pod install`

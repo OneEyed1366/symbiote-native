@@ -11,8 +11,11 @@
 import type { IRootTag } from './fabric';
 import { dlog } from './debug';
 import { installEventHandler } from './events';
-import { detachAnimatedProps } from './animated/host-binding';
-import { childrenOf } from './host-access';
+import { linkQueuedConsumers } from './container-tracking';
+import { ancestorsOf, childrenOf, subtreesOf } from './host-access';
+import { startMediaAccessibility } from './media-accessibility';
+import { detachNodeState } from './node-lifetime';
+import { setMediaAccessibilityStarter } from './style-registry/media-subscriptions';
 import {
   runCommittedHooks,
   runDeferredAttaches,
@@ -31,6 +34,7 @@ import {
   appendChild,
   createSurfaceRoot,
   insertBefore,
+  isSymbioteNode,
   removeChild,
   type ISymbioteNode,
 } from './node';
@@ -46,7 +50,7 @@ const isNodeCommitted = (node: ISymbioteNode): boolean =>
 
 // What the teardown sweep runs on a node that really left the tree
 function releaseNode(node: ISymbioteNode): void {
-  detachAnimatedProps(node);
+  detachNodeState(node);
   releaseNodeBindings(node);
 }
 
@@ -59,6 +63,8 @@ export class SymbioteSurface {
   constructor(rootTag: IRootTag) {
     this.rootTag = rootTag;
     this.node = createSurfaceRoot();
+    // `@media` reads accessibility settings through this, since a node module cannot import them
+    setMediaAccessibilityStarter(startMediaAccessibility);
   }
 
   // Every other live surface, so one commit names every root — see commitSurfaceOps. Static
@@ -114,13 +120,11 @@ export class SymbioteSurface {
 
   // Synchronous commit: used by React's resetAfterCommit, which already batches per logical update.
   commit(): void {
-    // A superseded surface still flushes its ops and names every other root (its teardown carries
-    // the removals), but must not complete a root another surface now owns — Fast Refresh and the
-    // focus lifecycle can re-mount the same rootTag while an old teardown commit is still pending.
+    // A superseded surface still flushes its ops and names the other roots, but must not complete
+    // a root another surface owns. Fast Refresh can re-mount a `rootTag` while an old commit waits
 
-    // The behavior-teardown half runs after ops are applied (asking the host for a parent needs the
-    // removal already handed over) but before the root completes, so a behavior's parting writes
-    // ride this commit instead of owing another one. flushOps is that split: apply, don't publish.
+    // The teardown half runs after the ops are applied, since a parent read needs the removal.
+    // It runs before the root completes, so parting writes ride this commit
     flushOps();
     // Guarded at the call site, not inside the sweep — this.children is a host read that builds the
     // whole top-level list, and it would run on every commit for a sweep with nothing to do.
@@ -134,11 +138,15 @@ export class SymbioteSurface {
       this.node,
       SymbioteSurface.others(this),
     );
-    // Fresh Fabric handles are now assigned, so the three things that couldn't run before one
-    // existed all drain here: notifyCommitted releases the imperative waiters, runPostCommitHooks
-    // the consumers that needed a committed tag, runDeferredAttaches the same for a host behavior.
+    // Fresh handles exist now, so what needed one drains here: `notifyCommitted` for waiters,
+    // `runPostCommitHooks` for tag consumers, `runDeferredAttaches` for host behaviors
     notifyCommitted();
     runPostCommitHooks();
+    // A node queued by a container condition finds the containers above it once it is placed
+    linkQueuedConsumers(
+      node => (isSymbioteNode(node) ? ancestorsOf(node) : []),
+      roots => subtreesOf(roots.filter(isSymbioteNode)),
+    );
     runDeferredAttaches(isNodeCommitted);
     // After the setup half, never before: a node carrying both hooks has attachAfterCommit seed the
     // mirrors afterCommit then compares against. Unlike the two above, this asks only "props were

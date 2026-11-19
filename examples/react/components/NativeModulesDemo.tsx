@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Image, I18nManager, Settings } from '@symbiote-native/react';
 import { ActionButton } from './ActionButton';
 
-// Three runtime modules, each read live so it only resolves on a
-// real host: I18nManager (RTL layout constants), Settings (a value round-tripped
-// through iOS NSUserDefaults via SettingsManager), and Image's static methods
-// (getSize / queryCache / prefetch, which hit the ImageLoader native module).
+// Runtime modules read live, so they only resolve on a real host
+// `I18nManager` RTL constants, `Settings` over `NSUserDefaults`, `Image` statics
+// (`getSize`, `queryCache`, `prefetch`) through `ImageLoader`
 const LOGO_URI = 'https://reactnative.dev/img/tiny_logo.png';
 // A distinct cache key for the prefetch demo: same asset, different URL (query
 // string), so nothing has loaded it yet. The cache starts cold and the button
@@ -14,10 +13,6 @@ const PREFETCH_URI = 'https://reactnative.dev/img/tiny_logo.png?warm=symbiote';
 const TAP_KEY = 'symbiote.tapCount';
 
 export function NativeModulesDemo() {
-  // I18nManager: RTL constants, read once at render. A non-throwing read proves the
-  // module name resolved; the values flip if you force RTL and relaunch.
-  const rtl = I18nManager.getConstants();
-
   // Settings is a counter persisted to NSUserDefaults: read back on mount, bumped and
   // re-saved on tap, and watched so an external write to the key reflects live. It
   // survives a relaunch, which is the whole point of the module.
@@ -62,6 +57,9 @@ export function NativeModulesDemo() {
       .then(() => refreshCache())
       .catch(() => setCacheState('unavailable'));
   };
+
+  // I18nManager: RTL constants, read at render. A non-throwing read proves the module resolved
+  const rtl = I18nManager.getConstants();
 
   return (
     <view className="section-nested">

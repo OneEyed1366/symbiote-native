@@ -139,7 +139,7 @@ describe('Angular DetailsScreen - reached via a real OS-level deep link', () => 
   });
 
   // SKIPPED: Detox reports `nav-pop` non-hittable although it is well inside the viewport
-  // Same upstream bug as `angular-open-modal` in `probe.test.ts`, wix/Detox #3130, #4747, #2229
+  // Same upstream bug as `modal-open` in `probe.test.ts`, wix/Detox #3130, #4747, #2229
   // Re-enable once upstream fixes hittability for this class of failure
   it.skip('tapping Pop is a no-op on a single-route stack, Details stays put', async () => {
     await element(by.id('nav-pop')).tap();

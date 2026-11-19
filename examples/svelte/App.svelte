@@ -14,6 +14,7 @@
     ISvelteScreenOptions,
   } from '@symbiote-native/navigation/svelte';
   import { hide } from '@symbiote-native/splash-screen/svelte';
+  import { BackHandler } from '@symbiote-native/svelte';
 
   import MenuScreen from './screens/MenuScreen.svelte';
   import CanaryScreen from './screens/CanaryScreen.svelte';
@@ -111,6 +112,19 @@
   useLinkingIntegration(APP_LINKING_CONFIG, () =>
     isNavigatorHandle(stackInstance) ? stackInstance : null,
   );
+
+  // Without a handler the Android Back key on the lab screen took the app to the launcher
+  // At the root `canGoBack` is false and the system leaves the app as usual
+  $effect(() => {
+    const handle = isNavigatorHandle(stackInstance) ? stackInstance : null;
+    if (handle === null) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!handle.canGoBack()) return false;
+      handle.pop();
+      return true;
+    });
+    return () => subscription.remove();
+  });
 
   // Bare `hide()` at the root, as the first route mounted is Menu
   $effect(() => {

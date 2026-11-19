@@ -5,6 +5,7 @@ import {
   registerRules as registerTokenRules,
   type IStyleRule,
 } from './style-registry';
+import type { IMediaCondition } from './style-registry/media-evaluate';
 
 const KEYFRAMES_PREFIX = '@keyframes ';
 
@@ -24,11 +25,14 @@ function registerKeyframesFrom(style: Readonly<Record<string, unknown>>): void {
 }
 
 // The token registry skips a rule with no tokens, so its keyframes are taken here first
-export function registerRules(rules: readonly IStyleRule[]): void {
+export function registerRules(
+  rules: readonly IStyleRule[],
+  conditions: readonly IMediaCondition[] = [],
+): void {
   for (const rule of rules) {
     if (rule.tokens.length === 0) registerKeyframesFrom(rule.style);
   }
-  registerTokenRules(rules);
+  registerTokenRules(rules, conditions);
 }
 
 export function clearGlobalStyles(): void {

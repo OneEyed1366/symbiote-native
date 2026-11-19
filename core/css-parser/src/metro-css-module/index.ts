@@ -1,31 +1,21 @@
-// Compiles a standalone .css/.scss/.sass/.less/.styl (and their .module.* twins) file into a
-// plain JS module — the framework-agnostic twin of a Vue SFC's inline <style>/<style module>
-// block (adapters/vue/metro-vue-transformer.cjs), usable from ANY adapter's own source file:
-// a default import of `Card.module.scss` works the same from a React .tsx, a Vue <script>, or an
-// Angular .ts.
-//
-// A plain style file registers its classes globally, exactly like an unscoped Vue <style>
-// block — side-effect import only (`import './theme.scss'`), no default export. A `.module.*`
-// file is ALWAYS scoped (that's the entire point of the extension): **lightningcss** owns the
-// renaming, `composes`, and `:global()` handling, and hands back both the renamed CSS and the
-// authored-name -> scoped-name `exports` map. We keep only what is genuinely ours — turning CSS
-// declarations into RN style objects (`compileCssToRules`).
-//
-// lightningcss is MPL-2.0 and this package is MIT. Depending on it is fine (file-level copyleft
-// does not reach our files); NEVER vendor, copy, or patch its sources — a copied file would
-// carry MPL.
-//
-// A preprocessor source (SCSS/Sass/Less/Stylus) is reduced to plain CSS text via
-// preprocessors.ts's `compile()` BEFORE lightningcss runs — it reads plain CSS only.
+// Compiles a .css/.scss/.sass/.less/.styl file and its .module.* twin into a JS module
+// A plain file registers globally, a module file is always scoped and exports a name map
+// lightningcss (MPL-2.0) owns renaming and `composes`: depend on it, never copy its sources
 import * as path from 'node:path';
+import type { ICompiledProperty } from '@symbiote-native/engine';
 import type { CSSModuleExports, CSSModuleReference } from 'lightningcss';
-import { compileCssToRules, type IStyleRule } from '../lightning/rules.ts';
+import type { IMediaCondition } from '../lightning/media.ts';
+import {
+  compileCssToRules,
+  type IRootVariable,
+  type IStyleRule,
+} from '../lightning/rules.ts';
 import { hashFilePath } from '../file-scope-id.ts';
 import { compile, detectLanguage } from '../preprocessors/index.ts';
 
-export interface ICompiledCssFile {
+export type ICompiledCssFile = {
   code: string;
-}
+};
 
 export function isCssModuleFile(filename: string): boolean {
   const ext = path.extname(filename);
@@ -44,18 +34,22 @@ function localsByScopedName(exports: CSSModuleExports): Map<string, string> {
   return locals;
 }
 
+type IComposeContext = {
+  exports: CSSModuleExports;
+  locals: ReadonlyMap<string, string>;
+  visited: Set<string>;
+  filename: string;
+};
+
 function referenceTokens(
   reference: CSSModuleReference,
-  exports: CSSModuleExports,
-  locals: ReadonlyMap<string, string>,
-  visited: Set<string>,
-  filename: string,
+  context: IComposeContext,
 ): string[] {
   // Resolving one would mean compiling the other file here, which this per-file transform cannot
   // do. Warn-and-drop is what the declaration mapper already does with a property it cannot map.
   if (reference.type === 'dependency') {
     console.warn(
-      `[@symbiote-native/css-parser] ${filename}: \`composes: ${reference.name} from ` +
+      `[@symbiote-native/css-parser] ${context.filename}: \`composes: ${reference.name} from ` +
         `"${reference.specifier}"\` ` +
         'crosses files and is not supported — dropped.',
     );
@@ -63,72 +57,52 @@ function referenceTokens(
   }
   if (reference.type === 'global') return [reference.name];
 
-  const local = locals.get(reference.name);
-  return local === undefined
-    ? [reference.name]
-    : tokensFor(local, exports, locals, visited, filename);
+  const local = context.locals.get(reference.name);
+  return local === undefined ? [reference.name] : tokensFor(local, context);
 }
 
-// Composed names come FIRST, the class's own name LAST. The runtime registry merges a
-// space-separated class string left to right (core/engine/src/style-registry), so this is what
-// makes the composing class override what it composes — the cascade order `composes` means.
-function tokensFor(
-  local: string,
-  exports: CSSModuleExports,
-  locals: ReadonlyMap<string, string>,
-  visited: Set<string>,
-  filename: string,
-): string[] {
-  if (visited.has(local)) return [];
-  visited.add(local);
+// Composed names come first and the class's own name last, so the composing class wins
+// The registry merges a space-separated class string left to right
+function tokensFor(local: string, context: IComposeContext): string[] {
+  if (context.visited.has(local)) return [];
+  context.visited.add(local);
 
-  const entry = exports[local];
+  const entry = context.exports[local];
   if (entry === undefined) return [];
 
   const tokens: string[] = [];
   for (const reference of entry.composes) {
-    tokens.push(
-      ...referenceTokens(reference, exports, locals, visited, filename),
-    );
+    tokens.push(...referenceTokens(reference, context));
   }
   tokens.push(entry.name);
   return tokens;
 }
 
-// `globals` is deliberately a SUPERSET of what CSS Modules specifies. lightningcss (like
-// css-loader and every other CSS Modules implementation) exports only the names it renamed, and
-// a `:global(...)` name is
-// by definition not renamed — so upstream has nothing to map and omits it. For us that omission
-// would force the author back to a bare string literal (`class="legacy-reset"`), throwing away the
-// typed, discoverable `styles.x` access that is the entire reason this map exists. So a global
-// name is exported as ITSELF: same key, no scope suffix.
+// A `:global(...)` name is exported as itself, since upstream omits it from the map
+// Markup would then need a bare literal and lose the typed `styles.x` access
 function classMapFrom(
   exports: CSSModuleExports,
   globals: ReadonlySet<string>,
   filename: string,
 ): Record<string, string> {
   const locals = localsByScopedName(exports);
-  const classMap: Record<string, string> = {};
-  // Sorted, because `exports` is a Rust HashMap whose iteration order is randomized PER PROCESS
-  // — emitting it verbatim makes the generated module bytes differ between builds and churns
-  // Metro's content cache. Measured, not assumed: three runs over one file gave three orders.
+  // Sorted, since the Rust export map iterates in a random order per process and churns the cache
   const names = [...new Set([...Object.keys(exports), ...globals])].sort();
+  const classMap: Record<string, string> = {};
 
   for (const name of names) {
-    // A name that is BOTH locally declared and `:global()`-wrapped elsewhere in the file resolves
-    // as local — the rename actually happened, so the scoped spelling is the one that matches.
+    // A name both local and `:global()` elsewhere resolves as local, since the rename happened
     const value =
       exports[name] === undefined
         ? name
-        : tokensFor(name, exports, locals, new Set(), filename).join(' ');
+        : tokensFor(name, {
+            exports,
+            locals,
+            visited: new Set(),
+            filename,
+          }).join(' ');
 
-    // Keyed AS AUTHORED — `.legacy-reset` keys as `legacy-reset`, read as
-    // `styles['legacy-reset']`. This reverses an earlier camelCase decision (css-loader's
-    // `exportLocalsConvention`), which existed only to keep dot access legal and paid for it by
-    // merging `.legacy-reset` and `.legacyReset` into one key — a collision that needed a warning
-    // to be survivable. Nothing downstream normalizes any more: the registry key is the authored
-    // name too, and `classNamesToDtsSource`'s `formatKey` already quotes a non-identifier key, so
-    // `styles['legacy-reset']` type-checks.
+    // Keyed as authored (`styles['legacy-reset']`), so nothing downstream normalizes the name
     classMap[name] = value;
   }
   return classMap;
@@ -139,18 +113,17 @@ export type ICompiledCssModule = {
   rules: readonly IStyleRule[];
   /** The default export: authored name -> the token(s) to put in the markup. */
   classMap: Record<string, string>;
+  /** The `@media` conditions the rules' `cond` indices point into. */
+  conditions: readonly IMediaCondition[];
+  /** The `:root` custom properties, whose `cond` indices point into the same table. */
+  rootVariables: readonly IRootVariable[];
+  /** The `@property` rules, whose `cond` indices point into the same table. */
+  properties: readonly ICompiledProperty[];
 };
 
 /**
- * One CSS source compiled as a CSS MODULE — a standalone `.module.*` file and a Vue
- * `<style module>` block are the same thing and go through this, so neither can register a class
- * under a name the other would not.
- *
- * The scope tail is our own `hashFilePath`, not lightningcss's `[hash]`: the runtime registry
- * parses this tail to factor a scope back out (SCOPE_TAIL_PATTERN in
- * core/engine/src/style-registry) and its alphabet is lowercase base36, which lightningcss's
- * mixed-case hash does not fit — that would silently kill scoped-token base layering. Same hash
- * the `<style scoped>` and Svelte scopers use, so all three scoping shapes stay one algorithm.
+ * One CSS source compiled as a CSS module, for a `.module.*` file and a Vue `<style module>` alike
+ * The scope tail is our `hashFilePath`, since the registry parses a lowercase base36 tail back out
  */
 export function compileCssModule(
   css: string,
@@ -164,6 +137,9 @@ export function compileCssModule(
   return {
     rules: compiled.rules,
     classMap: classMapFrom(compiled.moduleExports, compiled.globals, filename),
+    conditions: compiled.conditions,
+    rootVariables: compiled.rootVariables,
+    properties: compiled.properties,
   };
 }
 
@@ -189,12 +165,8 @@ export async function moduleClassNames(
   return Object.keys(compileCssModule(css, filename).classMap);
 }
 
-// Preprocessing (SCSS/Less/Stylus → plain CSS text) is inherently async in Node — Less has no
-// sync render API at all, and Stylus's callback-based render must be Promise-wrapped — so
-// compileCssFile is async uniformly, even for a plain `.css` file that needs no preprocessing.
-// See metro-transformer.ts for the fuller sync-vs-async writeup; the short version is that a
-// sync fast-path for `.css` would fork this function into two shapes for a build-time-only,
-// content-hash-cached call that is never a runtime hot path.
+// Always async, since Less has no sync render API and Stylus renders through a callback
+// Even a plain `.css` takes this path, so the function keeps one shape
 export async function compileCssFile(
   source: string,
   filename: string,
@@ -202,36 +174,84 @@ export async function compileCssFile(
   const css = await toPlainCss(source, filename);
 
   if (!isCssModuleFile(filename)) {
-    const { rules } = compileCssToRules(css, { filename });
-    return {
-      code:
-        `import { registerRules } from '@symbiote-native/engine';\n` +
-        `registerRules(${serializeRules(rules)});\n`,
-    };
+    const compiled = compileCssToRules(css, { filename });
+    return { code: registrationLines(compiled).join('\n') + '\n' };
   }
 
-  const { rules, classMap } = compileCssModule(css, filename);
+  const compiled = compileCssModule(css, filename);
 
   return {
     code:
       [
-        `import { registerRules } from '@symbiote-native/engine';`,
-        `registerRules(${serializeRules(rules)});`,
-        `export default ${JSON.stringify(classMap)};`,
+        ...registrationLines(compiled),
+        `export default ${JSON.stringify(compiled.classMap)};`,
       ].join('\n') + '\n',
   };
 }
 
-// `combinators` is compile-time-only — the registry matches by token subset and never reads it —
-// so it is stripped rather than shipped in every app bundle. Stage 4 is where it starts to mean
-// something at runtime, and that is when it earns its bytes.
-function serializeRules(rules: readonly IStyleRule[]): string {
+// `combinators` is compile-time-only, the registry never reads it, so it stays out of the bundle
+// Shared by the Vue and Svelte emitters, which wrap their own call around the same text
+export function serializeRules(rules: readonly IStyleRule[]): string {
   return JSON.stringify(
-    rules.map(({ tokens, specificity, order, style }) => ({
+    rules.map(({ tokens, specificity, order, style, cond }) => ({
       tokens,
       specificity,
       order,
       style,
+      cond,
     })),
   );
+}
+
+// The condition table rides in the same call, so a rule's `cond` index always has its table
+function registerCall(
+  rules: readonly IStyleRule[],
+  conditions: readonly IMediaCondition[],
+): string {
+  return `registerRules(${serializeRules(rules)}${conditionsArgument(conditions)});`;
+}
+
+// The trailing `, [...]` argument of a registration call, empty when the file has no `@media`
+export function conditionsArgument(
+  conditions: readonly IMediaCondition[],
+): string {
+  return conditions.length === 0 ? '' : `, ${JSON.stringify(conditions)}`;
+}
+
+type IRegistrations = {
+  rules: readonly IStyleRule[];
+  conditions: readonly IMediaCondition[];
+  rootVariables: readonly IRootVariable[];
+  properties: readonly ICompiledProperty[];
+};
+
+// The call every emitter writes for a file's `@property` rules, none when the file has no rule
+// The condition table rides along, as for `:root` variables, so a `cond` index has its table
+export function propertiesCall(
+  properties: readonly ICompiledProperty[],
+  conditions: readonly IMediaCondition[],
+): string {
+  return `registerProperties(${JSON.stringify(properties)}${conditionsArgument(conditions)});`;
+}
+
+// The `:root` call reuses the table the rules were compiled with, so a `cond` index stays valid
+// A file without `:root` variables or `@property` rules emits neither the import nor the call
+function registrationLines(compiled: IRegistrations): string[] {
+  const { rules, conditions, rootVariables, properties } = compiled;
+  const imported = ['registerRules'];
+  const calls = [registerCall(rules, conditions)];
+  if (rootVariables.length > 0) {
+    imported.push('registerRootVariables');
+    calls.push(
+      `registerRootVariables(${JSON.stringify(rootVariables)}${conditionsArgument(conditions)});`,
+    );
+  }
+  if (properties.length > 0) {
+    imported.push('registerProperties');
+    calls.push(propertiesCall(properties, conditions));
+  }
+  return [
+    `import { ${imported.join(', ')} } from '@symbiote-native/engine';`,
+    ...calls,
+  ];
 }

@@ -1,25 +1,26 @@
-// Per-tag behavior on an engine node — lets a primitive's state machine live below the framework
-// instead of inside a framework component, which would otherwise charge it a per-instance cost in
-// every framework touching element subtrees (see .claude/rules/host-primitive-tier.md, tier 2).
+// Per-tag behavior on an engine node, so a primitive's state machine lives below the framework
+// Inside a framework component it would pay a per-instance cost in every framework touching
+// element subtrees (see .claude/rules/host-primitive-tier.md, tier 2)
 
 // A registry, not a direct import: components depends on engine and never the reverse, so the
-// engine cannot import createPressHandlers directly. The inversion is forced, not chosen.
+// engine cannot import `createPressHandlers` directly. The inversion is forced, not chosen
 
-// The registration call itself is the hazard: Metro's inlineRequires makes a barrel re-export
-// lazy, so a module whose only job is registerHostBehavior() never evaluates in release unless
-// it's a bare side-effect import (`import '../register'`), never re-exported — see packages/slider.
+// Metro's `inlineRequires` makes a barrel re-export lazy, so a module that only calls
+// `registerHostBehavior()` never evaluates in release. Import it as a bare side-effect
+// (`import '../register'`), never re-exported, see packages/slider
 
 // registerHostBehavior emits a dlog so DEBUG=1 answers "did my registration run" before anyone
 // starts debugging the behavior itself.
 
 import { parentsOf, teardownSubtreesOf } from './host-access';
 import { recordSetTag } from './mutation-buffer';
+import { restoreMediaNode } from './style-registry/media-subscriptions';
 import { dlog } from './debug';
 import type { ISymbioteNode } from './node';
 
-// A pure props -> props mapping a behavior applies on the way to the Fabric payload — a tag has
-// no component body, and a wrapper's body is where per-primitive prop folds used to live
-// (TextInput's W3C aliases, Pressable's disabled -> accessibilityState).
+// A pure props to props mapping a behavior applies on the way to the Fabric payload
+// A tag has no component body, and a wrapper's body is where prop folds used to live
+// (TextInput's W3C aliases, Pressable's `disabled` folded into `accessibilityState`)
 
 // Not a hook on setProp (the engine's hottest path) — runs once per node per payload build, only
 // for a node whose behavior supplied one. Must be pure and must not mutate its input.
@@ -49,9 +50,8 @@ export type IHostBehavior = {
   // the owner is `style` on the slot). Goes through the slot's own routeProp, so it inherits style
   // merging, class merging and the already-published guard for free.
 
-  // Composing a constant with the redirected value is the slot's own payloadFold's job, not this
-  // field's — keeping them apart is what lets the rename stay a pure redirect and precedence live
-  // in the fold, not the routing.
+  // Composing a constant with the redirected value is the slot's own `payloadFold`'s job
+  // Keeping them apart lets the rename stay a pure redirect and precedence live in the fold
   readonly slotProps?: Readonly<Record<string, string>>;
   // The complement of slotProps: every prop not named here routes to the slot under its own name
   // (slotProps still wins where both could answer). ActivityIndicator hands the spinner
@@ -60,9 +60,9 @@ export type IHostBehavior = {
   // It is a redirect, so nothing needs marking dirty afterwards: the write lands on the slot and
   // marks it directly, which is why this isn't a slotDerived wildcard instead.
   readonly slotPropsExcept?: readonly string[];
-  // The value a redirected prop lands with, under its SLOT name. For the one rule the C++ host
-  // cannot express: Button's Android title is `title.toUpperCase()` (Button.js:352), JavaScript's
-  // full-Unicode uppercase — the host has no ICU. Runs per redirected write, never per commit.
+  // The value a redirected prop lands with, under its SLOT name, per write and never per commit
+  // For the one rule the C++ host cannot express: Button's Android title is `title.toUpperCase()`
+  // (Button.js:352), full-Unicode uppercase that the host has no ICU for
   readonly slotValueFor?: (slotKey: string, value: unknown) => unknown;
   // The slot is a built sibling, not a container: the app's children stay on the owner and land
   // after it. childHost normally answers both "which node redirects a prop" and "which node takes
@@ -82,9 +82,8 @@ export type IHostBehavior = {
   // build. Read from setProp past its identity guard, so a re-render writing the same value
   // dirties nothing; node.childHost turns away every slotless node before the registry is touched.
 
-  // SLOT_DERIVED_ALL is the fourth case: a cloneElement owner re-clones on every render whatever
-  // changed, so naming keys is only an optimisation, one traded for staying in step with a
-  // matching rule in SymbioteFabricProps.cpp rather than risking a silently stale clone.
+  // `SLOT_DERIVED_ALL` is the fourth case: a `cloneElement` owner re-clones on every render
+  // Naming keys is only an optimisation, and it must match a rule in SymbioteFabricProps.cpp
   readonly slotDerived?: readonly string[];
   // Children the owner takes out of the ordinary flow, by Fabric component name — the child twin
   // of slotProps. ScrollView's RefreshControl is a sibling before the content view on iOS but the
@@ -94,9 +93,9 @@ export type IHostBehavior = {
   // that way would attach the press machine to every plain View (Pressable resolves to RCTView
   // too). A claim only asks for children of one owner, so the name is unambiguous there.
   readonly claimedChildren?: Readonly<Record<string, IClaimMode>>;
-  // Runs after an app child has been placed under this node — the counterpart of buildStructure,
-  // for a primitive whose real target doesn't exist yet at attach because it's the framework's
-  // child, not the behavior's own (RN's TouchableNativeFeedback clones props onto its one child).
+  // Runs after an app child has been placed under this node, the counterpart of `buildStructure`
+  // For a primitive whose real target is the framework's child, absent at attach
+  // (RN's TouchableNativeFeedback clones props onto its one child)
 
   // The node is placed by the time this runs, so a behavior may adopt it as node.childHost (which
   // is what makes slotDerived reach it) and write on it through the ordinary mutation API.
@@ -129,20 +128,18 @@ export type IHostBehavior = {
   // React commits synchronously so that code would work there by accident; Vue/Solid/Angular
   // commit a tick later, so the same code would silently no-op — dead on device, headless-green.
 
-  // Optional, and the engine owns its lifecycle: registered by attachHostBehavior, dropped by
-  // detachSubtree, re-armed by reattachSubtree — removing the footgun of a hand-rolled
-  // whenCommitted call whose cancel in detach is easy to forget.
+  // Optional, and the engine owns its lifecycle: registered by `attachHostBehavior`, dropped by
+  // `detachSubtree`, re-armed by `reattachSubtree`, so no hand-rolled cancel is owed
   attachAfterCommit?(node: ISymbioteNode): void;
-  // A prior `onWrapChange` hook is gone: ScrollView's Android split (foldScrollViewProps /
-  // foldRefreshWrapperProps) now reads the wrapped child through IFirstChild in C++ instead, so
-  // nothing needs telling when the wrap shape changes. Re-add only for a genuine wrap event.
+  // The `onWrapChange` hook is gone, ScrollView's Android split now reads the wrapped child
+  // through `IFirstChild` in C++, so re-add a hook only for a genuine wrap event
 
   // Runs when the app wires or unwires one of ownedListeners, never on a re-render handing the
   // same name a fresh closure. `wired` is the new state.
 
-  // Not afterCommit: a listener flip alone changes no payload, so that commit is a no-op and
-  // afterCommit's drain never runs — this hook exists for behaviors (ScrollView's onLayout) whose
-  // payload depends on a listener's mere presence. Runs synchronously, before the first commit.
+  // Not `afterCommit`: a listener flip alone changes no payload, so its drain never runs
+  // For behaviors whose payload depends on a listener's presence (ScrollView's `onLayout`), runs
+  // synchronously before the first commit
   onOwnedListenerChange?(
     node: ISymbioteNode,
     name: string,
@@ -156,8 +153,8 @@ export type IHostBehavior = {
   // is too costly. This costs a Set iteration per commit, only over nodes whose behavior asked.
 
   // Runs even when a behavior's own fold stripped the prop and made the commit byte-identical
-  // (TouchableOpacity's disabled, Button's title/color) — see runCommittedHooks for how that drain
-  // stays separate from the tag-dependent one gated on reaching Fabric.
+  // (TouchableOpacity's `disabled`, Button's title/color), see `runCommittedHooks` for how that
+  // drain stays apart from the tag-dependent one
   afterCommit?(node: ISymbioteNode): void;
   // Runs once the node is known to have left the tree for good. Must release everything `attach`
   // took — a timer left behind outlives the tree that owned it.
@@ -183,23 +180,22 @@ const behaviors = new Map<string, IHostBehavior>();
 // `sweepDetachedBehaviors` for why the answer is not known until commit.
 const detachCandidates = new Set<ISymbioteNode>();
 
-// A node the sweep has torn down carries node.isTornDown — it can still be re-inserted (see
-// reattachHostBehaviors), and the bit tells an insert whether it must walk at all, so the common
-// case (building a fresh tree) never walks anything. A field, since both readers are per-node.
+// A node the sweep has torn down carries `node.isTornDown` and can still be re-inserted
+// The bit tells an insert whether it must walk at all, so building a fresh tree walks nothing
 
-// The behavior a node actually got lives on the node, as node.hostBehavior, remembered from its
-// one and only registry lookup — a field rather than a WeakMap, since a probe is the dearest way
-// to ask a question whose answer is almost always "none".
+// The behavior a node got lives on it as `node.hostBehavior`, from the one registry lookup
+// A field rather than a WeakMap, since a probe is the dearest way to ask a question
+// whose answer is almost always "none"
 
-// The registry is keyed by intrinsic tag, and the node is not: node.component is the resolved
+// The registry is keyed by intrinsic tag, and the node is not: `node.component` is the resolved
 // Fabric view name (`view` arrives as `RCTView`), and keying by that would attach the press
-// machine to every plain View. The tag alphabet is used exactly once, at attachHostBehavior.
+// machine to every plain View. The tag alphabet is used once, at `attachHostBehavior`
 
-// The gate: createElement and removeChild are the engine's hottest paths, so neither may pay a
-// Set insert for a feature no app uses yet. While this is false both cost one boolean read.
+// The gate: `createElement` and `removeChild` are the engine's hottest paths, so neither may pay
+// a Set insert for a feature no app uses yet. While this is false both cost one boolean read
 let hasBehaviors = false;
-// See `hasAttachedBehaviors`. A behavior TYPE existing and a behavior being ON a node are different
-// questions, and the teardown sweep was asking the first one.
+// See `hasAttachedBehaviors`. A behavior TYPE existing and a behavior being ON a node are
+// different questions, and the teardown sweep was asking the first one
 let hasAttached = false;
 
 export function registerHostBehavior(
@@ -211,9 +207,9 @@ export function registerHostBehavior(
   hasBehaviors = true;
 }
 
-// Read access to the registry, so an audit can derive what a behavior owns rather than restating
-// it — a name in ownedListeners is only reachable if routeProp also treats it as a registered
-// event, and owned-listeners-are-routable.test.ts checks that gap stays empty.
+// Read access to the registry, so an audit derives what a behavior owns instead of restating it
+// A name in `ownedListeners` is reachable only if `routeProp` treats it as a registered event,
+// and owned-listeners-are-routable.test.ts checks that gap stays empty
 export function hostBehaviorFor(tag: string): IHostBehavior | undefined {
   return behaviors.get(tag);
 }
@@ -252,9 +248,8 @@ export function slotPropNameFor(
   return undefined;
 }
 
-// Does this owner's slot host the app's children, or is it a built sibling they land beside? See
-// `slotTakesNoChildren`. Same `node.childHost` gate as every other probe here: the two callers ask
-// only after the field said there is a slot at all.
+// Does this owner's slot host the app's children, or is it a built sibling they land beside?
+// Both callers ask only after `node.childHost` said there is a slot, see `slotTakesNoChildren`
 export function slotTakesChildren(node: ISymbioteNode): boolean {
   return node.hostBehavior?.slotTakesNoChildren !== true;
 }
@@ -317,8 +312,8 @@ export function claimModeFor(
 // rather than a second field, so slotDerivesFrom stays one lookup.
 export const SLOT_DERIVED_ALL = '*';
 
-// Does this owner key feed the slot's payload? See `slotDerived`. Same `node.childHost` gate as
-// above keeps the WeakMap probe off every node that has no slot.
+// Does this owner key feed the slot's payload? See `slotDerived`
+// The `node.childHost` gate keeps the WeakMap probe off every node that has no slot
 export function slotDerivesFrom(node: ISymbioteNode, key: string): boolean {
   const names = node.hostBehavior?.slotDerived;
   if (names === undefined) return false;
@@ -356,9 +351,9 @@ export function appListenerFor(node: ISymbioteNode, name: string): unknown {
   return stashed.get(node)?.get(name);
 }
 
-// `tag` is the intrinsic tag the adapter started from, not the resolved Fabric name on the node —
-// callers default it to node.component for an adapter not yet taught to pass it, which costs one
-// harmless failed lookup since no behavior is registered under a Fabric name.
+// `tag` is the intrinsic tag the adapter started from, not the resolved Fabric name on the node
+// Callers default it to `node.component` for an adapter not yet taught to pass it, which costs
+// one harmless failed lookup
 export function attachHostBehavior(node: ISymbioteNode, tag: string): void {
   const behavior = behaviors.get(tag);
   if (behavior === undefined) return;
@@ -455,9 +450,9 @@ const committedEachTime = new Set<ISymbioteNode>();
 // reaching back for it would close an import cycle (see this file's own registration comment).
 const awaitingCommit = new Set<ISymbioteNode>();
 
-// Run the deferred half of every behavior whose node has now been committed, called right after
-// completeRoot assigns fresh Fabric tags. `isCommitted` is passed in for the same no-cycle reason.
-// A still-uncommitted node stays in the set until its commit lands, or detachSubtree drops it.
+// Run the deferred half of every behavior whose node has now been committed, right after
+// `completeRoot` assigns fresh Fabric tags, with `isCommitted` passed in for the no-cycle reason
+// An uncommitted node stays in the set until its commit lands or `detachSubtree` drops it
 export function runDeferredAttaches(
   isCommitted: (node: ISymbioteNode) => boolean,
 ): void {
@@ -467,30 +462,26 @@ export function runDeferredAttaches(
   for (const node of awaitingCommit) {
     if (!isCommitted(node)) continue;
     awaitingCommit.delete(node);
-    // Worth recording, not just acting on: runCommittedHooks asks the same isCommitted question
-    // right after, and that crosses to the host — a node with both hooks would otherwise pay two
-    // crossings for one fact on the commit that landed it.
+    // Recorded, not just acted on: `runCommittedHooks` asks the same `isCommitted` question next
+    // A node with both hooks would pay two host crossings for one fact on the commit that landed it
     everCommitted.add(node);
     node.hostBehavior?.attachAfterCommit?.(node);
   }
 }
 
-// The recurring beat, split from runDeferredAttaches: attachAfterCommit needs a fresh Fabric tag
-// and must not run on a no-op commit; afterCommit needs only "props were published", which a
-// no-op commit (a fold that stripped a prop, making the commit byte-identical) satisfies too.
+// The recurring beat, split from `runDeferredAttaches`: `attachAfterCommit` needs a fresh tag
+// `afterCommit` needs only published props, which a no-op commit satisfies too
 
-// Setup still runs before the beat on the first commit — a node carrying both hooks has
-// attachAfterCommit seed the mirrors afterCommit compares against, preserved by calling this after
-// runDeferredAttaches on the changed path only.
+// Setup still runs before the beat on the first commit: `attachAfterCommit` seeds the mirrors
+// `afterCommit` compares against, so this runs after `runDeferredAttaches` on the changed path
 
-// Nodes with a recurring hook whose props were written since the last beat — narrowing the
-// population the beat runs over, since the hook body itself (TextInput reading its native mirror)
-// is where the real cost is, not the loop deciding whether to run it.
+// Nodes with a recurring hook whose props were written since the last beat
+// Narrows the population the beat runs over, since the real cost is the hook body
+// (TextInput reading its native mirror), not the loop deciding whether to run it
 const commitHookNodesChanged = new Set<ISymbioteNode>();
 
-// Arm a node's recurring hook for the next commit. Called from setProp, gated on node.hasCommitHook
-// (a boolean field beside hasAriaAlias on the same hidden class), so a node without a recurring
-// hook pays one load and one branch per write and never reaches this.
+// Arm a node's recurring hook for the next commit, called from `setProp` behind `hasCommitHook`
+// A node without a recurring hook pays one load and one branch per write and never reaches this
 export function noteCommitHookNodeChanged(node: ISymbioteNode): void {
   commitHookNodesChanged.add(node);
 }
@@ -520,36 +511,34 @@ export function runCommittedHooks(
   }
 }
 
-// Nodes of committedEachTime that have reached Fabric at least once. Asked once per node, not
-// once per node per commit — isCommitted crosses to the host, and the loop above used to pay that
-// crossing for every mounted node with afterCommit, on every commit of any surface.
+// Nodes of `committedEachTime` that have reached Fabric at least once, asked once per node
+// `isCommitted` crosses to the host, so asking per node per commit costs a crossing per node
 
-// Sound because within committedEachTime it is monotone: a node enters when its behavior attaches,
-// leaves in detachOne when torn down, and a committed live node keeps its Fabric record — so the
-// bit only ever goes true for a node still in the set. A WeakSet, since nothing else reads it.
+// Sound because within `committedEachTime` it is monotone: a node enters when its behavior
+// attaches and leaves in `detachOne`, and a committed live node keeps its Fabric record
+// A WeakSet, since nothing else reads it
 const everCommitted = new WeakSet<ISymbioteNode>();
 
-// removeChild is NOT the destroy signal — a framework can spell a move as remove-then-reinsert
-// (Solid's replaceNode does), so tearing down here would kill the machine of a node that comes
-// back alive later in the same batch. Removal only nominates; the commit sweep decides.
+// `removeChild` is NOT the destroy signal, a framework can spell a move as remove-then-reinsert
+// (Solid's `replaceNode` does), and tearing down here would kill a node that comes back
+// Removal only nominates, the commit sweep decides
 export function markDetachCandidate(node: ISymbioteNode): void {
   detachCandidates.add(node);
 }
 
-// Commit is where a removal is cheapest to distinguish from a move — reinserted before the commit,
-// a node is back in the tree by now. Not a proof of death either: Svelte parks live nodes offscreen
-// across commits (a pending `{#if}`/snippet) fully intending to bring them back.
+// Commit is where a removal is cheapest to tell from a move: a reinserted node is back by now
+// Not a proof of death either, Svelte parks live nodes offscreen across commits (a pending
+// `{#if}` or snippet) and brings them back
 
-// So a sweep can and does tear down a node that returns, which is why attach is re-runnable
-// (reattachHostBehaviors) rather than the sweep trying to be cleverer. The subtree walk lives here
-// rather than at removal, so only nodes that actually left are walked.
+// So a sweep can tear down a node that returns, which is why attach is re-runnable
+// (`reattachHostBehaviors`) rather than the sweep trying to be cleverer
+// The subtree walk lives here, so only nodes that actually left are walked
 
-// onDetached runs for every node of a genuinely-removed subtree, behavior or not — it's how other
-// per-node lifetime state (an Animated subscription) gets the same "did it really leave" answer.
+// `onDetached` runs for every node of a genuinely removed subtree, behavior or not
+// It gives other per-node lifetime state (an Animated subscription) the same answer
 
-// Whether the sweep has anything to do, asked before its arguments are built: the sweep's own
-// first line already returns on an empty candidate set, but its caller passes surface.children, a
-// getter that crosses to the host and allocates — evaluated before the guard can decline.
+// Whether the sweep has anything to do, asked before its arguments are built
+// Its caller passes `surface.children`, a getter that crosses to the host and allocates
 export function hasDetachCandidates(): boolean {
   return detachCandidates.size > 0;
 }
@@ -559,24 +548,24 @@ export function sweepDetachedBehaviors(
   onDetached: (node: ISymbioteNode) => void,
 ): void {
   if (detachCandidates.size === 0) return;
-  // Two crossings for the whole sweep, whatever it is sweeping — one for the parents, one for the
-  // subtrees. Asked per node instead, a large clear pays one crossing per candidate instead.
+  // Two crossings for the whole sweep, one for the parents and one for the subtrees
+  // Asked per node, a large clear would pay one crossing per candidate
   const candidates = [...detachCandidates];
   const parents = parentsOf(candidates);
-  // A surface's top-level nodes carry parent === undefined by design, and commitChildren re-lists
-  // them without going through appendChild — so the parent check alone would report them as gone.
+  // A surface's top-level nodes carry `parent === undefined` by design, and `commitChildren`
+  // re-lists them without `appendChild`, so the parent check alone would report them as gone
   const left = candidates.filter(
     (node, at) => parents[at] === undefined && !topLevel.includes(node),
   );
-  // Narrowed, and it is the sweep's whole cost: what crosses is a handle per node, and most
-  // candidates are plain views the sweep marks and does nothing else with.
+  // Narrowed, and it is the sweep's whole cost: a handle crosses per node
+  // Most candidates are plain views the sweep marks and does nothing else with
   for (const node of teardownSubtreesOf(left)) detachOne(node, onDetached);
   detachCandidates.clear();
 }
 
-// Tear a subtree down unconditionally — the surface teardown path, where disposeRoot drops the
-// root container and every node under it has left for good. The sweep above can't answer this: it
-// only sees nodes removeChild nominated, and an unmount removes nothing.
+// Tear a subtree down unconditionally, the surface teardown path where `disposeRoot` drops the
+// root container and every node under it has left for good
+// The sweep above only sees nodes `removeChild` nominated, and an unmount removes nothing
 export function teardownSubtree(
   node: ISymbioteNode,
   onDetached: (node: ISymbioteNode) => void,
@@ -586,38 +575,35 @@ export function teardownSubtree(
   for (const each of teardownSubtreesOf([node])) detachOne(each, onDetached);
 }
 
-// isTornDown guards two overlaps: a removed parent and descendant both nominated in one call, and
-// a node the sweep released that disposeRoot then walks again on an ordinary unmount. The mark is
-// raised right below the guard, so a second arrival takes the same early return.
+// `isTornDown` guards two overlaps: a removed parent and descendant both nominated in one call,
+// and a node the sweep released that `disposeRoot` then walks again on an ordinary unmount
 
-// The subtree arrives flat, in one host read, instead of a childrenOf recursion — both this walk
-// and reattachSubtree mark or unmark a whole subtree at once, so descendants are marked too and
-// each takes the same early return below.
+// The subtree arrives flat in one host read, not a `childrenOf` recursion
+// Descendants are marked too, so each takes the same early return below
 function detachOne(
   node: ISymbioteNode,
   onDetached: (node: ISymbioteNode) => void,
 ): void {
   if (node.isTornDown) return;
   onDetached(node);
-  // Marked whether or not this node carries a behavior: the mark tells a later insert to walk, and
-  // the node re-inserted is usually a plain container whose descendant holds the machine.
+  // Marked whether or not this node carries a behavior, since the mark tells a later insert to walk
+  // The node re-inserted is usually a plain container whose descendant holds the machine
   node.isTornDown = true;
-  // The rest of the body is the behavior's, so a node without one leaves here — nine of every ten
-  // nodes in a removed subtree are plain views, and the mark above is the whole of what they owe.
+  // The rest of the body is the behavior's, so a node without one leaves here
+  // Nine of ten nodes in a removed subtree are plain views, and the mark is all they owe
   const behavior = node.hostBehavior;
   if (behavior === undefined) return;
-  // Drops a deferral the node never got to run. isCommitted already stops it from firing, so this
-  // changes no observable behavior — without it, a node torn down within one tick would stay in
-  // the Set forever, holding a strong reference to a dead subtree (a leak, not a wrong result).
+  // Drops a deferral the node never got to run, `isCommitted` already stops it from firing
+  // Without it a node torn down within one tick stays in the Set, holding a dead subtree
   awaitingCommit.delete(node);
-  // The recurring hook stops with the node — without this a torn-down node would keep being asked
-  // to reconcile props against a subtree that has left the tree, on every commit, forever.
+  // The recurring hook stops with the node, or it would reconcile props against a gone subtree
+  // on every commit
   committedEachTime.delete(node);
   behavior.detach(node);
 }
 
-// Re-arms a node the sweep tore down but that the framework put back. A WeakSet miss (no walk at
-// all) for every node in a freshly built tree, the common path on every create.
+// Re-arms a node the sweep tore down but that the framework put back
+// A freshly built tree takes the early return, which is the common path on every create
 export function reattachHostBehaviors(node: ISymbioteNode): void {
   if (!node.isTornDown) return;
   reattachSubtree(node);
@@ -632,6 +618,7 @@ function reattachSubtree(root: ISymbioteNode): void {
 function reattachOne(node: ISymbioteNode): void {
   if (node.isTornDown) {
     node.isTornDown = false;
+    restoreMediaNode(node);
     const behavior = node.hostBehavior;
     behavior?.attach(node);
     // Re-arms the deferred half too, keeping attach and attachAfterCommit a pair — restoring only

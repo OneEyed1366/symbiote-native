@@ -54,13 +54,13 @@ async function scrollUntilVisible(
       .withTimeout(400);
   } catch (error) {
     if (stepsLeft <= 0) throw error;
-    await element(by.id('angular-canary-scroll')).scroll(500, 'down');
+    await element(by.id('canary-scroll')).scroll(500, 'down');
     return scrollUntilVisible(id, stepsLeft - 1);
   }
 }
 
 async function bringIntoView(id: string): Promise<void> {
-  await element(by.id('angular-canary-scroll')).scrollTo('top');
+  await element(by.id('canary-scroll')).scrollTo('top');
   await scrollUntilVisible(id, MAX_SCROLL_STEPS);
   await sleep(300);
 }
@@ -87,7 +87,7 @@ describe('Angular canary native-module buttons', () => {
       .withTimeout(10_000);
 
     // The next test scrolls at once, so wait for the ScrollView to have real bounds
-    await waitFor(element(by.id('angular-canary-scroll')))
+    await waitFor(element(by.id('canary-scroll')))
       .toBeVisible()
       .withTimeout(10_000);
     await sleep(300);

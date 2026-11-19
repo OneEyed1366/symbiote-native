@@ -1,5 +1,5 @@
 import { REM_TO_PX } from '../values.ts';
-import type { IDeclarationContext, IStyleValue } from './declaration-types.ts';
+import type { IDeclarationContext, IStyleValue } from './style-types.ts';
 import {
   isRecord,
   readNumber,
@@ -24,36 +24,67 @@ const BORDER_WIDTH_KEYWORD_PX: Record<string, number> = {
   thick: 5,
 };
 
-const NODE_TYPE = {
+export const LENGTH_KIND = {
+  px: 'px',
+  percent: 'percent',
   auto: 'auto',
-  calc: 'calc',
-  value: 'value',
-  percentage: 'percentage',
-  number: 'number',
-  integer: 'integer',
-  function: 'function',
-  sum: 'sum',
 } as const;
 
-// The wrappers nest differently per property, so the walk goes through all of them
-const WRAPPER_TYPES: ReadonlySet<string> = new Set([
+// The `type` tags lightningcss puts on the wrappers this file walks
+const NODE = {
+  auto: 'auto',
+  calc: 'calc',
+  percentage: 'percentage',
+  value: 'value',
+} as const;
+
+// Wrappers that only carry the length one level down
+const WRAPPER_TYPE_NAMES = [
   'length',
   'length-percentage',
   'dimension',
-  NODE_TYPE.value,
-]);
+  NODE.value,
+] as const satisfies readonly string[];
+const WRAPPER_TYPES: ReadonlySet<string> = new Set(WRAPPER_TYPE_NAMES);
 
 export type IResolvedLength = {
-  readonly kind: 'px' | 'percent' | 'auto';
+  readonly kind: (typeof LENGTH_KIND)[keyof typeof LENGTH_KIND];
   readonly value: number;
 };
+
+function pxLength(value: number): IResolvedLength {
+  return { kind: LENGTH_KIND.px, value };
+}
+
+type ILeafReader = (amount: number | null) => IResolvedLength | null;
+
+const readPlainNumber: ILeafReader = amount =>
+  amount === null ? null : pxLength(amount);
+
+// A table keeps `readLength` flat: one entry per leaf `type`, a keyword ignoring the amount
+const LEAF_READERS = new Map<string, ILeafReader>([
+  // lightningcss reports a percentage as a FRACTION: `100%` arrives as 1
+  [
+    NODE.percentage,
+    amount =>
+      amount === null
+        ? null
+        : { kind: LENGTH_KIND.percent, value: amount * 100 },
+  ],
+  // RN's `lineHeight` has no multiplier form, so a unitless `1.4` becomes 1.4 points
+  ['number', readPlainNumber],
+  ['integer', readPlainNumber],
+  ...Object.entries(BORDER_WIDTH_KEYWORD_PX).map(
+    ([keyword, px]): [string, ILeafReader] => [keyword, () => pxLength(px)],
+  ),
+]);
 
 function unitToPx(
   unit: string,
   amount: number,
   context: IDeclarationContext,
 ): number | null {
-  // `em` scales by the root size, as the old parser did: there is no box tree for a parent size
+  // `em` scales by the root size too, since no box tree gives a parent font size here
   if (unit === 'rem' || unit === 'em') {
     return amount * (context.remToPx ?? REM_TO_PX);
   }
@@ -62,74 +93,96 @@ function unitToPx(
   return factor === undefined ? null : amount * factor;
 }
 
-// The leaf every wrapper bottoms out at is a bare `{unit, value}`, and undefined means not one
-function readLeaf(
-  value: Record<string, unknown>,
-  context: IDeclarationContext,
-): IResolvedLength | null | undefined {
-  const unit = readString(value.unit);
-  const amount = readNumber(value.value);
-  if (unit === null || amount === null) return undefined;
-  const px = unitToPx(unit, amount, context);
-  return px === null ? null : { kind: 'px', value: px };
-}
-
-// lightningcss reports a percentage as a FRACTION: `100%` arrives as 1
-function readPercentage(value: unknown): IResolvedLength | null {
-  const fraction = readNumber(value);
-  return fraction === null ? null : { kind: 'percent', value: fraction * 100 };
-}
-
-// RN's `lineHeight` has no multiplier form, so a unitless `1.4` becomes 1.4 points
-function readPlainNumber(value: unknown): IResolvedLength | null {
-  const plain = readNumber(value);
-  return plain === null ? null : { kind: 'px', value: plain };
-}
-
-function readTyped(
-  value: Record<string, unknown>,
-  context: IDeclarationContext,
-): IResolvedLength | null {
-  const type = readString(value.type);
-  if (type === null) return null;
-  if (type === NODE_TYPE.auto) return { kind: 'auto', value: 0 };
-  if (type === NODE_TYPE.percentage) return readPercentage(value.value);
-  if (type === NODE_TYPE.number || type === NODE_TYPE.integer) {
-    return readPlainNumber(value.value);
-  }
-  if (type === NODE_TYPE.calc) return evaluateCalc(value.value, context);
-  if (WRAPPER_TYPES.has(type)) return readLength(value.value, context);
-  const px = BORDER_WIDTH_KEYWORD_PX[type];
-  return px === undefined ? null : { kind: 'px', value: px };
-}
-
 /**
- * Reduces a length-ish wrapper of lightningcss to px, percent or auto, or to null when RN cannot
- * express it: a viewport unit, a `calc()` that does not evaluate, `normal`
+ * Reduces any of lightningcss's length-ish wrappers to px, percent or auto, or `null` when RN
+ * cannot express it (a viewport unit, a `calc()` it cannot evaluate, `normal`)
  */
 export function readLength(
   value: unknown,
   context: IDeclarationContext,
 ): IResolvedLength | null {
   if (!isRecord(value)) return null;
-  const leaf = readLeaf(value, context);
-  return leaf === undefined ? readTyped(value, context) : leaf;
+
+  // A bare `LengthValue` (`{unit, value}`) is the leaf every wrapper bottoms out at
+  const unit = readString(value.unit);
+  const amount = readNumber(value.value);
+  if (unit !== null && amount !== null) {
+    const px = unitToPx(unit, amount, context);
+    return px === null ? null : pxLength(px);
+  }
+
+  const type = readString(value.type) ?? '';
+  if (type === NODE.auto) return { kind: LENGTH_KIND.auto, value: 0 };
+  if (type === NODE.calc) return evaluateCalc(value.value, context);
+  if (WRAPPER_TYPES.has(type)) return readLength(value.value, context);
+  return LEAF_READERS.get(type)?.(amount) ?? null;
+}
+
+/** Whether a `min()`, `clamp()` or another math function is left in the tree, `calc()` aside */
+export function containsMathFunction(node: unknown): boolean {
+  if (Array.isArray(node)) return node.some(containsMathFunction);
+  if (!isRecord(node)) return false;
+  const isMathCall =
+    node.type === 'function' &&
+    isRecord(node.value) &&
+    node.value.type !== NODE.calc;
+  return isMathCall || containsMathFunction(node.value);
+}
+
+type IOperandKinds = {
+  opaqueUnit: boolean;
+  hasPercent: boolean;
+  hasLength: boolean;
+};
+
+function collectOperandKinds(
+  node: unknown,
+  kinds: IOperandKinds,
+  context: IDeclarationContext,
+): void {
+  if (Array.isArray(node)) {
+    for (const item of node) collectOperandKinds(item, kinds, context);
+    return;
+  }
+  if (!isRecord(node)) return;
+  if (node.type === NODE.percentage) kinds.hasPercent = true;
+  const unit = readString(node.unit);
+  if (unit !== null) {
+    kinds.hasLength = true;
+    kinds.opaqueUnit ||= unitToPx(unit, 0, context) === null;
+  }
+  collectOperandKinds(node.value, kinds, context);
+}
+
+/**
+ * Whether the engine can never compute this tree: a viewport or font-relative unit it has no
+ * size for, or a percentage next to a length (needs the parent box)
+ */
+export function isUnresolvableAtRuntime(
+  node: unknown,
+  context: IDeclarationContext,
+): boolean {
+  const kinds: IOperandKinds = {
+    opaqueUnit: false,
+    hasPercent: false,
+    hasLength: false,
+  };
+  collectOperandKinds(node, kinds, context);
+  return kinds.opaqueUnit || (kinds.hasPercent && kinds.hasLength);
 }
 
 export function lengthToStyleValue(length: IResolvedLength): IStyleValue {
   switch (length.kind) {
-    case 'auto':
-      return 'auto';
-    case 'percent':
+    case LENGTH_KIND.auto:
+      return NODE.auto;
+    case LENGTH_KIND.percent:
       return `${roundFloat(length.value)}%`;
-    case 'px':
+    case LENGTH_KIND.px:
       return roundFloat(length.value);
   }
 }
 
-// lightningcss folds a same-unit `calc()` itself, so a sum that reaches here mixes units
-// It evaluates only when every operand reduces to px
-function evaluateSum(
+function sumOperands(
   operands: unknown,
   context: IDeclarationContext,
 ): IResolvedLength | null {
@@ -138,14 +191,14 @@ function evaluateSum(
   let total = 0;
   for (const operand of operands) {
     const term = evaluateCalc(operand, context);
-    if (term === null || term.kind !== 'px') return null;
+    if (term === null || term.kind !== LENGTH_KIND.px) return null;
     total += term.value;
   }
-  return { kind: 'px', value: total };
+  return pxLength(total);
 }
 
-// `min()`, `max()`, `clamp()` and `product` have no RN equivalent, and a guess is how the old
-// evaluator emitted 100 for `calc(100% - 24px)`
+// Evaluates a `calc()` sum when every operand reduces to px, `null` otherwise
+// `min()`, `max()`, `clamp()` and `product` have no RN form, and a guessed one is wrong
 function evaluateCalc(
   node: unknown,
   context: IDeclarationContext,
@@ -153,12 +206,12 @@ function evaluateCalc(
   if (!isRecord(node)) return null;
 
   switch (node.type) {
-    case NODE_TYPE.function:
-    case NODE_TYPE.calc:
+    case 'function':
+    case NODE.calc:
       return evaluateCalc(node.value, context);
-    case NODE_TYPE.sum:
-      return evaluateSum(node.value, context);
-    case NODE_TYPE.value:
+    case 'sum':
+      return sumOperands(node.value, context);
+    case NODE.value:
       return readLength(node.value, context);
     default:
       return null;

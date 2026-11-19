@@ -29,27 +29,28 @@ commit. Solid's `cleanChildren` enters `applyOps` 2 000 times to clear a thousan
 
 ## The three per-batch tables
 
-**Slots.** `bySlot` resolves a slot to a node at most ONCE per batch and usually not at all: a slot
-this batch creates is written by its own create op and never read from JS, which on a create-shaped
-commit is nearly every slot. Only a slot naming a node an EARLIER batch created costs a read, and
-it costs exactly one however many ops go on to name it.
+**Slots**. `bySlot` resolves a slot to a node at most ONCE per batch and usually not at all.
+A slot this batch creates is written by its own create op and never read from JS, which on a
+create-shaped commit is nearly every slot. Only a slot naming a node an EARLIER batch created costs
+a read, and it costs exactly one however many ops go on to name it.
 
-**Strings, decoded EAGERLY.** This used to read the JSI array and allocate a fresh `std::string`
-inside the op loop, spending exactly the saving `mutation-buffer.ts` interns for: a 1 000-row create
-emits about a dozen distinct view names across 10 000 elements and draws every prop key from a set
-of a few hundred, and none of that reached here. Counted through a real adapter
+**Strings, decoded EAGERLY**. This used to read the JSI array and allocate a fresh `std::string`
+inside the op loop, spending exactly the saving `mutation-buffer.ts` interns for.
+A 1 000-row create emits about a dozen distinct view names across 10 000 elements and draws every
+prop key from a set of a few hundred, and none of that reached here. Counted through a real adapter
 (`adapters/solid/src/batch-decode-census.probe.test.tsx`): 16 005 decodes against a table of 2 008
 entries on a create, the same 8.0x on an append. Two costs go and only one is measurable headless:
 the allocation half benches at 3.26x for the whole path
 (`core/engine/bench/batch-string-decode.cpp`), and the other half is 13 997 JSI crossings that
 simply stop happening.
 
-**Values, converted LAZILY.** The other half of the buffer's interning and useless without it:
+**Values, converted LAZILY**. The other half of the buffer's interning and useless without it.
 `mutation-buffer.ts` gives one entry to one object however many nodes were handed it, so a
-`StyleSheet.create` style shared by a thousand rows arrives as one entry and converts once. Lazy
-rather than eager, unlike the strings, т.к. a batch's value table can hold entries no surviving op
-names (a prop written and then overwritten in the same batch) and converting one eagerly would
-charge for work the ops do not ask for. Consequence when a conversion throws:
+`StyleSheet.create` style shared by a thousand rows arrives as one entry and converts once.
+Lazy rather than eager, unlike the strings.
+A batch's value table can hold entries no surviving op names (a prop written and then overwritten
+in the same batch), and converting one eagerly would charge for work the ops do not ask for.
+Consequence when a conversion throws:
 `boundedDynamicFrom`'s message names the prop and view of the FIRST op to reach that entry, not
 every op sharing it.
 
@@ -61,22 +62,23 @@ reintroduce half of it.
 ## `publish`
 
 Handing a freshly built node to its placeholder is where it acquires an OWNER, and the only place
-one is taken: afterwards the object JS already holds is the handle, and when JS and the parent both
-let go, the node goes. `node->handle` is taken in the same moment for the same reason, т.к. this is
-the only point both halves are in hand and every later op resolves the node THROUGH the object, so
-the edge back can never be re-derived from what the ops carry.
+one is taken.
+Afterwards the object JS already holds is the handle, and when JS and the parent both let go, the
+node goes. `node->handle` is taken in the same moment for the same reason.
+This is the only point both halves are in hand and every later op resolves the node THROUGH the
+object, so the edge back can never be re-derived from what the ops carry.
 
 ## Child-vector maintenance
 
 **`kOpAppendChild`** writes `child->slotInParent` as a HINT. Appending past a hole is harmless: the
 hole keeps its place until the next read compacts, and order is preserved either way.
 
-**`kOpInsertBefore`, a move within the SAME parent, ERASES rather than punching a hole.** An insert
+**`kOpInsertBefore`, a move within the SAME parent, ERASES rather than punching a hole**. An insert
 shifts the vector anyway, so a hole would force a compaction pass on top of the shift, measured 2.4x
 worse on a 4 000-row reorder than simply erasing. A move to a DIFFERENT parent holes the old one as
 usual, since nothing is about to shift it.
 
-**The tail's hints are left one too low, deliberately.** Renumbering is O(width) per insert, which
+**The tail's hints are left one too low, deliberately**. Renumbering is O(width) per insert, which
 was tried and made a reorder of 4 000 rows 34.6 ms against 6.7, five times worse, to keep a hint
 exact that nothing requires to be. `detachFromParent` validates before it believes
 (`siblings[hinted] == child`) and falls back to a scan, so a stale hint costs one detach its old
@@ -190,3 +192,18 @@ arrive with that itest suite, and the JS host must keep refusing the committed a
 3. `core/test-utils/src/recording-host.ts` if the headless host has to see it.
 4. Keep the operand count at three or fewer. `push` takes four parameters; the one op with a fourth
    operand (`OP_CREATE_ELEMENT`) writes it through `pushFourth`.
+
+## ABI versions (`kNativeVersion` = `SUPPORTED_NATIVE_VERSION`)
+
+The two halves ship apart (a pod and an npm package), so an `npm install` without a `pod install`
+leaves them disagreeing. The number is a gate, not a diagnostic, and moves with an op layout or a
+calling convention, never with an optional read such as `readSurfaceTelemetry`.
+
+- 1 to 2: nodes became JS objects carrying their `shared_ptr` as `NativeState`. Every method name
+  survived, so only the number could tell a v1 pod from a v2 batch.
+- 3 to 4: the bindings own the shadow tree, `applyOps` went from six arguments to five under the
+  same name. A v3 binary reads the string table as child ids.
+- 4 to 5: `kOpSetReleaseMark` (14). 5 to 6: `kOpSetGlobalVariable` (15), the `:root` table.
+- 6 to 7: `OP_SET_PROP` carries a fourth operand, non-zero for a style that declares a `--x`. C++
+  scans only flagged styles, or one that held declarations before.
+- 7 to 8: `kOpSetVariable` (16), a custom property of one surface.

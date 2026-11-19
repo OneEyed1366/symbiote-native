@@ -22,9 +22,9 @@
 
 // ── why props go native, decided the other way first ────────────────────────────────────────────
 
-// Keeping prop values in JS assumed RawProps is lazy so handing Fabric a JS object costs nothing —
-// wrong: ConcreteComponentDescriptor::cloneProps calls parse() unconditionally, and the preparse
-// walks every key of every node through JSI regardless of mode.
+// Keeping prop values in JS assumed lazy RawProps, so a JS object would cost Fabric nothing
+// Wrong: `ConcreteComponentDescriptor::cloneProps` calls `parse()` unconditionally, and the
+// preparse walks every key of every node through JSI regardless of mode
 
 // So a create already pays a JSI property read and a string allocation per prop, per node, inside
 // createNode. Props held natively as folly::dynamic, built incrementally as setProp ops arrive,
@@ -43,16 +43,16 @@ export const OP_CREATE_ANCHOR = 2; // [slot]
 export const OP_APPEND_CHILD = 3; // [parent, child]
 export const OP_INSERT_BEFORE = 4; // [parent, child, before]
 export const OP_REMOVE_CHILD = 5; // [parent, child]
-export const OP_SET_PROP = 6; // [slot, key, value] — value = NO_VALUE deletes the key
+export const OP_SET_PROP = 6; // [slot, key, value, declares] — value = NO_VALUE deletes the key
 export const OP_SET_TEXT = 7; // [slot, text]
 export const OP_COMMIT = 8; // [rootTag, surface]
 export const OP_SET_COMPONENT = 9; // [slot, viewName]
 // The intrinsic tag this node came from — pressable, not RCTView. [slot, tag]. Emitted only for a
 // node a host behavior actually attached to; every other node pays nothing.
 
-// Native's platform-prop rules key off what the node IS, and the Fabric view name alone doesn't
-// always answer that — pressable commits as RCTView, byte-identical to a plain view, so the tag
-// is the only fact that separates them.
+// Native's platform-prop rules key off what the node IS, and the view name alone does not say it
+// A `pressable` commits as RCTView, byte-identical to a plain view, so the tag is the only
+// fact that separates them
 export const OP_SET_TAG = 10; // [slot, tag]
 
 // An app callback appeared on, or disappeared from, an event name the behavior owns.
@@ -79,10 +79,29 @@ export const OP_SET_UNDERLAY_SHOWN = 12; // [slot, shown]
 // only the commit walk treats it as contributing zero Fabric nodes, recursively.
 export const OP_CREATE_VOID = 13; // [slot]
 
-// A setProp whose value slot is this deletes the key. undefined can't carry it: null is a
-// legitimate Fabric prop value meaning "reset to default", and the two must stay distinguishable
-// since cloneNodeWithNewProps merges — a removed key must be sent as explicit null, never omitted.
+// The node holds JS state a teardown must release, such as a media subscription. [slot]
+// The narrowed teardown walk returns marked nodes along with tagged ones, and the mark stays
+export const OP_SET_RELEASE_MARK = 14; // [slot]
+
+// A `:root` custom property for every surface, not for a node, so it names no slot
+// [name, value], with `NO_VALUE` in the value place deleting the name
+export const OP_SET_GLOBAL_VARIABLE = 15; // [name, value]
+
+// A custom property of one surface, read after the node chain and before `:root`
+// [surface, name, value], with `NO_VALUE` in the value place deleting the name
+export const OP_SET_VARIABLE = 16; // [surface, name, value]
+
+// What a node reading `@container` rules needs for the host to style it in its first commit
+// [slot, envelope], the envelope being the JSON of `containerVariantsOf`, `NO_VALUE` clearing it
+export const OP_SET_CONTAINER_VARIANTS = 17; // [slot, envelope]
+
+// A `setProp` whose value slot is this deletes the key. `undefined` cannot carry that, since null
+// means "reset to default" in Fabric and `cloneNodeWithNewProps` merges: a removed key must go
+// out as explicit null, never omitted
 export const NO_VALUE = -1;
+
+// The fourth word of an `OP_SET_PROP` whose style declares a `--x`, the host's cue to scan it
+export const DECLARES_VARIABLES = 1;
 
 // A node kind. Native needs it because two of the three never become a Fabric node the same way,
 // decided at insert or child-set build, never by a walk. ELEMENT is an ordinary view, except a
@@ -92,20 +111,18 @@ export const NO_VALUE = -1;
 // becomes a Fabric node: native hoists its children into its parent's child set instead, which is
 // why our own store cannot BE the Fabric tree.
 
-// A surface is an anchor too: its children belong to the root's child set the same way an
-// anchor's belong to its parent's list, so OP_COMMIT names one and native needs no rootTag -> node
-// map — keeping the applier stateless.
+// A surface is an anchor too: its children belong to the root's child set, like an anchor's
+// belong to its parent's list. So `OP_COMMIT` names one and native needs no `rootTag` node map
 export const KIND_ELEMENT = 0;
 export const KIND_RAW_TEXT = 1;
 export const KIND_ANCHOR = 2;
 
-// One recorded batch, flat. handles is the load-bearing table and travels out rather than back:
-// it holds the placeholder object for every slot the ops address, and native attaches each created
-// node to that slot's object as JSI NativeState — the adapter's own objects become the handles.
+// One recorded batch, flat, whose `handles` table travels out rather than back
+// It holds the placeholder object for every slot, and native attaches each created node to that
+// slot's object as JSI NativeState, so the adapter's own objects become the handles
 
-// A slot is an index into THIS batch and meaningless outside it, deliberately: an id that outlives
-// a batch forces a table on the far side, and a table is a second owner with no signal when the
-// first one lets go — exactly the leak class a prior applier design hit.
+// A slot is an index into THIS batch and meaningless outside it, on purpose: an id that outlives
+// a batch needs a table on the far side, a second owner with no signal when the first lets go
 
 // values carries whatever a prop is: a string, number, boolean, null, style object, array. Native
 // converts each to folly::dynamic once, when the op is applied — never again per commit.
@@ -172,9 +189,8 @@ const stringIds = new Map<string, number>();
 // Starts at 1 because a fresh node's slotBatch is 0, so an untouched handle can never match a live
 // batch and needs no separate "is it in this batch" flag.
 let batchId = 1;
-// The same table for prop values, and it pays off on the far side: the host converts each entry
-// to folly::dynamic when the op is applied, so a style object reused across many rows was many
-// conversions of the same object without it.
+// The same table for prop values, which pays off on the far side: the host converts each entry to
+// folly::dynamic when the op is applied, so a reused style object would be many conversions
 const valueIds = new Map<unknown, number>();
 
 // Booleans skip that table entirely — see `internValue`. Two slots, reset with the batch alongside
@@ -246,9 +262,8 @@ function pushValue(value: unknown): number {
 // on drain. Walking handles to reset them costs what Map.clear costs; bumping one counter
 // invalidates all of them at once, and an unmentioned handle is never touched.
 function slotOf(handle: IMutationHandle): number {
-  // A buffer cannot silently absorb a handle that isn't a node the way the old retained tree did
-  // (children.indexOf(x) === -1, no-op) — the op is recorded, and the failure surfaces in the
-  // host, on a later op, as a node whose create it never saw.
+  // A buffer cannot silently absorb a handle that is not a node, as the old retained tree did
+  // The op is recorded, and the failure surfaces in the host on a later op, as a node never created
 
   // Deliberately only "an object", not "one of our nodes": a handle is an identity to this file and
   // nothing more. The wrong-kind-of-object case is caught one layer on, where the host fails to
@@ -321,9 +336,9 @@ export function noteHostSideChange(): void {
 // structural op. Exists so a read doesn't have to drain: parentOf is unconditional otherwise, and
 // most reads never touch a node the pending batch has.
 
-// Sound because a node's parent link changes only through an op that names that node as the child
-// — `before` on an insert is a position reference and moves nothing, so a handle absent from here
-// has the same parent in the host as it has here.
+// Sound because a node's parent link changes only through an op naming it as the child
+// A `before` operand is a position reference and moves nothing, so a handle absent from here
+// has the same parent in the host as it has here
 
 // Creation is in it too, since the host can't answer about a node it's never been told exists — the
 // half a "was it re-parented" set alone would get wrong.
@@ -404,17 +419,22 @@ export function recordRemoveChild(
   push(OP_REMOVE_CHILD, slotOf(parent), slotOf(child));
 }
 
-/** `undefined` DELETES the key — the collapse `setProp` has always performed, spelled on the wire. */
+/**
+ * `undefined` deletes the key, as `setProp` always did
+ * `declares` flags a style holding a `--x`
+ */
 export function recordSetProp(
   handle: IMutationHandle,
   key: string,
   value: unknown,
+  declares = false,
 ): void {
   if (value === undefined) {
     push(OP_SET_PROP, slotOf(handle), intern(key), NO_VALUE);
     return;
   }
   push(OP_SET_PROP, slotOf(handle), intern(key), internValue(value));
+  if (declares) pushFourth(DECLARES_VARIABLES);
 }
 
 export function recordSetText(handle: IMutationHandle, text: string): void {
@@ -463,6 +483,46 @@ export function recordSetUnderlayShown(
   push(OP_SET_UNDERLAY_SHOWN, slotOf(handle), shown ? 1 : 0);
 }
 
+// Emitted once per node, when it first holds a media subscription, see `OP_SET_RELEASE_MARK`
+export function recordSetReleaseMark(handle: IMutationHandle): void {
+  push(OP_SET_RELEASE_MARK, slotOf(handle));
+}
+
+// See `OP_SET_GLOBAL_VARIABLE`. Emitted from the `:root` table on a change, never per commit
+export function recordSetGlobalVariable(name: string, value: string): void {
+  push(OP_SET_GLOBAL_VARIABLE, intern(name), intern(value));
+}
+
+export function recordRemoveGlobalVariable(name: string): void {
+  push(OP_SET_GLOBAL_VARIABLE, intern(name), NO_VALUE);
+}
+
+// See `OP_SET_VARIABLE`. `undefined` removes the name
+export function recordSetVariable(
+  surface: number,
+  name: string,
+  value: string | undefined,
+): void {
+  push(
+    OP_SET_VARIABLE,
+    surface,
+    intern(name),
+    value === undefined ? NO_VALUE : intern(value),
+  );
+}
+
+// See `OP_SET_CONTAINER_VARIANTS`. `undefined` clears the node's variants
+export function recordSetContainerVariants(
+  handle: IMutationHandle,
+  envelope: string | undefined,
+): void {
+  push(
+    OP_SET_CONTAINER_VARIANTS,
+    slotOf(handle),
+    envelope === undefined ? NO_VALUE : intern(envelope),
+  );
+}
+
 export function recordCommit(rootTag: number, surface: IMutationHandle): void {
   push(OP_COMMIT, rootTag, slotOf(surface));
 }
@@ -472,9 +532,8 @@ export function hasPendingOps(): boolean {
   return opCount > 0;
 }
 
-// Drain the buffer. Fresh arrays rather than reused ones: the batch outlives this call on the
-// native path (applyOps reads handles while attaching state), and a recycled array would be
-// mutated under it by the next mutation the adapter makes.
+// Drain the buffer into fresh arrays, since the batch outlives this call on the native path
+// `applyOps` reads handles while attaching state, so a recycled array would be mutated under it
 
 // slice for the ops, not subarray, for the same reason — subarray would share the backing store
 // the very next push writes into. The ops buffer itself is kept so its capacity survives the drain.

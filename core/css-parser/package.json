@@ -70,6 +70,7 @@
     "lightningcss": "catalog:"
   },
   "devDependencies": {
+    "@symbiote-native/engine": "workspace:*",
     "sass": "catalog:",
     "less": "catalog:",
     "stylus": "catalog:",
@@ -78,9 +79,13 @@
     "typescript": "catalog:"
   },
   "peerDependencies": {
+    "@symbiote-native/engine": "workspace:^",
     "typescript": ">=5.0"
   },
   "peerDependenciesMeta": {
+    "@symbiote-native/engine": {
+      "optional": true
+    },
     "typescript": {
       "optional": true
     }

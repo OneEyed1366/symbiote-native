@@ -1,12 +1,19 @@
 #include "SymbioteFabricProps.h"
 
+#include "SymbioteCalc.h"
 #include "SymbioteDebug.h"
+#include "SymbioteGlobalVariables.h"
+#include "SymbioteRegisteredProperties.h"
+#include "SymbioteShorthand.h"
+#include "SymbioteStructuredStyle.h"
+#include "SymbioteVarSubstitute.h"
 
 #include <algorithm>
 #include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <optional>
@@ -18,6 +25,7 @@
 #include <variant>
 #include <vector>
 
+#include <folly/json.h>
 #include <react/renderer/css/CSSColor.h>
 #include <react/renderer/css/CSSValueParser.h>
 
@@ -72,11 +80,8 @@ constexpr const char *kSinglelineTextInput = "RCTSinglelineTextInputView";
 constexpr const char *kMultilineTextInput = "RCTMultilineTextInputView";
 constexpr const char *kAndroidTextInput = "AndroidTextInput";
 
-// Colour props must reach Fabric as platform ints. `fromRawValueShared.h` parses a CSS STRING only
-// when `enableNativeCSSParsing()` is on, and it defaults to FALSE — an unparsed string falls
-// through to `parsePlatformColor`, which looks for a SEMANTIC name and quietly yields nothing for
-// `#ff0000`. Copied name for name from the reference's COLOR_PROPS; a name added there and not here
-// is a colour that silently stops painting on device only.
+// Colour props reach Fabric as platform ints, as `enableNativeCSSParsing()` defaults to FALSE
+// An unparsed `#ff0000` paints nothing, so keep the names in step with the reference COLOR_PROPS
 //
 // This list covers OUR OWN primitives, whose style colours reach no ViewConfig — `resolve()`
 // short-circuits every builtin to EMPTY. A third-party view's colour props are NOT its business and
@@ -161,10 +166,8 @@ std::optional<uint32_t> parseHexColor(std::string_view text) {
  * `install_modules_dependencies` already puts on this pod, so it costs a dependency we have and
  * spares the build a second hand-rolled CSS parser to keep in step with the first.
  *
- * The ceiling this replaces was real and cost a day on device: a chip list coloured with
- * `hsl(...)` passed through as a STRING, and `PlatformColorParser.mm` answers a string with
- * `clearColor()` — so every chip painted transparent, on all five adapters at once, while every
- * headless test stayed green because the JS applier stores a prop value and never converts it.
+ * The ceiling this replaces cost a day on device: an `hsl(...)` STRING reached the platform, where
+ * `PlatformColorParser.mm` answers it with `clearColor()`, and headless tests never convert it
  */
 std::optional<uint32_t> parseCssColor(const std::string &text) {
   using facebook::react::CSSColor;
@@ -231,40 +234,123 @@ dynamic processValue(const std::string &key, const dynamic &value) {
   return processColorValue(value);
 }
 
+// --- VAR() ---
+
+bool hasVarCall(const std::string &text) {
+  return text.find("var(") != std::string::npos;
+}
+
+bool isCustomPropertyName(const std::string &key) {
+  return key.size() > 2 && key.compare(0, 2, "--") == 0;
+}
+
+std::string percentText(double value) {
+  char buffer[32];
+  std::snprintf(buffer, sizeof(buffer), "%g%%", value);
+  return buffer;
+}
+
+// A substituted number, px, rem or em length becomes a number as RN takes it, other text stays text
+// A `calc()` is evaluated, and `nullopt` means it is invalid
+std::optional<dynamic> coerceSubstituted(const std::string &text) {
+  const bool isCalc = isCalcText(text);
+  const bool startsNumeric = !text.empty() &&
+      (std::isdigit(static_cast<unsigned char>(text[0])) != 0 || text[0] == '-' ||
+       text[0] == '+' || text[0] == '.');
+  const bool isHex = text.find("0x") != std::string::npos || text.find("0X") != std::string::npos;
+  if (!isCalc && (!startsNumeric || isHex)) return dynamic(text);
+  const std::optional<CalcResult> result = evaluateCalc(isCalc ? text : "calc(" + text + ")");
+  if (!result.has_value()) return isCalc ? std::nullopt : std::optional<dynamic>(text);
+  if (result->kind != CalcKind::kPercent) return dynamic(result->value);
+  return dynamic(isCalc ? percentText(result->value) : text);
+}
+
+// `nullopt` means invalid at computed-value time, so the property is left unset
+// Without a node-aware lookup only the `:root` table is consulted
+std::optional<std::string> substituteVars(const std::string &text, const VarLookup &lookup) {
+  VarResolver resolver = registryResolver(
+      lookup ? lookup : VarLookup([](std::string_view name, VarScope) {
+        std::optional<VarDeclared> declared;
+        if (auto text = GlobalVariables::instance().get(name)) {
+          declared = VarDeclared{std::move(*text), nullptr, nullptr};
+        }
+        return declared;
+      }));
+  return resolver.substitute(text);
+}
+
+constexpr const char *kFontWeightKey = "fontWeight";
+
+// RN takes a font weight as text, so a substituted number goes back to a string
+dynamic asStyleValue(const std::string &key, const dynamic &value) {
+  if (key != kFontWeightKey || !value.isNumber()) return value;
+  return std::to_string(static_cast<int64_t>(value.asDouble()));
+}
+
+// Sets one key from substituted text, leaving it unset (and logged) when the text is invalid
+void setSubstituted(dynamic &out, const std::string &key, const std::string &text) {
+  const std::optional<dynamic> coerced = coerceSubstituted(text);
+  if (coerced.has_value()) {
+    out[key] = processValue(key, asStyleValue(key, *coerced));
+    return;
+  }
+  SYMBIOTE_DLOG("style `" + key + "` dropped, `" + text + "` is not a valid length or number");
+  out.erase(key);
+}
+
+// A colour token as the int `processColorValue` yields, or nothing when it is not a colour
+std::optional<long long> colorOfToken(const std::string &token) {
+  const dynamic color = processColorValue(dynamic(token));
+  if (!color.isInt()) return std::nullopt;
+  return color.asInt();
+}
+
+// The structured list RN's JS processors build for a key, parsed from the substituted text
+std::optional<dynamic> structuredStyle(const std::string &key, const std::string &text) {
+  const std::optional<std::string> json = structuredStyleJson(key, text, colorOfToken);
+  if (!json.has_value()) return std::nullopt;
+  return folly::parseJson(*json);
+}
+
+// Writes the substituted value of `key`, split into longhands when it is a shorthand
+void addSubstituted(dynamic &out, const std::string &key, const std::optional<std::string> &text) {
+  out.erase(key);
+  if (!text.has_value()) return;
+  const std::optional<dynamic> structured = structuredStyle(key, *text);
+  if (structured.has_value()) {
+    out[key] = *structured;
+    return;
+  }
+  const ShorthandResult split = expandShorthand(key, *text);
+  if (split.outcome == ShorthandOutcome::kInvalid) return;
+  if (split.outcome == ShorthandOutcome::kNotShorthand) {
+    setSubstituted(out, key, *text);
+    return;
+  }
+  for (const auto &[longhand, value] : split.longhands) setSubstituted(out, longhand, value);
+}
+
 // ── STYLE ────────────────────────────────────────────────────────────────────────────────────────
 
-/**
- * Hoist one style slot's keys into the payload being built, recursing on POSITION only — the same
- * rule `flattenStyle` follows, and for the same reason: `transform: [{translateX: 5}]` is an
- * array-VALUED prop, not a nested style.
- *
- * There is no intermediate object, which is the shape React Native itself uses
- * (`ReactNativeAttributePayload.addNestedProperty`); its `flattenStyle` appears only on the UPDATE
- * path. The reference's identity-keyed memo has no counterpart here and cannot have one: the bag is
- * a `folly::dynamic` copied off the JSI value, so a style object shared by a thousand rows arrives
- * as a thousand distinct values. The work that memo saved is a per-key copy plus, for a colour, one
- * parse — bounded by style keys per node, not by the tree.
- *
- * Later entries win, because a later write overwrites the same key.
- *
- * A NULL-valued style key ERASES instead. The reference distinguishes `undefined` (erase, so a
- * later entry can clear an earlier one) from `null` (write, meaning reset to the default), and this
- * side cannot: `jsi::dynamicFromValue` collapses both to null. Erasing is the resolvable half — it
- * keeps the documented clearing behaviour, and it is output-equivalent for the `null` case anyway,
- * since an absent key and an explicit null both leave Fabric on the default in a create payload,
- * while `diffProps` re-sends the vanished key as an explicit null on the clone path.
- */
-void addStyle(dynamic &out, const dynamic &style) {
+// Hoists one style slot into the payload, recursing on position only, as `flattenStyle` does
+// Later entries win, and null erases the key since null and undefined arrive as one value
+void addStyle(dynamic &out, const dynamic &style, const VarLookup &varLookup) {
   if (style.isArray()) {
-    for (const auto &entry : style) addStyle(out, entry);
+    for (const auto &entry : style) addStyle(out, entry, varLookup);
     return;
   }
   if (!style.isObject()) return;
   for (const auto &pair : style.items()) {
     if (!pair.first.isString()) continue;
     const std::string &key = pair.first.getString();
+    // A custom property is a declaration for the node chain, never a prop Fabric knows
+    if (isCustomPropertyName(key)) continue;
     if (pair.second.isNull()) {
       out.erase(key);
+      continue;
+    }
+    if (pair.second.isString() && (hasVarCall(pair.second.getString()) || isCalcText(pair.second.getString()))) {
+      addSubstituted(out, key, substituteVars(pair.second.getString(), varLookup));
       continue;
     }
     out[key] = processValue(key, pair.second);
@@ -453,9 +539,8 @@ dynamic foldAriaProps(const dynamic &props) {
 // ── TEXT INPUT ───────────────────────────────────────────────────────────────────────────────────
 
 /**
- * RN HAS NO `value` FABRIC PROP. A TextInput's controlled value rides as the private `text` prop,
- * and the wrapper is where `value ?? defaultValue` used to be folded — so a LOWERED element sent a
- * key no ViewConfig declares and the field rendered EMPTY, with nothing red anywhere.
+ * RN HAS NO `value` FABRIC PROP, so a controlled value rides as the private `text` prop
+ * Unfolded, a LOWERED element sent a key no ViewConfig declares and the field rendered EMPTY
  *
  * GATED ON THE COMPONENT, NOT ON THE PROP: `value` is also a prop of Switch and Slider, and a fold
  * keyed on the prop name would write a bogus `text` onto both.
@@ -606,11 +691,8 @@ const std::string *stringAt(const dynamic &props, const char *key) {
 /**
  * The bool a key holds, or nothing when it is absent or is not a bool.
  *
- * A VALUE, and it has to be. This returned `const bool *` into a single `static thread_local` slot
- * until 2026-09-18, which meant any two results held at once silently aliased — the second read
- * rewrote the first. Nothing had two live at a time, so nothing was wrong; the Android switch rule
- * is the first caller that needs `disabled` and `accessibilityState.disabled` side by side, and it
- * would have resolved every switch through whichever was read last.
+ * A VALUE, not a pointer, so two results held at once cannot alias
+ * The Android switch rule reads `disabled` and `accessibilityState.disabled` side by side
  */
 std::optional<bool> boolAt(const dynamic &props, const char *key) {
   const dynamic *found = props.get_ptr(key);
@@ -1002,11 +1084,9 @@ constexpr const char *kHighlightUnderlayColor = "black";
 /**
  * TouchableHighlight's UNDERLAY, and the last props-shaped rule in the migration.
  *
- * ONE NODE, which is the simplification every adapter already shipped rather than one this rule
- * invents. RN renders a container View carrying the underlay and CLONES an extra opacity style onto
- * its single child (`TouchableHighlight.js:189, 258-268`); every wrapper here folds BOTH onto the one
- * node instead, because splitting them needs a child to target and a framework component holding an
- * opaque children slot cannot reach one safely. The port keeps that, it does not reopen it.
+ * ONE NODE, the simplification every adapter already shipped rather than one this rule invents
+ * RN renders a container View carrying the underlay and clones an opacity style onto its child
+ * (`TouchableHighlight.js:189, 258-268`); the wrappers fold both onto one node, as does the port
  *
  * TWO INPUTS THAT ARE NOT PROPS, both already crossing:
  *   `underlayShown`      the feedback bit — `kOpSetUnderlayShown`, flipped by the JS hold timer
@@ -1082,10 +1162,9 @@ dynamic foldTouchableHighlightUnderlay(
  * container, `:379-383` for `cloneElement`). One is the whole population of children there,
  * `React.Children.only` (`:306`).
  *
- * THE GATE IS THE OWNER'S, repeated rather than shared, because the two rules run on two nodes and
- * neither can see the other's answer: `testOnly_pressed` latches with no gesture and bypasses the
- * press-handler check, exactly as upstream's initial state does (`:189-190`). Read off the OWNER's
- * props, since this node's own bag has neither.
+ * THE GATE IS THE OWNER'S, repeated rather than shared, since neither rule sees the other's answer
+ * `testOnly_pressed` latches with no gesture and bypasses the press-handler check (`:189-190`)
+ * Read off the OWNER's props, since this node's own bag has neither
  *
  * COMPOSES OVER, matching `:379-383` — a child that spells its own `opacity` still dims. Reversed,
  * any child with an explicit opacity would sit there visibly unresponsive to touch.
@@ -1191,9 +1270,8 @@ struct IScrollStyleSplit {
  * BOTH boxes (`ScrollView.js:1856`, `StyleSheet.compose(baseStyle, outer)` beside
  * `compose(baseStyle, inner)`).
  *
- * The second half is the one every adapter had dropped from the wrapper before this became one
- * function: an `AndroidSwipeRefreshLayout` with no explicit user layout style lost `flexGrow: 1` and
- * collapsed to its content height inside a flex parent, where RN's grows.
+ * The second half is what every adapter had dropped from the wrapper
+ * Without it an `AndroidSwipeRefreshLayout` lost `flexGrow: 1` and collapsed to its content height
  *
  * ONE FUNCTION SERVING TWO NODES is the reason the pair can be a rule at all — the scroller asks for
  * `.inner` off its own bag and the wrapper asks for `.outer` off its child's, and neither can be
@@ -1291,14 +1369,9 @@ dynamic foldScrollViewProps(
   out["snapToEnd"] = boolAt(props, "snapToEnd") != std::optional<bool>(false);
 
   const dynamic *authored = props.get_ptr("style");
-  // WRAPPED IS A DIFFERENT COMPOSITION, not an extra one: on Android a RefreshControl becomes this
-  // node's PARENT and takes the LAYOUT half of the app's style with it, so composing `[base,
-  // authored]` here would put every margin on both boxes. See `foldRefreshWrapperProps` for the
-  // other half and `IFirstChild` for why the pair can be one decision at all.
-  //
-  // TOPOLOGY DECIDES, NOT `#ifdef ANDROID`, and that is the same win `Switch`/`AndroidSwitch` gives:
-  // iOS claims the refresh control BESIDE the content, so a scroll view is never one's child there
-  // and this branch cannot fire whatever the host was compiled for.
+  // WRAPPED IS A DIFFERENT COMPOSITION: on Android a RefreshControl becomes this node's PARENT
+  // and takes the LAYOUT half of the style (`foldRefreshWrapperProps`), so `[base, authored]` here
+  // would double margins. Topology decides, not `#ifdef ANDROID`: iOS never wraps a scroll view
   out["style"] = isWrapped
       ? splitScrollViewStyle(isHorizontal, authored).inner
       : composeUnder(scrollViewBaseStyle(isHorizontal), authored);
@@ -1454,10 +1527,9 @@ dynamic foldScrollContentProps(
  * inverted — a background image shown as its own negative is the case the prop exists for. RN sets
  * it on every ImageBackground it renders, so it is unconditional here too.
  *
- * Only the OWNER's rule. The inner image's style is DERIVED from this node's live style (RN proxies
- * the wrapper's width/height onto the image so it fills the box rather than collapsing to the
- * source's intrinsic size), which reads a second node and therefore stays a JS fold — composition,
- * not platform.
+ * Only the OWNER's rule, since the inner image's style is DERIVED from this node's live style
+ * RN proxies the wrapper's width/height onto the image so it fills the box, which reads a second
+ * node and stays a JS fold: composition, not platform
  */
 dynamic foldImageBackgroundProps(const dynamic &props) {
   dynamic out = props;
@@ -1717,10 +1789,9 @@ dynamic foldActivityIndicatorSpinnerProps(
  * Button's own platform half, over and above the touchable's (`Button.js:350-382`). It runs AFTER
  * `foldPressableProps`, which is the order the JS composition always had.
  *
- * Four rules, and every one is a function of the tag alone:
+ * Four rules, each a function of the tag alone:
  *
- *   accessibilityRole          pinned to "button" (`:372`), spelled as a literal on the element —
- *                              not forwarded from the app, and there is no way to opt out
+ *   `accessibilityRole`        pinned to "button" (`:372`), never forwarded from the app
  *   importantForAccessibility  "no" becomes "no-hide-descendants" (`:357-361`). Only that ONE value
  *                              moves; the label lives inside the button, so plain "no" would leave
  *                              the text separately reachable
@@ -1925,17 +1996,9 @@ dynamic foldButtonProps(
   return out;
 }
 
-// `foldIdAlias` IS GONE (2026-09-18). The rename lives in `routeProp` now — ONE implementation where
-// there were seven, and the reason it could not stay here is COVERAGE: a tag rule needs a non-empty
-// `tagName`, which only a node with a registered behavior has, so this rule never reached a plain
-// `<view>` or `<text>` and those are the commonest elements in any app. They were covered by the
-// adapters' own folds instead, three of which were separate implementations.
-//
-// Moving it to the write seam also settled a divergence rather than only removing copies: Vue, Solid
-// and Angular folded per key with no gate, so three of five adapters were already renaming `id` on
-// third-party views while React and Svelte were not. Everybody gets upstream's answer now.
-//
-// Contract: `core/engine/cpp/tests/js/id-alias-coverage.itest.ts`.
+// The `id` rename lives in `routeProp`: a tag rule needs a `tagName`, which a plain `<view>` lacks
+// Moving it to the write seam also gave every adapter upstream's answer on third-party views
+// Contract: `core/engine/cpp/tests/js/id-alias-coverage.itest.ts`
 
 /**
  * The props the press MACHINE consumes and the host must never see.
@@ -2073,11 +2136,9 @@ dynamic foldPressableProps(
 }
 
 /**
- * `TouchableNativeFeedback.js:349-390`, verbatim and in RN's own order. A CLOSED list, not a
- * passthrough: RN clones exactly these and nothing else, and it clones them WHATEVER their value —
- * `cloneElement` assigns every key of its config, so an owner with no `accessibilityLabel` CLEARS
- * the child's. Writing the key unconditionally is what reproduces that; `fabricProps` drops an
- * undefined on its way out, which is the same erasure the JS fold relied on.
+ * `TouchableNativeFeedback.js:349-390`, verbatim, in RN's order: a CLOSED list, not a passthrough
+ * RN clones exactly these whatever their value, so an owner without `accessibilityLabel` CLEARS it
+ * Writing every key unconditionally reproduces that, as `fabricProps` drops an undefined later
  */
 const std::array<const char *, 18> kNativeFeedbackClonedKeys = {
     "accessibilityHint",
@@ -2718,6 +2779,10 @@ dynamic foldCheckboxMarkProps(const dynamic &props, const dynamic *ownerProps) {
 
 } // namespace
 
+std::optional<long long> parseColorToken(const std::string &token) {
+  return colorOfToken(token);
+}
+
 dynamic fabricProps(
     const std::string &component,
     const std::string &tagName,
@@ -2726,7 +2791,8 @@ dynamic fabricProps(
     const IOwner &owner,
     const ISelf &self,
     const IAncestorLookup &ancestors,
-    const IFirstChild &firstChild) {
+    const IFirstChild &firstChild,
+    const VarLookup &varLookup) {
   if (component == kRawTextComponent) {
     dynamic out = dynamic::object();
     const dynamic *text = props.get_ptr("text");
@@ -2770,10 +2836,9 @@ dynamic fabricProps(
   }
 #endif
 
-  // The TAG's own platform props, in the slot the behavior's JS fold used to occupy — after the aria
-  // fold and before anything else, because that order is load-bearing and always was: the aria fold
-  // writes `accessibilityState` from `aria-disabled`, and this resolves that against `disabled`.
-  // Swapped, whichever ran second would silently win.
+  // The TAG's own platform props go after the aria fold and before the rest: that fold writes
+  // `accessibilityState` from `aria-disabled` and this resolves it against `disabled`
+  // Swapped, whichever ran second would silently win
   dynamic tagResolved;
   if (usesPressableRule(tagName)) {
     tagResolved = foldPressableProps(
@@ -2797,17 +2862,13 @@ dynamic fabricProps(
       tagResolved = foldCheckboxProps(tagResolved, props);
     bag = &tagResolved;
   } else if (tagName == "image" || tagName == "image-background-image") {
-    // `aria-hidden` read off the RAW, pre-aria-fold `props`: by the time `*bag` reaches here the
-    // aria fold has already erased the key in favour of `accessibilityElementsHidden`, and vendor's
-    // own accessible formula (`Image.ios.js`/`Image.android.js`) keys specifically on `aria-hidden`
-    // (the W3C name), not on whatever `accessibilityElementsHidden` an app may have set directly.
+    // `aria-hidden` is read off the RAW `props`: the aria fold already erased it from `*bag`
+    // The vendor's accessible formula (`Image.ios.js`/`Image.android.js`) keys on that W3C name
     tagResolved =
         foldImageProps(*bag, boolAt(props, "aria-hidden").value_or(false));
-    // The background's inner image is an image PLUS a fill, and the order is the recorded
-    // divergence from RN preserved exactly: the image rule folds this node's own `width`/`height`
-    // props under its style FIRST, and the box proxied from the owner layers over that. RN nests it
-    // the other way (`ImageBackground.js:83-98`); the decision is pinned in
-    // `core/components/src/behaviors/image-background.test.ts` and moving the fold does not reopen it.
+    // The inner image is an image PLUS a fill: the image rule folds its own `width`/`height` first
+    // and the owner's box layers over it, reversing RN (`ImageBackground.js:83-98`), pinned by
+    // `core/components/src/behaviors/image-background.test.ts`
     if (tagName == "image-background-image")
       tagResolved = foldImageBackgroundImageProps(tagResolved, owner.props);
     bag = &tagResolved;
@@ -2862,13 +2923,9 @@ dynamic fabricProps(
     bag = &tagResolved;
   }
 
-  // THE DESCENDANT RULE, and it is its own step rather than an arm of the chain above because it is
-  // keyed on a different thing. Every branch up there asks "what tag am I"; this asks "what tag
-  // contains me", and a node can answer both — a `<pressable>` under a TouchableWithoutFeedback gets
-  // its own rule AND the clone, in that order, which is the order RN composes them in.
-  //
-  // One `strcmp` against a usually-empty parent tag per node, placed after the chain so the common
-  // case pays only that.
+  // THE DESCENDANT RULE is its own step: the chain asks "what am I", this asks "what contains me"
+  // A node can answer both: a `<pressable>` under a TouchableWithoutFeedback gets its own rule AND
+  // the clone, in RN's order. One `strcmp` against a usually-empty parent tag per node
   dynamic ownerResolved;
   if (usesCloneOntoChildRule(owner.tagName)) {
     ownerResolved = foldCloneOntoChild(
@@ -2927,11 +2984,9 @@ dynamic fabricProps(
     bag = &aliasResolved;
   }
 
-  // RN's two Text defaults (`Text.js:289` and `:291`), applied here so no adapter has to write them
-  // as props. Three of them used to (`seedTextDefaults` in Vue, Angular and Solid): both keys landed
-  // on every text node at `createElement`, the app then authored the same values, and each write
-  // crossed into this host, converted to a `folly::dynamic` and was dropped for equalling what was
-  // already there — 6 000 wasted crossings per 1 000-row create, measured with `writesOfUnchanged`.
+  // RN's two Text defaults (`Text.js:289`, `:291`), applied here so no adapter writes them as props
+  // Authored per node, they crossed into this host and were dropped for equalling the stored value
+  // (6 000 wasted crossings per 1 000-row create, measured with `writesOfUnchanged`)
   //
   // LAST of the component-keyed folds, so a behavior's own fold still gets to set either key and win.
   // A fallback and never an override, and `!= false` rather than "is missing": RN treats an explicit
@@ -3014,7 +3069,7 @@ dynamic fabricProps(
   // Hoist the style slot (object | array | nested arrays) into the SAME payload object — no
   // intermediate flatten. See `addStyle`.
   const dynamic *style = folded.get_ptr("style");
-  if (style != nullptr) addStyle(out, *style);
+  if (style != nullptr) addStyle(out, *style, varLookup);
   if (component == kTextComponent) applyTextStyleOverrides(out, true);
   if (isTextInput) applyTextStyleOverrides(out, false);
 #ifndef ANDROID
@@ -3022,6 +3077,35 @@ dynamic fabricProps(
   if (isMultilineTextInput && !hasVerticalPadding(style)) out["paddingTop"] = 5;
 #endif
   return out;
+}
+
+namespace {
+
+void collectDeclarations(const dynamic &style, VarDeclarations &declarations) {
+  if (style.isArray()) {
+    for (const auto &entry : style) collectDeclarations(entry, declarations);
+    return;
+  }
+  if (!style.isObject()) return;
+  for (const auto &pair : style.items()) {
+    if (!pair.first.isString() || !pair.second.isString()) continue;
+    const std::string &name = pair.first.getString();
+    if (!isCustomPropertyName(name)) continue;
+    const auto known = std::find_if(declarations.begin(), declarations.end(), [&](const auto &entry) {
+      return entry.first == name;
+    });
+    if (known != declarations.end()) known->second = pair.second.getString();
+    else declarations.emplace_back(name, pair.second.getString());
+  }
+}
+
+} // namespace
+
+VarDeclarations declaredStyleVars(const dynamic &props) {
+  VarDeclarations declarations;
+  const dynamic *style = props.get_ptr("style");
+  if (style != nullptr) collectDeclarations(*style, declarations);
+  return declarations;
 }
 
 } // namespace symbiote

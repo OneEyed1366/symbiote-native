@@ -1,12 +1,11 @@
 import { warnOnce } from '../values.ts';
 import { colorToCss } from './colors.ts';
-import type { IDeclarationContext, IStyleObject } from './declaration-types.ts';
-import { warnDrop, warnedKeysFor } from './drop-warnings.ts';
-import { readLength } from './lengths.ts';
+import { warnDrop, warnedKeysFor } from './drop-warning.ts';
+import { LENGTH_KIND, readLength } from './lengths.ts';
+import type { IDeclarationContext, IStyleObject } from './style-types.ts';
 import { isRecord, roundFloat } from './value-readers.ts';
 
-// `text-shadow` has no engine-side processor to defer to, since RN only has the three decomposed
-// legacy props, so this is the one place that decomposes it
+// RN has no unified `textShadow` prop, so this is the one place that decomposes it
 const TEXT_SHADOW_DEFAULT_COLOR = '#000000';
 
 function shadowLengthPx(
@@ -14,7 +13,7 @@ function shadowLengthPx(
   context: IDeclarationContext,
 ): number | null {
   const length = readLength(value, context);
-  return length === null || length.kind !== 'px'
+  return length === null || length.kind !== LENGTH_KIND.px
     ? null
     : roundFloat(length.value);
 }
@@ -26,7 +25,6 @@ export function textShadowToStyle(
   if (!Array.isArray(value)) return {};
 
   if (value.length > 1) {
-    // The same key and wording as ../values.ts, so both pipelines report the limit alike
     warnOnce(
       warnedKeysFor(context.filename),
       'text-shadow:multiple',
@@ -48,7 +46,7 @@ export function textShadowToStyle(
     return {};
   }
 
-  // An omitted color is `currentColor`, which RN lacks, so both pipelines land on black
+  // An omitted color is `currentColor` in CSS, which RN cannot express, so it lands on black
   const color = colorToCss(layer.color);
   const isUsableColor = color !== null && color !== 'currentColor';
 

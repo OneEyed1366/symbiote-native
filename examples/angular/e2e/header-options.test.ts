@@ -91,7 +91,7 @@ describe('Angular HeaderOptions screen', () => {
   });
 
   // SKIPPED: Detox reports `search-bar-focus` non-hittable although it is well inside the viewport
-  // Same upstream bug as `angular-open-modal` in `probe.test.ts`, wix/Detox #3130, #4747, #2229
+  // Same upstream bug as `modal-open` in `probe.test.ts`, wix/Detox #3130, #4747, #2229
   // Not settle timing, and a raw coordinate tap confirms every search bar button works
   it.skip('drives the search bar imperatively through its SearchBarCommands ref', async () => {
     await waitFor(element(by.id('search-bar-focus')))

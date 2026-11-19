@@ -41,9 +41,9 @@ and the shared core packages.
   component parity with React/Vue/Angular/Svelte, including `createPortal`,
   `createTunnel`, `Animated`, and `AppRegistry` (`examples/solid`). Every
   companion package under `packages/*` also ships a `./solid` export subpath
-  now, matching npm-catalog parity with the other four adapters. On the
-  landing page's live framework switcher, with its own demo clip, verified
-  on a real device like the other four. It doesn't yet share the Detox
+  now, matching npm-catalog parity with the other four adapters. It sits on the
+  landing page's live framework switcher with its own demo clip, was verified
+  on a real device like the other four, and doesn't yet share the Detox
   `canary-journeys` spec React, Vue, and Svelte carry.
 
 ## Core status
@@ -57,7 +57,8 @@ and the shared core packages.
   through a class registry shared by React, Vue, Angular, Svelte, and Solid. Also ships a
   `css-dts` CLI (typo-safe `.module.css` `.d.ts` generation) and a
   `typescript-plugin` for live in-editor autocomplete — see the
-  [roadmap](/docs/project/roadmap/).
+  [roadmap](/docs/project/roadmap/). `@media`, `@container` and `var()` stay on the compiled rule
+  and are evaluated on the device, see [the guide](/docs/learn/media-queries-and-vars/).
 - `@symbiote-native/components` — shared component state, render helpers,
   accessibility, and parity logic.
 - `@symbiote-native/expo-modules-link` — app-level linker for the

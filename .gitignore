@@ -110,5 +110,7 @@ packages/*/.rn-*
 # excludes every dot-directory, and git cannot re-include a file whose parent directory is
 # excluded, so no negation can rescue it from there.
 scripts/verdaccio/token
+scripts/verdaccio/stamps.json
 examples/*/.npmrc
 .claude/ralph-loop.local.md
+examples/*/artifacts/

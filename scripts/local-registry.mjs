@@ -15,11 +15,23 @@
 
 // `pod install` is still owed afterwards: replacing a package folder deletes
 // `@symbiote-native/splash-screen/.rn-bootsplash/`, which the podspec vendors at pod-install time.
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
+import { promisify } from 'node:util';
 
+import { listSvelteFiles } from './copy-svelte-sources.mjs';
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
+import {
+  declaredAmong,
+  isUnchanged,
+  isUntouched,
+  movedSince,
+  newestMtimeMs,
+  readStamps,
+  withDependents,
+  writeStamps,
+} from './lib/registry-stamps.mjs';
 
 const REPO_ROOT = new URL('..', import.meta.url).pathname;
 const REGISTRY = 'http://localhost:4873';
@@ -28,6 +40,10 @@ const SCOPE = '@symbiote-native';
 // Gitignored. A token for an anonymous-publish registry bound to loopback is not a secret, but it
 // is machine state and has no business in a tracked file.
 const TOKEN_FILE = join(REPO_ROOT, 'scripts', 'verdaccio', 'token');
+// Gitignored like the token: what the registry last received, per package
+const STAMPS_FILE = join(REPO_ROOT, 'scripts', 'verdaccio', 'stamps.json');
+// Lives in an example's `node_modules`, so wiping it also wipes the claim of what it holds
+const INSTALLED_FILE = '.symbiote-installed.json';
 const USER = 'symbiote-dev';
 const IMAGE = 'verdaccio/verdaccio';
 const CONTAINER = 'verdaccio';
@@ -64,12 +80,9 @@ async function isRegistryUp() {
 // satisfy npm, not the registry.
 async function ensureToken() {
   if (existsSync(TOKEN_FILE)) return readFileSync(TOKEN_FILE, 'utf8').trim();
-  // One endpoint, two outcomes. A first run REGISTERS and gets a token back; a later run on a
-  // registry that already knows the user gets `username is already registered` and no token, so it
-  // has to LOG IN instead — the same PUT carrying basic auth. Registering and logging in look like
-  // one operation to `npm adduser` and are two here, and the second only shows up once the token
-  // file has been deleted while the registry's storage survived, which is the normal state after a
-  // `git clean` or a fresh clone against a running container.
+  // A first run registers and gets a token, a later run on a registry that knows the user gets
+  // `username is already registered` and logs in with the same PUT under basic auth
+  // That happens once the token file is gone while the storage survived, e.g. after `git clean`
   const body = JSON.stringify({
     name: USER,
     password: USER,
@@ -139,120 +152,282 @@ function commandOff(targets) {
   );
 }
 
-// pack -> unpublish -> publish. The unpublish is not optional: npm refuses to publish over an
-// existing version ("You cannot publish over the previously published versions"), and the dev loop
-// republishes one version many times a day. Verdaccio allows it because this config sets
-// `unpublish: $all`; real npm does not, which is half of why this is not a dist-tag on npmjs.
-//
-// `pnpm pack` ships whatever is already sitting in `build/` — most packages have no `prepack`
-// build step of their own (only svelte and angular do), so without this, publishing after an edit
-// with no manual `pnpm run prepublish-build` first silently republishes STALE or EMPTY bytes: no
-// error, a tarball that installs fine, and an example that measures last week's code. Building
-// here, always, closes that gap instead of documenting it as a step to remember.
-async function commandPublish(dirs) {
-  const token = await ensureToken();
-  console.log('building a fresh package tree (pnpm run prepublish-build) ...');
-  execFileSync('pnpm', ['run', 'prepublish-build'], {
-    cwd: REPO_ROOT,
-    stdio: 'inherit',
-  });
-  const entries = publishablePackageEntries();
-  // No argument means EVERY publishable package. Naming them was the default because publishing is
-  // the slow half, but a list you have to remember is a list that goes stale mid-loop — and the
-  // package you forget is the one you spent the day changing, which is the same failure the overlay
-  // script's `reportSkipped` exists for.
-  const selected = dirs.length > 0 ? dirs : entries.map(entry => entry.dir);
-  const failed = [];
-  // Progress is printed BEFORE the work, not after it. `pnpm pack` runs each package's own build
-  // and takes seconds; with a completion-only line a large run shows one header and then nothing
-  // for minutes, reading as a hang. The step CURRENTLY running is the only one worth naming.
-  let done = 0;
-  for (const dir of selected) {
-    const entry = entries.find(candidate => candidate.dir === dir);
-    if (entry === undefined) {
-      throw new Error(`${dir} is not a publishable package`);
+async function isInRegistry(name, version) {
+  try {
+    const response = await fetch(
+      `${REGISTRY}/${name.replace('/', '%2f')}/${version}`,
+      { signal: AbortSignal.timeout(2000) },
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+function entryFor(entries, dir) {
+  const entry = entries.find(candidate => candidate.dir === dir);
+  if (entry === undefined) {
+    throw new Error(`${dir} is not a publishable package`);
+  }
+  return entry;
+}
+
+const execFileAsync = promisify(execFile);
+const DRY_RUN_PARALLELISM = 8;
+
+// Runs `task` over `items` a batch at a time, so the processes it starts stay few
+async function inBatches(items, size, task) {
+  if (items.length === 0) return [];
+  const head = await Promise.all(items.slice(0, size).map(task));
+  return [...head, ...(await inBatches(items.slice(size), size, task))];
+}
+
+// What each package holds now, and whether the registry already has exactly that
+function planPublish(selected, stamps, isForced) {
+  return inBatches(selected, DRY_RUN_PARALLELISM, async entry => {
+    const version = versionOf(entry);
+    const stamp = stamps[entry.name];
+    const isHeldInRegistry = await isInRegistry(entry.name, version);
+    const newest = newestMtimeMs(join(REPO_ROOT, entry.dir));
+    if (!isForced && isHeldInRegistry && isUntouched(stamp, version, newest)) {
+      return { entry, current: stamp, isHeld: true };
     }
-    done += 1;
-    const label = `[${String(done).padStart(2)}/${selected.length}]`;
+    // The integrity `npm pack` would ship: equal for equal contents, and cheap unlike a real pack
+    const { stdout } = await execFileAsync(
+      'npm',
+      ['pack', '--dry-run', '--json', '--ignore-scripts'],
+      { cwd: join(REPO_ROOT, entry.dir) },
+    );
+    const current = { version, integrity: JSON.parse(stdout)[0].integrity };
+    const isHeld = !isForced && isUnchanged(stamp, current, isHeldInRegistry);
+    return { entry, current, isHeld };
+  });
+}
+
+// npm refuses to publish over an existing version and the loop republishes one many times a day
+// Verdaccio allows it through `unpublish: $all`, so every publish is an unpublish first
+function publishEntry(entry, version, token) {
+  const packageDir = join(REPO_ROOT, entry.dir);
+  // Only `pnpm pack` applies the `publishConfig` swap and resolves `workspace:*`, never `npm pack`
+  const packOutput = execFileSync(
+    'pnpm',
+    ['pack', '--pack-destination', packageDir],
+    { cwd: packageDir, encoding: 'utf8' },
+  );
+  // pnpm prints the tarball name, not a path, and npm resolves a bare name against the cwd
+  const tarball = join(
+    packageDir,
+    basename(packOutput.trim().split('\n').pop().trim()),
+  );
+  const npmArgs = [
+    `--registry=${REGISTRY}`,
+    `--${REGISTRY_HOST}:_authToken=${token}`,
+  ];
+  try {
+    execFileSync(
+      'npm',
+      ['unpublish', `${entry.name}@${version}`, '--force', ...npmArgs],
+      { stdio: 'ignore' },
+    );
+  } catch {
+    // Not published here yet, the normal state on a first run
+  }
+  execFileSync('npm', ['publish', tarball, ...npmArgs], { stdio: 'ignore' });
+  rmSync(tarball, { force: true });
+}
+
+// Folders the JS build does not read, so a write there is no edit that calls for a rebuild
+// Native sources reach the example through the tarball, not through the build
+const NOT_BUILD_INPUTS = ['node_modules', 'build', 'build-ngc', 'cpp', 'android', 'ios'];
+
+function runPnpm(args) {
+  execFileSync('pnpm', args, { cwd: REPO_ROOT, stdio: 'inherit' });
+}
+
+// Packages with a source newer than the last sync of them, or never synced, and their dependents
+// A dependent is rebuilt too, since its declarations are derived from the types it imports
+function packagesToBuild(entries, stamps) {
+  const moved = entries.filter(({ name, dir }) => {
+    const stamp = stamps[name];
+    return (
+      typeof stamp?.at !== 'number' ||
+      newestMtimeMs(join(REPO_ROOT, dir), NOT_BUILD_INPUTS) > stamp.at
+    );
+  });
+  const dependenciesByName = Object.fromEntries(
+    entries.map(({ name, dir }) => {
+      const manifest = JSON.parse(
+        readFileSync(join(REPO_ROOT, dir, 'package.json'), 'utf8'),
+      );
+      const declared = {
+        ...manifest.dependencies,
+        ...manifest.peerDependencies,
+        ...manifest.devDependencies,
+      };
+      return [name, Object.keys(declared)];
+    }),
+  );
+  const names = withDependents(
+    moved.map(({ name }) => name),
+    dependenciesByName,
+  );
+  return entries.filter(({ name }) => names.includes(name));
+}
+
+// The cheap steps always run. The Svelte declarations (every package, ~30 s) need a changed package
+// that holds a `.svelte` file, and `ng:build` (~35 s over all) runs only for the changed packages
+function buildChanged(changed, isFast) {
+  ['typecheck', 'fix-esm-extensions', 'copy-svelte-sources'].forEach(step =>
+    runPnpm(['run', step]),
+  );
+  const hasSvelte = changed.some(
+    ({ dir }) => listSvelteFiles(join(REPO_ROOT, dir, 'src')).length > 0,
+  );
+  if (hasSvelte && !isFast) runPnpm(['run', 'emit-svelte-declarations']);
+  if (changed.length > 0 && !isFast) {
+    const filters = changed.flatMap(({ name }) => ['--filter', name]);
+    runPnpm([...filters, '--if-present', 'run', 'ng:build']);
+  }
+  runPnpm(['--filter', './{core,adapters,packages}/*', '--if-present', 'run', 'build']);
+}
+
+// The build runs here, since `pnpm pack` ships what sits in `build/`
+// `--full` rebuilds everything clean, `--fast` skips the Svelte declarations and `ng:build`
+async function commandPublish(dirs, { isFull = false, isFast = false } = {}) {
+  const entries = publishablePackageEntries();
+  const stamps = readStamps(STAMPS_FILE);
+  if (isFull) {
+    console.log('building everything (pnpm run prepublish-build) ...');
+    runPnpm(['run', 'prepublish-build']);
+  } else {
+    const changed = packagesToBuild(entries, stamps);
+    console.log(`building ${changed.length} package(s): changed sources and their dependents ...`);
+    buildChanged(changed, isFast);
+  }
+  // Files written by the build are not edits, so the stamp time is taken once it is done
+  const builtAt = Date.now();
+  const named = dirs.length > 0 ? dirs : entries.map(entry => entry.dir);
+  const selected = named.map(dir => entryFor(entries, dir));
+  const plan = await planPublish(selected, stamps, isFull || dirs.length > 0);
+  const token = await ensureToken();
+  const published = [];
+  const failed = [];
+  // The label is printed before the work, since a package can take seconds and a silent run reads
+  // as a hang
+  plan.forEach(({ entry, current, isHeld }, index) => {
+    const label = `[${String(index + 1).padStart(2)}/${plan.length}]`;
+    process.stdout.write(`  ${label} ${entry.name}@${current.version} ... `);
+    if (isHeld) {
+      stamps[entry.name] = { ...current, at: builtAt };
+      console.log('unchanged');
+      return;
+    }
     try {
-      const packageDir = join(REPO_ROOT, entry.dir);
-      const version = versionOf(entry);
-      process.stdout.write(`  ${label} ${entry.name}@${version} ... `);
-      // `pnpm pack`, never `npm pack` — the latter skips the publishConfig build-artifact swap and
-      // leaves `workspace:*` in peerDependencies (<examples_vs_dot_examples>).
-      const packOutput = execFileSync(
-        'pnpm',
-        ['pack', '--pack-destination', packageDir],
-        { cwd: packageDir, encoding: 'utf8' },
-      );
-      // `pnpm pack` prints the tarball NAME, not a path, whatever `--pack-destination` says — so
-      // rejoin it. Passed straight to npm it resolves against the process cwd (the repo root) and the
-      // publish dies with a bare exit 254 and no stderr at all.
-      const tarball = join(
-        packageDir,
-        basename(packOutput.trim().split('\n').pop().trim()),
-      );
-      const npmArgs = [
-        `--registry=${REGISTRY}`,
-        `--${REGISTRY_HOST}:_authToken=${token}`,
-      ];
-      try {
-        execFileSync(
-          'npm',
-          ['unpublish', `${entry.name}@${version}`, '--force', ...npmArgs],
-          { stdio: 'ignore' },
-        );
-      } catch {
-        // Not yet published here — the normal state on a first run.
-      }
-      execFileSync('npm', ['publish', tarball, ...npmArgs], {
-        stdio: 'ignore',
-      });
-      rmSync(tarball, { force: true });
+      publishEntry(entry, current.version, token);
+      stamps[entry.name] = { ...current, at: builtAt };
+      published.push({ name: entry.name, version: current.version });
       console.log('published');
     } catch (error) {
+      // Collected, not thrown: one failed package must not hide the rest, nor vanish from the end
       console.log('FAILED');
-      // Collected rather than thrown. One unbuilt package must not abandon the other thirty-three
-      // — but it must also not vanish: a run that reports success while a package silently stayed
-      // on its old build is the measurement-that-lies failure this repo keeps paying for.
       failed.push(`${entry.name} (${error.message.split('\n')[0]})`);
     }
-  }
+  });
+  writeStamps(STAMPS_FILE, stamps);
+  const heldCount = plan.length - published.length - failed.length;
+  console.log(`\n${published.length} published, ${heldCount} unchanged`);
   if (failed.length > 0) {
     console.log(`\nFAILED to publish ${failed.length}:`);
     for (const line of failed) console.log(`  ${line}`);
-    console.log(
-      '\nThe build ran fresh just before this — check the build output above for a type error.',
-    );
+    console.log('\nCheck the build output above for a type error.');
     process.exitCode = 1;
   }
 }
 
-// The repair for the lockfile short-circuit described in this file's header — and for any other
-// way an example's `node_modules` can drift out of sync with its manifest (a killed install, a
-// half-applied `rm -rf`). Wiping both `node_modules` and `package-lock.json` before a full
-// `npm install` is the only repair that cannot leave stale bytes behind; a targeted
-// `npm install <pkg>@<version>` is faster but assumes the rest of the tree is already correct.
-function commandRefresh(targets) {
-  let done = 0;
-  for (const dir of targets) {
-    done += 1;
-    console.log(`\n  [${done}/${targets.length}] ${dir}`);
-    const exampleRoot = join(REPO_ROOT, dir);
-    rmSync(join(exampleRoot, 'node_modules'), { recursive: true, force: true });
-    rmSync(join(exampleRoot, 'package-lock.json'), { force: true });
-    execFileSync('npm', ['install', '--no-audit', '--no-fund'], {
-      cwd: exampleRoot,
-      stdio: 'inherit',
-    });
-    console.log(`  ${dir}: reinstalled from a clean node_modules`);
-  }
+// Written once an install has finished, so a killed refresh leaves the old claim and is redone
+function recordInstalled(exampleRoot) {
+  const modules = join(exampleRoot, 'node_modules');
+  const installed = Object.fromEntries(
+    Object.entries(readStamps(STAMPS_FILE))
+      .filter(([name]) => existsSync(join(modules, name)))
+      .map(([name, stamp]) => [name, stamp.integrity]),
+  );
+  writeStamps(join(modules, INSTALLED_FILE), installed);
 }
 
-// Everything a new machine needs, idempotent: run it twice and the second run is a no-op that
-// reports the same state. Deliberately does NOT install docker or start colima — those are the
-// user's own machine setup, and a script that silently starts a VM is a script that surprises
-// somebody mid-measurement.
+// The repair for the lockfile short-circuit and any drift of `node_modules` from the manifest
+// Wiping both `node_modules` and `package-lock.json` is the one repair that leaves no stale bytes
+function refreshFully(exampleRoot) {
+  rmSync(join(exampleRoot, 'node_modules'), { recursive: true, force: true });
+  rmSync(join(exampleRoot, 'package-lock.json'), { force: true });
+  execFileSync('npm', ['install', '--no-audit', '--no-fund'], {
+    cwd: exampleRoot,
+    stdio: 'inherit',
+  });
+  recordInstalled(exampleRoot);
+}
+
+// The moved packages this example declares, or `null` when only a full install is safe
+// That is the case with nothing installed yet and with a moved package reached only transitively
+// Moved means the stamped bytes differ from what the example recorded, not what this run published
+function declaredChanges(exampleRoot) {
+  const modules = join(exampleRoot, 'node_modules');
+  if (!existsSync(modules)) return null;
+  const changed = movedSince(
+    readStamps(STAMPS_FILE),
+    readStamps(join(modules, INSTALLED_FILE)),
+  );
+  const manifest = JSON.parse(
+    readFileSync(join(exampleRoot, 'package.json'), 'utf8'),
+  );
+  const declared = declaredAmong(
+    manifest,
+    changed.map(item => item.name),
+  );
+  const isTransitiveOnly = changed.some(
+    ({ name }) => !declared.includes(name) && existsSync(join(modules, name)),
+  );
+  return isTransitiveOnly
+    ? null
+    : changed.filter(({ name }) => declared.includes(name));
+}
+
+// By default every example is reinstalled from a clean `node_modules`
+// Incremental replaces only the packages that moved since the example last installed them, and a
+// failed targeted install falls back to a clean one
+function commandRefresh(targets, { isIncremental = false } = {}) {
+  targets.forEach((dir, index) => {
+    console.log(`\n  [${index + 1}/${targets.length}] ${dir}`);
+    const exampleRoot = join(REPO_ROOT, dir);
+    const packages = isIncremental ? declaredChanges(exampleRoot) : null;
+    if (packages === null) {
+      refreshFully(exampleRoot);
+      console.log(`  ${dir}: reinstalled from a clean node_modules`);
+      return;
+    }
+    if (packages.length === 0) {
+      console.log(`  ${dir}: nothing it declares has changed`);
+      return;
+    }
+    try {
+      // `--no-save` keeps the tracked manifest as it is, an explicit version defeats the lockfile
+      const specs = packages.map(({ name, version }) => `${name}@${version}`);
+      execFileSync(
+        'npm',
+        ['install', '--no-save', '--no-audit', '--no-fund', ...specs],
+        { cwd: exampleRoot, stdio: 'inherit' },
+      );
+      recordInstalled(exampleRoot);
+      console.log(`  ${dir}: replaced ${packages.length} package(s)`);
+    } catch {
+      console.log(`  ${dir}: targeted install failed, reinstalling cleanly`);
+      refreshFully(exampleRoot);
+    }
+  });
+}
+
+// Everything a new machine needs, idempotent: a second run is a no-op that reports the same state
+// It does not install docker or start colima, since a script that starts a VM surprises people
 async function commandSetup() {
   try {
     execFileSync('docker', ['version', '--format', '{{.Server.Version}}'], {
@@ -298,42 +473,50 @@ async function commandSetup() {
       ],
       { stdio: 'ignore' },
     );
-  } else if (running !== 'running') {
+  } else if (running === 'running') {
+    console.log(`container ${CONTAINER} already running`);
+  } else {
     console.log(`starting existing container ${CONTAINER} ...`);
     execFileSync('docker', ['start', CONTAINER], { stdio: 'ignore' });
-  } else {
-    console.log(`container ${CONTAINER} already running`);
   }
 
-  // Polled rather than slept: the container answers in about two seconds cold and much faster warm,
-  // and a fixed sleep is either a wasted wait or a flake.
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    if (await isRegistryUp()) {
-      await ensureToken();
-      console.log(`\nregistry ${REGISTRY} is up, token stored.\n`);
-      console.log('Next:');
-      console.log('  pnpm run registry:publish core/engine core/components');
-      console.log('  pnpm run registry:on examples/react');
-      console.log('  pnpm run registry:refresh examples/react');
-      console.log("  (then `pod install` in that example's ios/)");
-      return;
-    }
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  throw new Error(
-    `container is up but ${REGISTRY} never answered — check \`docker logs ${CONTAINER}\``,
-  );
+  await waitForRegistry();
+  await ensureToken();
+  console.log(`\nregistry ${REGISTRY} is up, token stored.\n`);
+  console.log('Next:');
+  console.log('  pnpm run registry:publish core/engine core/components');
+  console.log('  pnpm run registry:on examples/react');
+  console.log('  pnpm run registry:refresh examples/react');
+  console.log("  (then `pod install` in that example's ios/)");
 }
 
-// The loop, end to end, with no list to remember: publish everything, point every example at the
-// registry, pull the new bytes into every one of them. `pod install` is still yours.
-async function commandSync(targets) {
-  console.log('publishing every package ...');
-  await commandPublish([]);
+const MS_PER_SECOND = 1_000;
+const REGISTRY_POLL_ATTEMPTS = 30;
+const REGISTRY_POLL_MS = 500;
+
+// Polled rather than slept: a cold container answers in about two seconds, a warm one at once
+async function waitForRegistry(attempt = 0) {
+  if (await isRegistryUp()) return;
+  if (attempt >= REGISTRY_POLL_ATTEMPTS) {
+    throw new Error(
+      `container is up but ${REGISTRY} never answered, check \`docker logs ${CONTAINER}\``,
+    );
+  }
+  await new Promise(resolve => setTimeout(resolve, REGISTRY_POLL_MS));
+  return waitForRegistry(attempt + 1);
+}
+
+// The loop, end to end: publish what changed, point the examples at the registry, pull it in
+// `--full` cleans, publishes everything and reinstalls every example from scratch
+async function commandSync(targets, options) {
+  const startedAt = Date.now();
+  await commandPublish([], options);
   console.log('\npointing examples at the registry ...');
   await commandOn(targets);
   console.log('\nrefreshing examples ...');
-  commandRefresh(targets);
+  commandRefresh(targets, { isIncremental: !options.isFull });
+  const seconds = Math.round((Date.now() - startedAt) / MS_PER_SECOND);
+  console.log(`\nsync took ${seconds}s`);
 }
 
 async function commandStatus() {
@@ -353,7 +536,12 @@ async function commandStatus() {
 }
 
 async function main() {
-  const [command, ...rest] = process.argv.slice(2);
+  const [command, ...args] = process.argv.slice(2);
+  const options = {
+    isFull: args.includes('--full'),
+    isFast: args.includes('--fast'),
+  };
+  const rest = args.filter(arg => !arg.startsWith('--'));
   const targets = rest.length > 0 ? rest : exampleDirs();
   switch (command) {
     case 'on':
@@ -361,9 +549,9 @@ async function main() {
     case 'off':
       return commandOff(targets);
     case 'publish':
-      return commandPublish(rest);
+      return commandPublish(rest, options);
     case 'sync':
-      return commandSync(targets);
+      return commandSync(targets, options);
     case 'refresh':
       return commandRefresh(targets);
     case 'setup':

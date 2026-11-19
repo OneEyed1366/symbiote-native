@@ -59,6 +59,7 @@ export function nativeTreeHost(bindings: INativeEngineBindings): ITreeHost {
     measureLayout: bindings.measureLayout,
     setIsJSResponder: bindings.setIsJSResponder,
     getBoundingClientRect: bindings.getBoundingClientRect,
+    readVariable: bindings.readVariable,
   };
 }
 

@@ -1,0 +1,244 @@
+---
+title: Media queries, container queries and CSS variables
+description: '@media, @container, var(), matchMedia and setVariable: responsive styles resolved at run time, on every adapter.'
+---
+
+A CSS class can now change with the device, the way it does on the web. `@media`, `@container` and `var()` stay in the compiled rule, and the engine
+evaluates them on the device. No adapter code is involved, so a class behaves the same from React's `className`, Vue's `class` and Angular's `[ngClass]`.
+
+The rules work wherever a class can be written: a `.css` or `.module.css` file, the SCSS, Less and Stylus variants of those, a Vue SFC `<style>` block
+(including `scoped` and `module`) and a Svelte component's `<style>` block. `:root` and `@property` rules work in all of them too.
+
+## `@media`
+
+The compiler keeps each `@media` block as a condition on the rule. When the window or an accessibility setting changes, only the conditions that
+flipped restyle their nodes. A resize that crosses no breakpoint costs a few checks and touches no node.
+
+```css
+.card {
+  padding: 12px;
+  background-color: #1e293b;
+}
+
+@media (min-width: 37.5rem) {
+  .card {
+    padding: 24px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .card {
+    background-color: #0f172a;
+  }
+}
+```
+
+Supported features:
+
+| Feature                                                                  | Reads                                           |
+| ------------------------------------------------------------------------ | ----------------------------------------------- |
+| `width`, `height`, `min-`/`max-` forms, range syntax (`width >= 600px`) | The app window (`Dimensions.window`)            |
+| `orientation`                                                            | The app window                                  |
+| `prefers-color-scheme`                                                   | `Appearance`                                    |
+| `prefers-reduced-motion`                                                 | The system setting, iOS and Android             |
+| `prefers-contrast`                                                       | Darker colors on iOS, high text contrast on Android |
+| `prefers-reduced-transparency`                                           | iOS only, Android answers `no-preference`       |
+| `platform`, `dir`, `resolution`                                          | The device (`platform` is `ios` or `android`)   |
+| `aspect-ratio`                                                           | The app window                                  |
+
+Lengths accept `px`, `rem` and `calc()`. `resolution` takes `dppx`, `x`, `dpi` and `dpcm`, and `aspect-ratio` takes `16/9` or a bare number.
+The accessibility features start at `no-preference` and flip once when the system answers, because React
+Native reads them asynchronously.
+
+### What is dropped
+
+`@media` queries the device cannot answer make the rule not apply, and the compiler warns at build time.
+
+- A feature such as `hover`, a unit such as `cm`, or a media type other than `all` and `screen` is unknown.
+- One unknown part drops the whole rule, including the other branches of an `or` or a comma list. `(hover: hover), (min-width: 600px)` is dropped as a whole.
+- `@supports` is dropped as before.
+
+The build prints one warning per cause, so a missing feature is easy to find:
+
+```
+[@symbiote-native/css-parser] App.css: media feature `hover` cannot be answered here, so the `@media` rule that uses it is dropped.
+```
+
+The same wording covers `@container`, a media type such as `print`, and a condition the compiler could not read.
+
+## `@container`
+
+A node becomes a container through its style. Set `container-type` (and optionally `container-name`) in a CSS rule, and descendants can query its size.
+
+```css
+.panel {
+  container-type: inline-size;
+  width: 100%;
+}
+
+@container (min-width: 15rem) {
+  .panel-title {
+    font-size: 20px;
+  }
+}
+```
+
+- `container-type: inline-size` queries the width, `size` queries both axes. Queries support width, height, aspect-ratio and orientation.
+  `inline-size` and `block-size` are accepted as aliases of `width` and `height`, since React Native has one writing mode.
+- Name a container with `container-name` (or the `container` shorthand) and target it with `@container name (min-width: 15rem)`.
+- A container never styles itself, only its descendants, as in the browser.
+- The queried axis must not depend on the content. It counts as definite when the container sets `width`, `height`, `flex`, `flexGrow`/`flexBasis` or `aspectRatio`.
+- An axis that depends on content makes the condition false and logs one `console.warn` per container: `a container leaves its width to its content, so a query on it reads false. Set width, height, flex or aspectRatio on the container.`
+- Container length units (`cqw`, `cqh`) are not supported.
+
+The first paint already uses the container's size, so a container does not flash its narrow layout. Later resizes restyle after layout.
+
+## CSS variables
+
+`var()` is no longer folded in at build time. It ships as text and the engine resolves it on the device, so a variable can change while the app runs.
+
+```css
+:root {
+  --accent: #8338ec;
+}
+
+.badge {
+  background-color: var(--accent);
+  padding: var(--gap) 4px;
+}
+```
+
+A `var()` resolves, from the highest to the lowest source:
+
+1. A `--x` declared on the node or an ancestor, in a class rule. The engine also reads an inline `--x` key, but the style types have no field for it yet.
+2. The value written with `setVariable` on the surface.
+3. A `:root` rule in CSS. It may sit inside `@media`, so `@media (prefers-color-scheme: dark) { :root { --bg: #000 } }` re-themes every `var(--bg)` at once.
+
+A `--x` in a class rule scopes a value to the nodes with that class and their descendants, with no provider component:
+
+```css
+.theme-warm {
+  --accent: #ffbe0b;
+}
+```
+
+```tsx
+<view className="theme-warm">
+  <view className="badge" />
+</view>
+```
+
+Longhands, shorthands (`padding`, `margin`, `border`), `rem`, `calc()`, `boxShadow`, `filter` and `transform` all work after substitution.
+A value that is invalid once substituted unsets that one property and leaves the rest of the rule alone.
+
+### Write a variable from code
+
+`setVariable(surface, name, value)` writes a custom property on a surface, and `undefined` removes it. Every node that reads the name restyles.
+A name that does not start with `--` throws.
+
+```tsx
+import { useContext, useEffect } from 'react';
+import { RootTagContext, setVariable } from '@symbiote-native/react';
+
+function ThemeButton() {
+  const surface = useContext(RootTagContext);
+
+  // The write belongs to the surface, so take it back when the screen goes
+  useEffect(() => () => setVariable(surface, '--accent', undefined), [surface]);
+
+  return (
+    <pressable onPress={() => setVariable(surface, '--accent', '#ffbe0b')}>
+      <text>Warm accent</text>
+    </pressable>
+  );
+}
+```
+
+`surface` is the root tag of the app. Each adapter hands it over in its own idiom:
+
+| Adapter | Accessor |
+| ------- | -------- |
+| React   | `useContext(RootTagContext)` |
+| Vue     | `useRootTag()` in `setup()` |
+| Solid   | `useContext(RootTagContext)` |
+| Svelte  | `useRootTag()` during component init |
+| Angular | `injectRootTag()` in an injection context |
+
+Solid returns `0` outside a mounted surface, as React does. The others throw.
+
+### Read a variable
+
+`getComputedVariable(node, name)` is a one-shot read of what a `var()` on that node would see now. It returns `''` when nothing declares the name.
+Pass the host ref of an element, such as the ref of a `<view>`:
+
+```tsx
+import { useRef } from 'react';
+import { getComputedVariable, type IHostInstance } from '@symbiote-native/react';
+
+function AccentReadout() {
+  const box = useRef<IHostInstance>(null);
+  const read = () => (box.current === null ? '' : getComputedVariable(box.current, '--accent'));
+
+  return <view ref={box} onPress={() => console.log(read())} />;
+}
+```
+
+It is a snapshot like `getComputedStyle`, so wrap it in your framework's own reactivity if you need updates.
+
+The other adapters hand over the same host node through their own handle:
+
+| Adapter | Where the node comes from |
+| ------- | ------------------------- |
+| Vue     | A template ref on the element |
+| Solid   | The `ref={el}` callback |
+| Svelte  | An `{@attach fn}` on the element |
+| Angular | `@ViewChild(..., { read: ElementRef })`, then `nativeElement` |
+
+### Typed properties
+
+`@property` rules in CSS, or `registerProperty` from code, declare a custom property with a `syntax`, an `inherits` flag and an `initialValue`.
+A typed property computes to a canonical value, and `inherits: false` stops the ancestor walk.
+Registering the same name twice throws, as `CSS.registerProperty` does on the web.
+
+```ts
+import { registerProperty } from '@symbiote-native/react';
+
+registerProperty({
+  name: '--gap',
+  syntax: '<length>',
+  inherits: true,
+  initialValue: '8px',
+});
+```
+
+## `matchMedia`
+
+`matchMedia(query)` answers from the same environment as the `@media` rules, and returns a `MediaQueryList` as on the web.
+
+```ts
+import { matchMedia } from '@symbiote-native/react';
+
+const wide = matchMedia('(min-width: 600px)');
+
+wide.matches; // true or false now
+wide.addEventListener('change', event => {
+  console.log(event.matches);
+});
+```
+
+- `change` fires when the condition flips, not on every resize.
+- `addListener` and `removeListener` work, and so does `onchange`.
+- Watching starts with the first listener, so reading `.matches` in a render leaks nothing.
+- A query the device cannot answer reports `matches: false` for good, as a browser does for an unknown feature.
+
+## Limits
+
+- `@media` `width` and `height` read the app window. A small embedded surface sees the window size, so use `@container` to size against a surface or component.
+- Variable and condition changes are not reactive per adapter. Use `matchMedia` or `getComputedVariable` and wrap them in the adapter's state.
+- An inline `setVariable` and a declared `--x` on one node share a slot, and the last write wins. A framework that re-publishes `style` overwrites an imperative value, as with `setNativeProps`.
+- Tailwind is not supported.
+
+See also the [Styling guide](/docs/learn/styling/) and the [responsive styles how-to](/docs/howtos/responsive-styles/).
+For a running example, the style demo screen of every app in `examples/` has a media panel, for instance
+[`examples/svelte/screens/StyleShowcase.media.css`](https://github.com/OneEyed1366/symbiote-native/blob/master/examples/svelte/screens/StyleShowcase.media.css)
+(green from 600 wide, an amber border in landscape).
