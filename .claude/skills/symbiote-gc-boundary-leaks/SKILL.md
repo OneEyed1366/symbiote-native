@@ -66,6 +66,10 @@ The upstream patch is in `react-native-worklets/bundleMode/patches/patch-package
 
 Every Bundle Mode example carries both patches in `patches/` and runs `patch-package` on `postinstall`. The files are named for `metro` 0.84.6. A `metro` bump needs the matching upstream patch.
 
+The upstream patch does not cover a warm cache ([reanimated#11313](https://github.com/software-mansion/react-native-reanimated/issues/11313), open). A transform cache hit skips the plugin, so a wiped `.worklets` stays empty and the build fails with `ENOENT`. Any reinstall does that, `registry:sync` included, as the Metro cache in `$TMPDIR` survives. The repo keeps the patch upstream: `--reset-cache` once after a reinstall, noted in the example READMEs.
+
+If that step gets in the way, a trial fix worked: in `Transformer.transformFile` of `metro`, treat a cache hit as a miss when a `.worklets` dependency is missing on disk. It was not adopted, to avoid carrying our own patch hunk.
+
 Do not release `props` or `committed` when a node is removed: `reattachHostBehaviors` (`host-behavior.ts`) supports putting a swept node back. Only `teardownSubtree` (unmount) means gone for good.
 
 ## Guards
