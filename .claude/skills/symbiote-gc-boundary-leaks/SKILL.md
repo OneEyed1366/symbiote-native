@@ -64,6 +64,8 @@ Bundle Mode without a `metro` patch fails with `Failed to get the SHA-1 for .../
 
 The upstream patch is in `react-native-worklets/bundleMode/patches/patch-package` of the reanimated repo. `metro+0.84.4.patch` applied to the installed 0.84.6 and the clean `react` bundle passed on run 1. A separate `metro-runtime` patch is for Fast Refresh in worklet runtimes. See the [setup page](https://docs.swmansion.com/react-native-worklets/docs/bundleMode/setup/).
 
+Every Bundle Mode example carries both patches in `patches/` and runs `patch-package` on `postinstall`. The files are named for `metro` 0.84.6. A `metro` bump needs the matching upstream patch.
+
 Do not release `props` or `committed` when a node is removed: `reattachHostBehaviors` (`host-behavior.ts`) supports putting a swept node back. Only `teardownSubtree` (unmount) means gone for good.
 
 ## Guards
