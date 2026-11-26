@@ -10,13 +10,14 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { availableParallelism, tmpdir } from 'node:os';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+import { createLimiter } from './lib/create-limiter.mjs';
 import { parseJson, readJsonFile } from './lib/parse-json.mjs';
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
 
@@ -309,23 +310,38 @@ function copyTrackedExample(exampleDir, destination) {
   }
 }
 
-// Concurrent is safe, each `pnpm pack` writes its own tarball. The Angular AOT in a `prepack`
-// dominates the time either way
+// A `prepare` that is only `ng:build` would redo the `build-ngc` already on disk, so it is skipped
+// Anything more, a `prepack` or codegen vendoring, makes files the tarball needs
+export function packArgs(manifest, hasAngularBuild, packDirectory) {
+  const { prepare, prepack } = manifest.scripts ?? {};
+  const pack = ['pack', '--pack-destination', packDirectory];
+  const isRebuildOnly =
+    prepare === 'pnpm run ng:build' && prepack === undefined;
+  return isRebuildOnly && hasAngularBuild
+    ? ['--config.ignore-scripts=true', ...pack]
+    : pack;
+}
+
+// Packs that still run scripts cost ~0.5 GB each in `ng:build`, so they are capped at one per core
+// The ~70 uncapped packs of an expo arm would likely outgrow a runner's memory, not measured there
 async function packPackages(names, packDirectory) {
   const entries = new Map(
     publishablePackageEntries().map(entry => [entry.name, entry]),
   );
   const tarballs = new Map();
+  const limitPack = createLimiter(availableParallelism());
   await Promise.all(
     names.map(async name => {
       const entry = entries.get(name);
       if (entry === undefined)
         throw new Error(`${name} is not publishable from this checkout`);
-      const output = await runAsync(
-        'pnpm',
-        ['pack', '--pack-destination', packDirectory],
-        { cwd: join(REPO_ROOT, entry.dir) },
+      const cwd = join(REPO_ROOT, entry.dir);
+      const args = packArgs(
+        readJsonFile(join(cwd, 'package.json')),
+        existsSync(join(cwd, 'build-ngc')),
+        packDirectory,
       );
+      const output = await limitPack(() => runAsync('pnpm', args, { cwd }));
       const finalLine = output.trim().split('\n').at(-1)?.trim();
       if (!finalLine)
         throw new Error(`pnpm pack returned no tarball path for ${name}`);

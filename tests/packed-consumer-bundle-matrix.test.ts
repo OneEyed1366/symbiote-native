@@ -12,6 +12,7 @@ import {
   KNOWN_FRAMEWORKS,
   MATRIX_EXAMPLES,
   ownFrameworkOf,
+  packArgs,
   PLATFORMS,
   platformsOf,
   rewriteInternalDependencies,
@@ -28,6 +29,30 @@ describe('packed consumer bundle matrix', () => {
     );
     expect(covered.sort()).toEqual(canaryExampleNames());
     expect(PLATFORMS).toEqual(['ios', 'android']);
+  });
+
+  it('skips the lifecycle scripts only when they would just redo an AOT build on disk', () => {
+    const plain = ['pack', '--pack-destination', '/out'];
+    const skipping = ['--config.ignore-scripts=true', ...plain];
+    const rebuildOnly = { scripts: { prepare: 'pnpm run ng:build' } };
+
+    expect(packArgs(rebuildOnly, true, '/out')).toEqual(skipping);
+    expect(packArgs(rebuildOnly, false, '/out')).toEqual(plain);
+    expect(
+      packArgs(
+        { scripts: { prepare: 'node vendor.cjs && pnpm run ng:build' } },
+        true,
+        '/out',
+      ),
+    ).toEqual(plain);
+    expect(
+      packArgs(
+        { scripts: { prepare: 'pnpm run ng:build', prepack: 'node emit.mjs' } },
+        true,
+        '/out',
+      ),
+    ).toEqual(plain);
+    expect(packArgs({}, true, '/out')).toEqual(plain);
   });
 
   it('type-checks every expo example without bundling it', () => {

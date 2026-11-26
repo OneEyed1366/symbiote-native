@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 import esbuild from 'esbuild';
 
+import { createLimiter } from './lib/create-limiter.mjs';
 import { parseJson } from './lib/parse-json.mjs';
 import {
   reanimatedItestSeams,
@@ -759,31 +760,6 @@ const testConcurrency = Math.max(
   Number(process.env.SYMBIOTE_ITEST_JOBS) ||
     (isBenchBuild ? Math.floor(cores / 4) : cores),
 );
-
-/**
- * A fixed chunk of `Promise.all` stalls on its slowest member, and benchmarks mix with unit tests
- * Here a slot refills the moment it frees, from one shared queue, so a fast file never waits
- */
-function createLimiter(max) {
-  let active = 0;
-  const queue = [];
-  const pump = () => {
-    if (active >= max || queue.length === 0) return;
-    active += 1;
-    const { fn, resolve, reject } = queue.shift();
-    fn()
-      .then(resolve, reject)
-      .finally(() => {
-        active -= 1;
-        pump();
-      });
-  };
-  return fn =>
-    new Promise((resolve, reject) => {
-      queue.push({ fn, resolve, reject });
-      pump();
-    });
-}
 
 const limitTestRun = createLimiter(testConcurrency);
 
