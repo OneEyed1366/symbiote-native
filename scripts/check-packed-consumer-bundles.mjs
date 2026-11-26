@@ -1,16 +1,12 @@
-// A publish artifact is only useful if a standalone npm consumer can install and bundle it.
-// This matrix copies each framework example to a disposable directory, rewrites every direct
-// @symbiote-native/* dependency to a freshly packed tarball from THIS checkout, runs the example's
-// real type/AOT check, then creates production Metro bundles for both platforms. The sourcemaps are
-// inspected for foreign-framework package files, and the installed adapter must itself appear in
-// the graph — so a registry adapter can never make the check falsely green.
+// Each arm installs tarballs packed from THIS checkout into a copy of one example and type-checks
+// it. A canary is then bundled for both platforms: its sourcemap must hold the installed adapter,
+// so a registry copy cannot pass, and no file of a foreign framework
 import { execFile, execFileSync } from 'node:child_process';
 import {
   copyFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -21,6 +17,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+import { parseJson, readJsonFile } from './lib/parse-json.mjs';
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
 
 export const INTERNAL_PREFIX = '@symbiote-native/';
@@ -63,6 +60,52 @@ export const FRAMEWORK_EXAMPLES = {
   },
 };
 
+// Only the expo examples import the Expo wrappers, so their type check is what reads those types
+const EXPO_EXAMPLES = {
+  'expo-react': {
+    dir: 'examples/expo-react',
+    adapter: '@symbiote-native/react',
+    verify: ['npm', ['exec', '--', 'tsc', '--noEmit']],
+    isTypecheckOnly: true,
+  },
+  'expo-vue-sfc': {
+    dir: 'examples/expo-vue-sfc',
+    adapter: '@symbiote-native/vue',
+    verify: ['npm', ['run', 'typecheck']],
+    isTypecheckOnly: true,
+  },
+  'expo-vue-tsx': {
+    dir: 'examples/expo-vue-tsx',
+    adapter: '@symbiote-native/vue',
+    verify: ['npm', ['run', 'typecheck']],
+    isTypecheckOnly: true,
+  },
+  'expo-svelte': {
+    dir: 'examples/expo-svelte',
+    adapter: '@symbiote-native/svelte',
+    verify: ['npm', ['run', 'typecheck']],
+    isTypecheckOnly: true,
+  },
+  'expo-angular': {
+    dir: 'examples/expo-angular',
+    adapter: '@symbiote-native/angular',
+    verify: ['npm', ['run', 'ng:build']],
+    isTypecheckOnly: true,
+  },
+  'expo-solid': {
+    dir: 'examples/expo-solid',
+    adapter: '@symbiote-native/solid',
+    verify: ['npm', ['run', 'typecheck']],
+    isTypecheckOnly: true,
+  },
+};
+
+export const MATRIX_EXAMPLES = { ...FRAMEWORK_EXAMPLES, ...EXPO_EXAMPLES };
+
+export function platformsOf(example, platforms) {
+  return example.isTypecheckOnly ? [] : platforms;
+}
+
 const REPO_ROOT = fileURLToPath(new URL('../', import.meta.url));
 const DEPENDENCY_FIELDS = [
   'dependencies',
@@ -98,57 +141,43 @@ function run(command, args, options = {}) {
   }
 }
 
-// npm's cacache fans out internally: one `npm install` fetches many packages in parallel inside a
-// single process, so tmp-then-rename cache writes race even WITHIN one process — per-framework
-// cache isolation (`frameworkNpmCache`) can't fix that. ENOTEMPTY is an upstream npm/cacache bug.
-
-// `--legacy-peer-deps`: navigation/slider/splash-screen each list all five adapters as peers, so
-// installing just one makes npm auto-resolve the other four, and that 5-way graph can trigger
-// arborist's own backtracking crash (npm/cli#4828) — skip resolution rather than risk it.
-async function installWithCacheRetry(cwd, env, cacheDir, attempts = 3) {
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      await runAsync(
-        'npm',
-        [
-          'install',
-          '--package-lock=false',
-          '--no-audit',
-          '--no-fund',
-          '--prefer-offline',
-          '--legacy-peer-deps',
-        ],
-        { cwd, env },
-      );
-      return;
-    } catch (error) {
-      const isCacheRace =
-        error instanceof Error && /ENOTEMPTY.*_cacache/s.test(error.message);
-      if (!isCacheRace || attempt === attempts) throw error;
-      // A failed rmdir mid-write can leave the cache half-consistent; a bare retry can hit the
-      // same stuck entry, so wipe and let npm repopulate it from scratch.
-      rmSync(cacheDir, { recursive: true, force: true });
-      mkdirSync(cacheDir, { recursive: true });
-    }
+// Retried: parallel fetches of one install can race in the npm cache and raise ENOTEMPTY
+// `--legacy-peer-deps`: resolving the peers of all five adapters can crash npm (npm/cli#4828)
+async function installWithCacheRetry(cwd, env, cacheDir, attemptsLeft = 3) {
+  try {
+    await runAsync(
+      'npm',
+      [
+        'install',
+        '--package-lock=false',
+        '--no-audit',
+        '--no-fund',
+        '--prefer-offline',
+        '--legacy-peer-deps',
+      ],
+      { cwd, env },
+    );
+  } catch (error) {
+    const isCacheRace =
+      error instanceof Error && /ENOTEMPTY.*_cacache/s.test(error.message);
+    if (!isCacheRace || attemptsLeft === 1) throw error;
+    // A bare retry can hit the same half-written entry, so npm repopulates the cache from scratch
+    rmSync(cacheDir, { recursive: true, force: true });
+    mkdirSync(cacheDir, { recursive: true });
+    await installWithCacheRetry(cwd, env, cacheDir, attemptsLeft - 1);
   }
 }
 
-// Non-blocking counterpart of `run`, so independent frameworks can install/verify/bundle
-// concurrently instead of one at a time (execFileSync blocks the whole event loop, so wrapping it
-// in Promise.all buys nothing — only an async child process yields the loop while it waits on I/O).
-// `stdio: 'inherit'` isn't available here (execFile always captures), which is a wash: every arm
-// writing 'inherit' at once would interleave into unreadable output anyway. Captured
-// output is instead surfaced by the caller, attributed to its framework, only on failure or once
-// the step completes — see `processExample`'s `log` array below.
+// The async twin of `run`, so arms overlap. Output is captured, as `processExample` prints
+// one block per arm and live output of several arms would interleave
 async function runAsync(command, args, options = {}) {
   try {
     const { stdout } = await execFileAsync(command, args, {
       cwd: options.cwd,
       env: options.env,
       encoding: options.encoding ?? 'utf8',
-      // Default maxBuffer (1 MB) is sized for a captured call, not for npm install / tsc / ng:build
-      // output that used to bypass it entirely via stdio: 'inherit'.
-      maxBuffer: options.maxBuffer ?? 256 * 1024 * 1024,
+      // The 1 MB default is too small for the output of npm install, `tsc` and `ng:build`
+      maxBuffer: options.maxBuffer ?? 256 * 1_024 * 1_024,
     });
     return stdout;
   } catch (error) {
@@ -209,14 +238,17 @@ export function rewriteInternalDependencies(manifest, tarballs) {
   return rewritten;
 }
 
-// The framework an arm belongs to, derived from the adapter it consumes rather than from its own
-// key. The two agree for every single-canary arm and DIVERGE for `vue-tsx`, whose adapter is
-// `@symbiote-native/vue` — and only this value may reach `findForeignFrameworkLeaks`, which
-// compares by identity. Handing it the arm key instead would report every legitimate
-// `.../navigation/build/vue/index.js` in that bundle as a foreign-framework leak: a guaranteed red
-// on a correct build.
+// From the adapter, not the arm key: they differ for `vue-tsx`, and `findForeignFrameworkLeaks`
+// given the key would report every Vue file of that bundle as foreign
 export function ownFrameworkOf(example) {
   return example.adapter.slice(INTERNAL_PREFIX.length);
+}
+
+function holdsFrameworkFile(source, packageName, framework) {
+  const packageRoot = `/@symbiote-native/${packageName}/`;
+  return ['src', 'build', 'build-ngc'].some(buildDir =>
+    source.includes(`${packageRoot}${buildDir}/${framework}/`),
+  );
 }
 
 export function findForeignFrameworkLeaks(
@@ -224,28 +256,22 @@ export function findForeignFrameworkLeaks(
   multiFrameworkPackages,
   ownFramework,
 ) {
-  const leaks = [];
-  for (const rawSource of sources) {
+  return sources.flatMap(rawSource => {
     const source = normalizedPath(rawSource);
-    for (const pkg of multiFrameworkPackages) {
-      const pkgRoot = `/@symbiote-native/${pkg.name}/`;
-      if (!source.includes(pkgRoot)) continue;
-      for (const foreignFramework of pkg.frameworks) {
-        if (foreignFramework === ownFramework) continue;
-        const foreign = ['src', 'build', 'build-ngc'].some(buildDir =>
-          source.includes(`${pkgRoot}${buildDir}/${foreignFramework}/`),
-        );
-        if (foreign) {
-          leaks.push({
-            package: pkg.name,
-            foreignFramework,
-            source: rawSource,
-          });
-        }
-      }
-    }
-  }
-  return leaks;
+    return multiFrameworkPackages.flatMap(pkg =>
+      pkg.frameworks
+        .filter(
+          framework =>
+            framework !== ownFramework &&
+            holdsFrameworkFile(source, pkg.name, framework),
+        )
+        .map(foreignFramework => ({
+          package: pkg.name,
+          foreignFramework,
+          source: rawSource,
+        })),
+    );
+  });
 }
 
 export function adapterReachedBundle(sources, adapterName) {
@@ -283,9 +309,8 @@ function copyTrackedExample(exampleDir, destination) {
   }
 }
 
-// Each `pnpm pack` writes its own uniquely-named tarball into the shared packDirectory, so nothing
-// here is mutable shared state - safe to run concurrently (three packages - navigation, slider,
-// splash-screen - run a full Angular AOT compile as a prepack side effect and dominate either way).
+// Concurrent is safe, each `pnpm pack` writes its own tarball. The Angular AOT in a `prepack`
+// dominates the time either way
 async function packPackages(names, packDirectory) {
   const entries = new Map(
     publishablePackageEntries().map(entry => [entry.name, entry]),
@@ -317,9 +342,7 @@ function discoverMultiFrameworkPackages() {
   const packages = [];
   for (const entry of publishablePackageEntries()) {
     if (!entry.dir.startsWith('packages/')) continue;
-    const manifest = JSON.parse(
-      readFileSync(join(REPO_ROOT, entry.dir, 'package.json'), 'utf8'),
-    );
+    const manifest = readJsonFile(join(REPO_ROOT, entry.dir, 'package.json'));
     const exportKeys = Object.keys(manifest.exports ?? {});
     const frameworks = KNOWN_FRAMEWORKS.filter(framework =>
       exportKeys.includes(`./${framework}`),
@@ -344,9 +367,10 @@ function verifyInstalledTarballs(exampleRoot, names, tarballs) {
     );
     if (!existsSync(installedPath))
       throw new Error(`${name} was not installed in ${exampleRoot}`);
-    const installed = JSON.parse(readFileSync(installedPath, 'utf8'));
-    const packed = JSON.parse(
+    const installed = readJsonFile(installedPath);
+    const packed = parseJson(
       run('tar', ['-xOf', tarballs.get(name), 'package/package.json']),
+      `the packed manifest of ${name}`,
     );
     if (JSON.stringify(installed) !== JSON.stringify(packed)) {
       throw new Error(
@@ -398,193 +422,172 @@ async function bundleSources(exampleRoot, platform) {
       ],
       { cwd: exampleRoot },
     );
-    return JSON.parse(readFileSync(sourcemap, 'utf8')).sources;
+    return readJsonFile(sourcemap).sources;
   } finally {
     rmSync(outputDir, { recursive: true, force: true });
   }
 }
 
-// One arm's full pipeline (install -> verify -> bundle both platforms), run concurrently with
-// every other arm's — each works in its own disposable directory, so nothing here is shared
-// mutable state. Output is captured (see runAsync) and printed as one block per arm once the whole
-// pipeline finishes, so concurrent arms don't interleave their logs.
-async function processExample(
-  framework,
-  example,
-  manifest,
-  tarballs,
-  multiFrameworkPackages,
-  platforms,
-  npmEnvironment,
-  matrixRoot,
-) {
-  const log = [];
-  const started = Date.now();
+// Kept apart so `processExample` reads as install, type check, bundle
+// A cache per arm: two `npm install` writing one cache root at once raise ENOTEMPTY
+async function installConsumer({ framework, example, manifest }, matrix) {
+  const root = join(matrix.matrixRoot, framework);
+  copyTrackedExample(example.dir, root);
+  const cacheDir = npmCacheDirFor(
+    root,
+    framework,
+    process.env.SYMBIOTE_NPM_CACHE_ROOT,
+  );
+  mkdirSync(cacheDir, { recursive: true });
+  const environment = { ...matrix.npmEnvironment, npm_config_cache: cacheDir };
+  const rewritten = rewriteInternalDependencies(manifest, matrix.tarballs);
+  writeFileSync(
+    join(root, 'package.json'),
+    `${JSON.stringify(rewritten, null, 2)}\n`,
+  );
+  rmSync(join(root, 'package-lock.json'), { force: true });
+
+  await installWithCacheRetry(root, environment, cacheDir);
+  verifyInstalledTarballs(
+    root,
+    directInternalDependencies(manifest),
+    matrix.tarballs,
+  );
+  return { root, environment };
+}
+
+// One platform bundle must hold this arm's adapter and no file of a foreign framework
+async function checkBundle(root, platform, arm, multiFrameworkPackages) {
+  const { framework, example } = arm;
+  const sources = await bundleSources(root, platform);
+  if (!adapterReachedBundle(sources, example.adapter)) {
+    throw new Error(
+      `${framework}/${platform} did not bundle ${example.adapter}; ` +
+        'the matrix may be validating registry or dead code instead of this adapter',
+    );
+  }
+  const leaks = findForeignFrameworkLeaks(
+    sources,
+    multiFrameworkPackages,
+    ownFrameworkOf(example),
+  );
+  if (leaks.length > 0) {
+    const details = leaks
+      .map(
+        leak =>
+          `${leak.package}: ${leak.foreignFramework} file reached ${framework}/${platform}\n` +
+          `  ${leak.source}`,
+      )
+      .join('\n');
+    throw new Error(details);
+  }
+  return sources.length;
+}
+
+// Kept apart so the timing and the log flush of `processExample` read in one glance
+async function runArm(arm, matrix, log) {
+  const { framework, example } = arm;
+  const consumer = await installConsumer(arm, matrix);
+  const [verifyCommand, verifyArgs] = example.verify;
+  log.push(
+    `${framework}: running ${verifyCommand} ${verifyArgs.join(' ')} ...`,
+  );
+  await runAsync(verifyCommand, verifyArgs, {
+    cwd: consumer.root,
+    env: verifyCommand === 'npm' ? consumer.environment : process.env,
+  });
+
+  await Promise.all(
+    platformsOf(example, matrix.platforms).map(async platform => {
+      const moduleCount = await checkBundle(
+        consumer.root,
+        platform,
+        arm,
+        matrix.multiFrameworkPackages,
+      );
+      log.push(
+        `${framework}/${platform}: ok (${moduleCount} modules, current adapter, no foreign framework)`,
+      );
+    }),
+  );
+}
+
+// The log is printed as one block per arm, so concurrent arms do not interleave
+async function processExample(arm, matrix) {
+  const { framework } = arm;
+  const startedAt = Date.now();
+  const log = [`${framework}: installing fresh tarball consumer ...`];
   try {
-    const exampleRoot = join(matrixRoot, framework);
-    copyTrackedExample(example.dir, exampleRoot);
-    // Own cache per framework, never the matrix-wide one: npm's cacache does content-addressable
-    // writes (tmp-then-rename into content-v2/<algo>/<first two hex chars>/...) that are NOT safe
-    // for two `npm install` processes writing into the SAME cache root at once — a concurrent
-    // rmdir/mkdir race on a shared bucket directory throws ENOTEMPTY. Every framework already runs
-    // its own `npm install` concurrently (see the Promise.all in main()); a shared
-    // `npm_config_cache` was the one piece of mutable state that comment didn't account for.
-    const frameworkNpmCache = npmCacheDirFor(
-      exampleRoot,
-      framework,
-      process.env.SYMBIOTE_NPM_CACHE_ROOT,
-    );
-    mkdirSync(frameworkNpmCache, { recursive: true });
-    const frameworkNpmEnvironment = {
-      ...npmEnvironment,
-      npm_config_cache: frameworkNpmCache,
-    };
-    const directPackages = directInternalDependencies(manifest);
-    const rewritten = rewriteInternalDependencies(manifest, tarballs);
-    writeFileSync(
-      join(exampleRoot, 'package.json'),
-      `${JSON.stringify(rewritten, null, 2)}\n`,
-    );
-    rmSync(join(exampleRoot, 'package-lock.json'), { force: true });
-
-    log.push(`${framework}: installing fresh tarball consumer ...`);
-    await installWithCacheRetry(
-      exampleRoot,
-      frameworkNpmEnvironment,
-      frameworkNpmCache,
-    );
-    verifyInstalledTarballs(exampleRoot, directPackages, tarballs);
-
-    const [verifyCommand, verifyArgs] = example.verify;
-    log.push(
-      `${framework}: running ${verifyCommand} ${verifyArgs.join(' ')} ...`,
-    );
-    await runAsync(verifyCommand, verifyArgs, {
-      cwd: exampleRoot,
-      env: verifyCommand === 'npm' ? frameworkNpmEnvironment : process.env,
-    });
-
-    await Promise.all(
-      platforms.map(async platform => {
-        const sources = await bundleSources(exampleRoot, platform);
-        if (!adapterReachedBundle(sources, example.adapter)) {
-          throw new Error(
-            `${framework}/${platform} did not bundle ${example.adapter}; ` +
-              'the matrix may be validating registry or dead code instead of this adapter',
-          );
-        }
-        const leaks = findForeignFrameworkLeaks(
-          sources,
-          multiFrameworkPackages,
-          ownFrameworkOf(example),
-        );
-        if (leaks.length > 0) {
-          const details = leaks
-            .map(
-              leak =>
-                `${leak.package}: ${leak.foreignFramework} file reached ${framework}/${platform}\n` +
-                `  ${leak.source}`,
-            )
-            .join('\n');
-          throw new Error(details);
-        }
-        log.push(
-          `${framework}/${platform}: ok (${sources.length} modules, current adapter, no foreign framework)`,
-        );
-      }),
-    );
-
-    log.push(
-      `${framework}: done in ${((Date.now() - started) / 1000).toFixed(1)}s`,
-    );
+    await runArm(arm, matrix, log);
+    const seconds = (Date.now() - startedAt) / 1_000;
+    log.push(`${framework}: done in ${seconds.toFixed(1)}s`);
     console.log(log.join('\n'));
   } catch (error) {
-    // Flush whatever progress this framework logged before failing — Promise.all rejects on the
-    // first error, and without this the other four frameworks' concurrent output can bury it.
-    if (log.length > 0) console.log(log.join('\n'));
+    // Printed before the rethrow, or the output of the other arms buries how far this one got
+    console.log(log.join('\n'));
     throw error;
   }
 }
 
-async function main() {
-  const frameworks = selectedValues(
+function selectedArms() {
+  return selectedValues(
     'SYMBIOTE_CONSUMER_FRAMEWORKS',
-    Object.keys(FRAMEWORK_EXAMPLES),
-  );
-  const platforms = selectedValues('SYMBIOTE_CONSUMER_PLATFORMS', PLATFORMS);
-  const matrixRoot = mkdtempSync(join(tmpdir(), 'symbiote-consumer-matrix-'));
+    Object.keys(MATRIX_EXAMPLES),
+  ).map(framework => {
+    const example = MATRIX_EXAMPLES[framework];
+    const manifest = readJsonFile(join(REPO_ROOT, example.dir, 'package.json'));
+    return { framework, example, manifest };
+  });
+}
+
+// pnpm hands its children a setting of its own, which npm does not know and warns about
+function consumerNpmEnvironment() {
+  const environment = { ...process.env };
+  delete environment.npm_config_manage_package_manager_versions;
+  return environment;
+}
+
+async function runMatrix(arms, platforms, matrixRoot) {
   const packDirectory = join(matrixRoot, 'tarballs');
   mkdirSync(packDirectory);
-  // Base env for every framework's npm calls; each gets its OWN npm_config_cache override inside
-  // processExample, never a shared one — see the comment there.
-  const npmEnvironment = { ...process.env };
-  // pnpm injects its own setting into child processes; npm does not recognize it and warns on
-  // every install/run. It has no bearing on the standalone consumer, so do not forward it.
-  delete npmEnvironment.npm_config_manage_package_manager_versions;
+  const packageNames = [
+    ...new Set(arms.flatMap(arm => directInternalDependencies(arm.manifest))),
+  ].sort();
+
+  console.log(
+    `Packing ${packageNames.length} direct consumer package(s): ${packageNames.join(', ')}`,
+  );
+  const matrix = {
+    tarballs: await packPackages(packageNames, packDirectory),
+    multiFrameworkPackages: discoverMultiFrameworkPackages(),
+    npmEnvironment: consumerNpmEnvironment(),
+    platforms,
+    matrixRoot,
+  };
+
+  // Not `Promise.all`: the caller's cleanup would run while other arms still write under
+  // `matrixRoot`, and its ENOTEMPTY would replace the real error of the failed arm
+  const settled = await Promise.allSettled(
+    arms.map(arm => processExample(arm, matrix)),
+  );
+  const failures = settled
+    .filter(result => result.status === 'rejected')
+    .map(result => result.reason);
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures,
+      `${failures.length} of ${arms.length} framework(s) failed`,
+    );
+  }
+}
+
+async function main() {
+  const arms = selectedArms();
+  const platforms = selectedValues('SYMBIOTE_CONSUMER_PLATFORMS', PLATFORMS);
+  const matrixRoot = mkdtempSync(join(tmpdir(), 'symbiote-consumer-matrix-'));
 
   try {
-    const selectedExamples = frameworks.map(framework => [
-      framework,
-      FRAMEWORK_EXAMPLES[framework],
-    ]);
-    const manifests = new Map(
-      selectedExamples.map(([framework, example]) => [
-        framework,
-        JSON.parse(
-          readFileSync(join(REPO_ROOT, example.dir, 'package.json'), 'utf8'),
-        ),
-      ]),
-    );
-    const packageNames = [
-      ...new Set(
-        [...manifests.values()].flatMap(manifest =>
-          directInternalDependencies(manifest),
-        ),
-      ),
-    ].sort();
-
-    console.log(
-      `Packing ${packageNames.length} direct consumer package(s): ${packageNames.join(', ')}`,
-    );
-    const tarballs = await packPackages(packageNames, packDirectory);
-    const multiFrameworkPackages = discoverMultiFrameworkPackages();
-
-    // Every framework works in its own disposable directory (npm cache included — see
-    // processExample), so running them concurrently turns wall time from "sum of all five" into
-    // "roughly the slowest one" instead of needing to serialize.
-    //
-    // allSettled, not all: Promise.all rejects the instant the FIRST framework fails while the
-    // others keep running in the background (nothing cancels them). The finally block below then
-    // rmSync's the whole matrixRoot immediately on that rejection, which races an in-progress
-    // sibling's own npm/cacache writes under that same root — the real cause of the "ENOTEMPTY on
-    // _cacache" this script kept hitting even after per-framework cache isolation (782d2cdc) and a
-    // wipe-and-retry (3bd62461). Worse, a throw from `finally` replaces whatever the `try` was
-    // rejecting with, so the ENOTEMPTY from that race was masking each framework's real error.
-    // Waiting for every framework to settle before cleanup removes the race outright.
-    const settled = await Promise.allSettled(
-      selectedExamples.map(([framework, example]) =>
-        processExample(
-          framework,
-          example,
-          manifests.get(framework),
-          tarballs,
-          multiFrameworkPackages,
-          platforms,
-          npmEnvironment,
-          matrixRoot,
-        ),
-      ),
-    );
-    const failures = settled
-      .filter(result => result.status === 'rejected')
-      .map(result => result.reason);
-    if (failures.length > 0) {
-      throw new AggregateError(
-        failures,
-        `${failures.length} of ${selectedExamples.length} framework(s) failed`,
-      );
-    }
-
+    await runMatrix(arms, platforms, matrixRoot);
     console.log('\nAll packed consumer bundles passed.');
   } finally {
     if (process.env.SYMBIOTE_KEEP_CONSUMER_MATRIX === '1') {

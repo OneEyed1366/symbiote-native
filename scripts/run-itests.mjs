@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 import esbuild from 'esbuild';
 
+import { parseJson } from './lib/parse-json.mjs';
 import {
   reanimatedItestSeams,
   reanimatedNodePaths,
@@ -214,14 +215,6 @@ const FABRIC_FLAGS_PATTERN = /@symbiote-fabric-flags\s+(\{.*\})/g;
 
 // A flag value `"*"` runs the file once per boolean, as Fantom's `@fantom_flags name:*` does
 const EVERY_VALUE = '*';
-
-function parseJson(text, origin) {
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    throw new Error(`invalid JSON in ${origin}: ${error.message}`);
-  }
-}
 
 // One entry per flag combination a file asks for, `flags` undefined when it asks for none
 function fabricFlagVariantsOf(file) {

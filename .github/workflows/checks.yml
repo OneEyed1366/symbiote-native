@@ -114,7 +114,7 @@ jobs:
       # node builtins only.
       - id: arms
         run: |
-          list=$(node -e "import('./scripts/check-packed-consumer-bundles.mjs').then(m => console.log(JSON.stringify(Object.keys(m.FRAMEWORK_EXAMPLES))))")
+          list=$(node -e "import('./scripts/check-packed-consumer-bundles.mjs').then(m => console.log(JSON.stringify(Object.keys(m.MATRIX_EXAMPLES))))")
           echo "list=$list" >> "$GITHUB_OUTPUT"
 
   # Fails a PR whose changed packages outnumber its changesets - see symbiote-release-publishing

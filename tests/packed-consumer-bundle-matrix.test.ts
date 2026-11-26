@@ -10,8 +10,10 @@ import {
   findForeignFrameworkLeaks,
   FRAMEWORK_EXAMPLES,
   KNOWN_FRAMEWORKS,
+  MATRIX_EXAMPLES,
   ownFrameworkOf,
   PLATFORMS,
+  platformsOf,
   rewriteInternalDependencies,
 } from '../scripts/check-packed-consumer-bundles.mjs';
 import { canaryExampleNames } from '../scripts/lib/canary-examples.mjs';
@@ -19,17 +21,30 @@ import { canaryExampleNames } from '../scripts/lib/canary-examples.mjs';
 const REPO_ROOT = path.resolve(__dirname, '..');
 
 describe('packed consumer bundle matrix', () => {
-  // Read the expected set off DISK, never from a written-down list. This assertion used to be
-  // `Object.keys(FRAMEWORK_EXAMPLES) === KNOWN_FRAMEWORKS`, which is not a coverage check at all:
-  // both sides were hand-written, both said "five", and `examples/vue-tsx` — a sixth canary with
-  // no arm — satisfied it. No audit detects a member absent from the list being audited
-  // (`.claude/rules/adapter-parity-audit.md`), so the next example has to join by existing.
+  // The expected set comes from disk: no audit notices a member missing from its own list
   it('runs one arm per canary example, on both native platforms', () => {
     const covered = Object.values(FRAMEWORK_EXAMPLES).map(example =>
       example.dir.replace('examples/', ''),
     );
     expect(covered.sort()).toEqual(canaryExampleNames());
     expect(PLATFORMS).toEqual(['ios', 'android']);
+  });
+
+  it('type-checks every expo example without bundling it', () => {
+    const expoExamples = fs
+      .readdirSync(path.join(REPO_ROOT, 'examples'))
+      .filter(name => name.startsWith('expo-'));
+    const typecheckOnly = Object.values(MATRIX_EXAMPLES).filter(
+      example => 'isTypecheckOnly' in example,
+    );
+
+    expect(
+      typecheckOnly.map(example => example.dir.replace('examples/', '')).sort(),
+    ).toEqual(expoExamples.sort());
+    expect(
+      typecheckOnly.flatMap(example => platformsOf(example, PLATFORMS)),
+    ).toEqual([]);
+    expect(platformsOf(FRAMEWORK_EXAMPLES.react, PLATFORMS)).toEqual(PLATFORMS);
   });
 
   // `vue-tsx`'s arm key is not its framework, and only the derived value may reach the foreign-file
@@ -52,7 +67,7 @@ describe('packed consumer bundle matrix', () => {
     ).toEqual([]);
   });
 
-  it.each(Object.entries(FRAMEWORK_EXAMPLES))(
+  it.each(Object.entries(MATRIX_EXAMPLES))(
     '%s consumes its own adapter directly',
     (framework, example) => {
       const manifest = JSON.parse(
@@ -120,18 +135,8 @@ describe('packed consumer bundle matrix', () => {
     ]);
   });
 
-  // The workflow runs one RUNNER per arm now, and a `strategy.matrix` is precisely the shape that
-  // invites a second copy of the arm names — the mistake that left `examples/vue-tsx` in no CI list
-  // for a year. Both halves are needed: the first says the list is derived, the second says no
-  // EXECUTABLE line quietly re-states it. Comments are stripped first because the prose around the
-  // job names these frameworks on purpose, and a guard that forbids explaining itself is one
-  // somebody deletes.
-  //
-  // Break-tested in two directions, because the first attempt caught only one: replacing the
-  // expression with a literal list fires the first assertion, and adding a `- arm: solid` exclude
-  // BESIDE the expression fires the second. The original spelling of the second half — matching
-  // `- solid\n` / quoted forms — passed that exclude and would have let the list back in one
-  // `exclude:` at a time.
+  // The first checks prove the arm list is derived, the last one that no executable line names an
+  // arm beside it, in an `exclude:` say. Comments are stripped: their prose names frameworks
   it('derives the CI matrix arms from this script, never a written-down list', () => {
     const workflow = fs.readFileSync(
       path.join(REPO_ROOT, '.github/workflows/checks.yml'),
@@ -140,11 +145,12 @@ describe('packed consumer bundle matrix', () => {
     expect(workflow).toContain(
       'arm: ${{ fromJSON(needs.gate.outputs.bundle-arms) }}',
     );
+    expect(workflow).toContain('Object.keys(m.MATRIX_EXAMPLES)');
     const executable = workflow
       .split('\n')
       .filter(line => !line.trim().startsWith('#'))
       .join('\n');
-    const restated = Object.keys(FRAMEWORK_EXAMPLES).filter(arm =>
+    const restated = Object.keys(MATRIX_EXAMPLES).filter(arm =>
       new RegExp(`\\b${arm}\\b`).test(executable),
     );
     expect(restated).toEqual([]);
