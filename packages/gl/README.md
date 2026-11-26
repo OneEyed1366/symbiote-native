@@ -4,11 +4,15 @@
 [SymbioteNative](../../README.md) adapter: React, Vue, Svelte, Solid and Angular. A `GLView` that
 gives a WebGL2 context to draw into, headless contexts and snapshots.
 
-Built the same way as [`@symbiote-native/clipboard`](../clipboard)'s `ClipboardPasteButton`, an
-`expo-modules-core` native view reached through `requireNativeViewManager` (see the
-`symbiote-expo-native-module` project skill: why `expo-modules-core` is depended on directly and never
-the `expo` meta-package, why the upstream JS is hand-ported into `core/`, and how autolinking finds the
-native module). One render function in `core/` returns a descriptor and every adapter only turns it into
+Built the same way as [`@symbiote-native/clipboard`](../clipboard)'s `ClipboardPasteButton`: an
+`expo-modules-core` native view reached through `requireNativeViewManager`. The
+`symbiote-expo-native-module` project skill explains three choices:
+
+- `expo-modules-core` is a direct dependency, never the `expo` meta-package
+- the upstream JS is hand-ported into `core/`
+- how autolinking finds the native module
+
+One render function in `core/` returns a descriptor and every adapter only turns it into
 its own element.
 
 ## Install
@@ -159,6 +163,7 @@ function onContextCreate(gl: IExpoWebGLRenderingContext) {
 <GLView onContextCreate={(gl: IExpoWebGLRenderingContext) => void} msaaSamples? enableExperimentalWorkletSupport? style? />
 // gl is a WebGL2 context, call gl.endFrameEXP() at the end of every frame
 // handle: exglCtxId, createCameraTextureAsync(camera), destroyObjectAsync(texture), takeSnapshotAsync(options?)
+// Svelte: `bind:this` has getContextId() in place of exglCtxId
 
 createContextAsync(): Promise<IExpoWebGLRenderingContext>      // headless
 destroyContextAsync(exgl?: IExpoWebGLRenderingContext | number): Promise<boolean>

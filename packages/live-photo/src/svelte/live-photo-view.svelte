@@ -7,9 +7,10 @@
     hostProps,
   } from '@symbiote-native/svelte/native-view-bridge';
   import { createLivePhotoViewHandle, renderLivePhotoView } from '../core';
+  import type { IViewProps } from '@symbiote-native/svelte';
   import type { ILivePhotoPlaybackStyle, ILivePhotoViewProps } from '../core';
 
-  const props: ILivePhotoViewProps = $props();
+  const props: ILivePhotoViewProps & Pick<IViewProps, 'class'> = $props();
   const descriptor = $derived(renderLivePhotoView({ ...props }));
   let viewHost: unknown = $state.raw(null);
   const captureViewHost = captureHost(host => {
