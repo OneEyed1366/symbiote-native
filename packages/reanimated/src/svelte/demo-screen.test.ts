@@ -21,6 +21,17 @@ vi.mock('react-native-reanimated/src/updateProps', () => ({
   updateProps: vi.fn(),
 }));
 
+// Headless builds the keyframes rule from the platform class, so the native manager would not
+// recognise it, and the style a node hands over is read off the manager's `update` instead
+const cssUpdate = vi.hoisted(() => vi.fn());
+vi.mock('react-native-reanimated/src/css/native', () => ({
+  CSSManager: class {
+    update = cssUpdate;
+    unmountCleanup(): void {}
+  },
+  markNodeAsRemovable: vi.fn(),
+}));
+
 let unmountTree = () => {};
 
 beforeEach(() => {
@@ -54,6 +65,15 @@ describe('the Svelte Reanimated demo screen, mounted', () => {
 
     expect(live.texts(root)).toEqual(
       expect.arrayContaining([...SECTION_TITLES]),
+    );
+  });
+
+  it('hands the style object of a bare tag to the CSS manager', async () => {
+    await mountScreen();
+
+    expect(cssUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ animationDuration: '600ms' }),
+      expect.anything(),
     );
   });
 

@@ -2,6 +2,7 @@
   // The native view name is mixed-case, which a literal tag would parse as a component reference,
   // so the tag is dynamic
   import {
+    captureHost,
     hostInstance,
     hostProps,
   } from '@symbiote-native/svelte/native-view-bridge';
@@ -10,8 +11,11 @@
 
   const props: ILivePhotoViewProps = $props();
   const descriptor = $derived(renderLivePhotoView({ ...props }));
-  let shim: unknown = $state(null);
-  const handle = createLivePhotoViewHandle(() => hostInstance(shim));
+  let viewHost: unknown = $state.raw(null);
+  const captureViewHost = captureHost(host => {
+    viewHost = host;
+  });
+  const handle = createLivePhotoViewHandle(() => hostInstance(viewHost));
 
   export function startPlayback(playbackStyle?: ILivePhotoPlaybackStyle): void {
     handle.startPlayback(playbackStyle);
@@ -25,7 +29,7 @@
 {#if descriptor}
   <svelte:element
     this={descriptor.type}
-    bind:this={shim}
+    {@attach captureViewHost}
     {@attach hostProps(descriptor.props)}
   />
 {/if}

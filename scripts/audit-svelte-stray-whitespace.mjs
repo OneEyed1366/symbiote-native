@@ -1,35 +1,32 @@
-// Audits every .svelte file for whitespace that reaches a real native node — costs nothing to run,
-// catches what tsc/the compiler never will:
+// Audits every .svelte file for whitespace that reaches a real native node
+// It costs nothing to run and catches what tsc and the compiler never will
 //   node scripts/audit-svelte-stray-whitespace.mjs [...roots]
 
-// INSIDE one text node — Svelte trims a text node's leading/trailing whitespace but does not
-// condense whitespace inside it, so a sentence wrapped across source lines ships its literal
-// newline+indent into the RCTText: the device renders a line break and mid-sentence spaces.
+// INSIDE one text node: Svelte trims a text node's edges but not the whitespace within it
+// So a sentence wrapped across source lines ships its newline and indent into the `RCTText`
+// and the device renders a line break and mid-sentence spaces
 
-// Checks the PIPELINE'S OUTPUT (after `collapseTextWhitespace()`, same as svelte.config.js), not
-// the source — checking source would flag every readability-wrapped sentence as a false positive.
-// Catches only what survives: a text node the preprocessor can't fix, or an unregistered build.
+// Checks the pipeline's output (after `collapseTextWhitespace()`, as `svelte.config.js` does)
+// Source would flag every readability-wrapped sentence as a false positive
+// It catches only what survives: a text node the preprocessor cannot fix, or an unregistered build
 
-// BETWEEN siblings — no longer checked: `dom-shim/text.ts` maps a whitespace-only text node under
-// a parent that can't hold raw text to an anchor, so the gap never reaches Fabric (mechanism:
-// svelte-adapter-dom-shim skill §16b).
+// BETWEEN siblings is no longer checked: the renderer maps a whitespace-only text node under a
+// parent that cannot hold raw text to an anchor, so the gap never reaches Fabric
 
 import { readFileSync } from 'node:fs';
 import { globSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { relative } from 'node:path';
 
-// pnpm keeps node_modules isolated per package, and `svelte` is a devDependency of
-// adapters/svelte — not of the repo root — so resolve from there, not from this script.
+// `svelte` is a `devDependency` of `adapters/svelte` and not of the repo root, and pnpm isolates
+// node_modules per package, so it resolves from there
 const require = createRequire(
   new URL('../adapters/svelte/package.json', import.meta.url),
 );
 const { parse } = require('svelte/compiler');
 
-// The built preprocessor, not the .ts source: this script is plain node with no TS loader, and
-// the build output is what a consuming app actually runs. A missing build would mean auditing
-// raw source — every normally-formatted file reported as an offender — so fail loudly instead of
-// producing a wrong report.
+// The built preprocessor, as this script is plain node with no TS loader, and an app runs the build
+// A missing build would flag every normally-formatted file, so fail loudly instead
 const COLLAPSE_BUILD = new URL(
   '../adapters/svelte/build/preprocessor/collapse-text-whitespace.js',
   import.meta.url,
@@ -40,16 +37,30 @@ try {
 } catch {
   console.error(
     'audit-svelte-stray-whitespace: adapters/svelte build output missing.\n' +
-      'Run `pnpm typecheck` (which emits build/) first — auditing raw source would report every\n' +
+      'Run `pnpm typecheck` (which emits build/) first, as auditing raw source would report every\n' +
       'normally-formatted file as an offender.',
   );
   process.exit(2);
 }
 const collapse = collapseTextWhitespace();
 
-// Walks any parsed node shape looking for Text nodes whose real content spans source lines.
-// Reads the AST through plain structural checks rather than a pinned type, the same discipline
-// adapters/svelte/src/preprocessor/forbid-special-elements.ts uses on the same parse() output.
+const TEXT_NODE_TYPE = 'Text';
+
+// The fields of a modern Svelte AST node that hold child nodes or a fragment of them
+const CHILD_FIELDS = [
+  'fragment',
+  'nodes',
+  'consequent',
+  'alternate',
+  'body',
+  'fallback',
+  'pending',
+  'then',
+  'catch',
+];
+
+// Walks the AST by those fields for Text nodes whose real content spans source lines
+// The shape is read with plain structural checks, as `forbid-special-elements.ts` does
 function collectWrappedText(node, found) {
   if (Array.isArray(node)) {
     for (const child of node) collectWrappedText(child, found);
@@ -57,19 +68,18 @@ function collectWrappedText(node, found) {
   }
   if (typeof node !== 'object' || node === null) return found;
   if (
-    node.type === 'Text' &&
+    node.type === TEXT_NODE_TYPE &&
     typeof node.data === 'string' &&
     node.data.trim().includes('\n')
   ) {
     found.push(node.data.trim().replace(/\s+/g, ' ').slice(0, 60));
   }
-  for (const value of Object.values(node)) collectWrappedText(value, found);
+  for (const field of CHILD_FIELDS) collectWrappedText(node[field], found);
   return found;
 }
 
-// `packages/**` is in the default set on purpose — omitting it silently under-scans (slider and
-// navigation's .svelte files went unaudited until someone remembered to pass a root), and a
-// default that silently under-scans reads as "clean", which is worse than no default at all.
+// `packages/*/src` is in the default set on purpose, as omitting it silently under-scans
+// A default that under-scans reads as clean, which is worse than no default at all
 const roots = process.argv.slice(2);
 const patterns = (
   roots.length > 0
@@ -109,10 +119,10 @@ for (const { file, spans } of wrapped.sort(
   (a, b) => b.spans.length - a.spans.length,
 )) {
   console.log(`${String(spans.length).padStart(3)}  ${file}`);
-  for (const span of spans) console.log(`     "${span}…"`);
+  for (const span of spans) console.log(`     "${span}..."`);
 }
 
 console.log(
-  `\n${files.length} files scanned · ${wrapped.length} files / ${wrappedTotal} wrapped text nodes`,
+  `\n${files.length} files scanned, ${wrapped.length} files / ${wrappedTotal} wrapped text nodes`,
 );
 process.exit(wrappedTotal > 0 ? 1 : 0);

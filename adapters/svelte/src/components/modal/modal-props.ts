@@ -1,10 +1,6 @@
-// `IModalProps`'s canonical home — see `view-props.ts`'s header comment for why this type
-// lives in a plain `.ts` file rather than being re-exported straight out of `index.svelte`.
-// The shared @symbiote-native/components base types (IModalAnimationType/IModalPresentationStyle/
-// IModalOrientation/IModalOrientationChangeEvent) are framework-agnostic and re-exported verbatim;
-// visible/transparent/backdropColor/... plus style/class/children/the event callbacks are declared
-// here per <prop_types_split_agnostic_vs_per_adapter> (children is a Svelte Snippet, so the full
-// prop type is per-adapter like React's/Vue's IModalProps, not shared).
+// Canonical home of `IModalProps`, see `view-props.ts` for why it is a plain `.ts` file
+// The agnostic base types from `@symbiote-native/components` are re-exported verbatim
+// The rest is per adapter, as `children` is a `Snippet`: <prop_types_split_agnostic_vs_per_adapter>
 import type { Snippet } from 'svelte';
 import type {
   IColorValue,
@@ -46,7 +42,7 @@ export type IModalProps = IAccessibilityProps &
     allowSwipeDismissal?: boolean;
     // Real ViewConfig DirectEvents (onShow/onDismiss/onRequestClose/onOrientationChange) —
     // idiomatic Svelte 5 callback props, riding the object bag raw like every other adapter's
-    // passthrough (svelte-adapter-dom-shim skill §3g(c): "most of §5 collapses").
+    // passthrough
     onShow?: () => void;
     onDismiss?: () => void;
     onRequestClose?: () => void;

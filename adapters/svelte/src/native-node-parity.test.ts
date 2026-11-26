@@ -1,25 +1,16 @@
-// CROSS-ADAPTER DIFFERENTIAL / CHARACTERIZATION: how many NATIVE Fabric nodes does each adapter
-// create for the same intended UI?
-//
-// Why this exists: `examples/svelte` measured ~20 MB more device RSS than `examples/vue-sfc` on
-// an equivalent screen, and every cheap explanation died under measurement — the Svelte iOS dev
-// bundle is the SMALLEST of the three adapters (5.9M vs Vue's 6.0M), and the dom-shim's own JS
-// cost is 548 B/node, about 1 MB for a realistic screen (svelte-adapter-dom-shim §11b). An RN
-// process's footprint is dominated by NATIVE memory — shadow nodes and views — not JS objects,
-// so the question that actually matters is whether the shim makes the engine emit more native
-// nodes than Vue's renderer does for identical markup.
-//
-// ANSWER, locked in below: no. Svelte emits exactly ONE extra node in total — a constant root
-// wrapper — and the rest of the tree is node-for-node identical. That is a fixed cost of about
-// half a kilobyte, so this file is the proof that native node inflation is NOT the explanation
-// for a multi-megabyte gap. Do not go looking here again; measure JS heap on device instead.
-//
-// `counts.createNode` is the honest instrument: the fake Fabric counts real createNode calls and
-// excludes clones, so this measures native node PRODUCTION, not commit churn.
-//
-// The Svelte template is packed edge-to-edge deliberately (§16): whitespace between siblings
-// compiles to real RCTRawText nodes, and leaving it in would measure that known hazard instead
-// of the structural question being asked here.
+// Cross-adapter differential: how many native Fabric nodes does each adapter create for one UI?
+
+// `examples/svelte` measured ~20 MB more device RSS than `examples/vue-sfc` on the same screen
+// The Svelte iOS dev bundle is the smallest of the three
+// An RN process is dominated by native memory, so the question is whether Svelte emits more nodes
+
+// ANSWER: no. Svelte emits exactly one extra node, a constant root wrapper of about half a KB
+// So native node count does not explain the gap, measure the JS heap on device instead
+
+// `counts.createNode` is the instrument: the fake Fabric counts real `createNode` calls, not clones
+
+// The Svelte template is packed edge-to-edge, as whitespace between siblings compiles to real
+// `RCTRawText` nodes and would measure that known hazard instead of the structure
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -27,6 +18,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { h } from '@vue/runtime-core';
+import { textOf } from '@symbiote-native/engine';
 import {
   createLiveTree,
   installRecordingFabric,
@@ -114,26 +106,20 @@ const VueRoot = {
   },
 };
 
-// No Negative group: this is a cross-adapter structural invariant, not a unit with a throwing
-// contract — the only outcome that matters is whether the two committed trees agree.
-// No Negative group: this is a cross-adapter structural invariant, not a unit with a throwing
-// contract — the only outcome that matters is whether the two committed trees agree.
+// No Negative group: this is a structural invariant across adapters, not a unit that throws
+// The only outcome that matters is whether the two committed trees agree
 describe('native node production per adapter, same UI', () => {
   describe('Positive', () => {
     it('differs from Vue by exactly one constant root wrapper, nothing per-element', async () => {
-      // why: the product rule this file locks in — the Svelte shim must not inflate native
-      // Fabric node count beyond its one constant root-wrapper cost (see the file header for
-      // the investigation that ruled out every other explanation for the measured RSS gap). A
-      // regression here means the shim started emitting extra native nodes per element, which
-      // is exactly the class of bug §16 (stray whitespace -> real RCTRawText) already caused.
+      // The renderer must not inflate the native node count beyond one constant root wrapper
+      // A regression means extra native nodes per element, as stray whitespace once caused
       const SvelteRoot = await compileComponent(SVELTE_SOURCE, 'ParityRoot');
 
-      // An anchor (OP_CREATE_ANCHOR, empty viewName) is engine-side bookkeeping the commit walk
-      // flattens away — it never reaches nativeFabricUIManager.createNode, so it is excluded from
-      // a NATIVE node count. Svelte's each-block mints two of them for this markup; Vue's `h()`
-      // reconciler mints none, which is not a native-node difference and must not read as one.
-      const isNative = (node: { viewName: string }): boolean =>
-        node.viewName !== '';
+      // An anchor (empty `viewName`) and an empty `RCTRawText` never reach `createNode`
+      // Svelte leaves both as block anchors and Vue's `h()` none, which is no native difference
+      const isNative = (node: IAuthoredNode): boolean =>
+        node.viewName !== '' &&
+        !(node.viewName === 'RCTRawText' && textOf(node.handle) === '');
 
       svelteMount(SVELTE_ROOT, SvelteRoot);
       await tick();
@@ -149,11 +135,9 @@ describe('native node production per adapter, same UI', () => {
       const vueCreated = fabric.findAll(isNative);
       const vueTree = live.serialize(live.appRoot());
 
-      // root-element.ts puts a wrapper ShimElement between the engine's synthetic box-none
-      // AppContainer and the app's own root, because Svelte's compiled output mounts through an
-      // anchor rather than handing us a root node the way Vue/React do. It carries flex:1 so a
-      // flex:1 app root still fills the screen (mount-pipeline.smoke.test.ts covers that).
-      // Peeling BOTH layers off the Svelte tree and ONE off Vue's must leave identical trees.
+      // `root-element.ts` puts a flex:1 wrapper between the AppContainer and the app root, as
+      // Svelte mounts through an anchor rather than receiving a root node like Vue and React
+      // Peeling both layers off the Svelte tree and one off Vue's must leave identical trees
       expect(
         stripOuter(stripOuter(svelteTree)),
         'tree below the adapter wrappers',

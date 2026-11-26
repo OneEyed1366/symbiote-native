@@ -160,6 +160,27 @@ describe('useWindowDimensions (Svelte)', () => {
 
     expect(values).toHaveLength(before);
   });
+
+  it('drops its Dimensions subscription on unmount', async () => {
+    const removeDimensions = vi.fn();
+    const subscribe = Dimensions.addEventListener.bind(Dimensions);
+    vi.spyOn(Dimensions, 'addEventListener').mockImplementation(
+      (type, next) => {
+        const subscription = subscribe(type, next);
+        const remove = subscription.remove.bind(subscription);
+        subscription.remove = () => {
+          removeDimensions();
+          remove();
+        };
+        return subscription;
+      },
+    );
+    await mountProbe(DIMENSIONS_RUNE);
+
+    unmount(ROOT_TAG);
+
+    expect(removeDimensions).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useColorScheme (Svelte)', () => {

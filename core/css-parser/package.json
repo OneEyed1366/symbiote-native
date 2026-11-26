@@ -62,6 +62,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run core/css-parser/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

@@ -30,8 +30,8 @@
     "@symbiote-native/splash-screen": "latest",
     "react": "19.2.3",
     "react-native": "0.86.0",
-    "react-native-reanimated": "4.7.1",
-    "react-native-worklets": "0.13.0",
+    "react-native-reanimated": "4.7.2",
+    "react-native-worklets": "0.13.1",
     "solid-js": "^1.9.14"
   },
   "devDependencies": {

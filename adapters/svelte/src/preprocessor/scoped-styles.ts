@@ -1,7 +1,7 @@
 // A `.svelte` file's `<style>` block, compiled to real native styles
 // Svelte's own `result.css` is unusable here, so scoping runs on the source before `compile()`
 
-// With `css: 'external'` a rule on a host tag is dead, since `ShimElement` has no `className`
+// With `css: 'external'` a rule on a host tag is dead, since a host element has no `className`
 // A rule on a component is emitted as `css_unused_selector`, and that is all real app code
 
 // Cut the block out as text and compile it with `compileScopedCss`, as Vue's `<style scoped>`
@@ -28,21 +28,16 @@ import {
   type IScopedCss,
   serializeRules,
 } from '@symbiote-native/css-parser';
-// Resolved by package SELF-REFERENCE, not the relative `../scope-token` the rest of this package
-// would write — same reason metro-svelte-transformer.cjs reaches for
-// `@symbiote-native/svelte/preprocessor`. `svelte.config.js` is loaded directly by Node
-// (svelte-check, the language server), which strips types off a `.ts` file but still applies its
-// own ESM resolver to what that file imports, where an extensionless relative specifier is
-// ERR_MODULE_NOT_FOUND. The `exports` map supplies the extension at both targets — `src`
-// in this workspace, `build` in a published install — so one line works in both. `scope-token`
-// specifically, never `style-scope`: that one reaches the engine through `class-value`, a whole
-// extensionless graph this build-time file must not pull in.
+// Self-reference, not `../scope-token`: Node loads `svelte.config.js` and its ESM resolver
+// rejects an extensionless relative import, while the `exports` map adds the extension
+// `scope-token`, never `style-scope`: that one pulls the engine through `class-value`
 import {
   scopeToken,
   type IScopedNames,
 } from '@symbiote-native/svelte/scope-token';
 
 const SCOPE_ID_PREFIX = 'svelte-';
+const TEXT_NODE_TYPE = 'Text';
 const ENGINE_MODULE = '@symbiote-native/engine';
 const RUNTIME_MODULE = '@symbiote-native/svelte/style-scope';
 
@@ -186,10 +181,7 @@ async function compileStyleBlock(
   return compilePreprocessor(block.source, language, path);
 }
 
-// ---------------------------------------------------------------------------------------------
-// AST reading. `parse()`'s return type is not pinned here (same call, same reasoning as
-// forbid-web-only-constructs.ts): it is read through runtime guards on `unknown` rather than
-// trusting a shape nothing verifies.
+// `parse()`'s return type is not pinned, so the AST is read through guards on `unknown`
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -218,10 +210,8 @@ function fragmentNodes(ast: unknown): unknown[] {
   return Array.isArray(fragment.nodes) ? fragment.nodes : [];
 }
 
-// The markup walk descends through every child value rather than one known key: a `class`
-// attribute can sit inside an {#if}/{#each} branch, a snippet body, or a component's children,
-// and those hang off different fields. Deliberately started from `ast.fragment` alone, never the
-// root — the `css` subtree has its own nodes carrying a `name` and would be walked for nothing.
+// Walks every child value, not one key: a `class` can sit in a block branch, a snippet or children
+// Started from `ast.fragment`, as the `css` subtree has its own `name` nodes
 function nestedNodes(node: Record<string, unknown>): unknown[] {
   const nested: unknown[] = [];
   for (const value of Object.values(node)) {
@@ -270,7 +260,7 @@ function staticTextOf(attribute: Record<string, unknown>): string | undefined {
   if (parts === undefined) return undefined;
   let text = '';
   for (const part of parts) {
-    if (!isRecord(part) || part.type !== 'Text') return undefined;
+    if (!isRecord(part) || part.type !== TEXT_NODE_TYPE) return undefined;
     const data = stringAt(part, 'data');
     if (data === undefined) return undefined;
     text += data;
@@ -315,11 +305,9 @@ function classAttributeEdit(
   };
 }
 
-// `class:card={cond}` carries its class name in the DIRECTIVE, where the value rewrite above
-// cannot see it. Svelte rejects the directive on a COMPONENT (`component_invalid_directive`), so
-// only a host element reaches here — rewritten anyway, because a token left unscoped names a rule
-// that registered under the scoped name and is silently dead. The shorthand `class:card` expands
-// to `class:card__<scope>={card}`: the class is scoped, the variable it reads keeps its own name.
+// `class:card={cond}` holds its name in the directive, out of reach of the value rewrite above
+// An unscoped token would name a rule registered under the scoped name, so it is dead
+// The shorthand `class:card` becomes `class:card__<scope>={card}`, the variable keeps its name
 function classDirectiveEdit(
   directive: Record<string, unknown>,
   content: string,
@@ -339,10 +327,8 @@ function classDirectiveEdit(
   return { start, end, text: `class:${scoped}={${expression}}` };
 }
 
-// A lone `class={expr}` reproduces `expr` verbatim, so an arbitrary expression — a clsx array, a
-// ternary, a function call — passes through untouched and only its RESULT gets scoped. An
-// interpolated `class="a {b} c"` is rebuilt as the template literal Svelte itself would have
-// concatenated, so both shapes reduce to one expression the runtime helper can take.
+// A lone `class={expr}` passes `expr` through verbatim, so only its result gets scoped
+// An interpolated `class="a {b} c"` is rebuilt as the template literal Svelte would concatenate
 function expressionSourceOf(
   parts: unknown[],
   content: string,
@@ -358,7 +344,7 @@ function expressionSourceOf(
   let literal = '';
   for (const part of parts) {
     if (!isRecord(part)) return undefined;
-    if (part.type === 'Text') {
+    if (part.type === TEXT_NODE_TYPE) {
       const data = stringAt(part, 'data');
       if (data === undefined) return undefined;
       literal += escapeTemplateLiteral(data);
@@ -390,9 +376,6 @@ function escapeTemplateLiteral(text: string): string {
     .replace(/`/g, '\\`')
     .replace(/\$\{/g, '\\${');
 }
-
-// ---------------------------------------------------------------------------------------------
-// Emitting
 
 // Kept apart so `injectModuleScript` reads as the engine calls, then the scope map, then the splice
 // The rules, the `:root` tokens and the `@property` rules each get an import and a call

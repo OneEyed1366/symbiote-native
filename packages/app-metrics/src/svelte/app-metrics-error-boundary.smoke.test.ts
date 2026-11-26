@@ -3,7 +3,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { join } from 'node:path';
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 import {
   createLiveTree,
@@ -37,7 +37,12 @@ const tick = (): Promise<void> =>
 let harness = createSvelteHarness('app-metrics-error-boundary');
 let consoleError: ReturnType<typeof vi.spyOn>;
 
-const EXPLODING_CHILD_PATH = join(__dirname, 'boundary-exploding-child.svelte');
+// Under `build/`, which the source scanners skip, so they never see the file come and go
+const EXPLODING_CHILD_DIR = join(__dirname, 'build');
+const EXPLODING_CHILD_PATH = join(
+  EXPLODING_CHILD_DIR,
+  'boundary-exploding-child.svelte',
+);
 const EXPLODING_CHILD_SOURCE = `<script lang="ts">throw new Error('${BOOM}');</script>`;
 
 beforeEach(() => {
@@ -45,6 +50,7 @@ beforeEach(() => {
   harness = createSvelteHarness('app-metrics-error-boundary');
   vi.clearAllMocks();
   consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+  mkdirSync(EXPLODING_CHILD_DIR, { recursive: true });
   writeFileSync(EXPLODING_CHILD_PATH, EXPLODING_CHILD_SOURCE);
 });
 
@@ -84,7 +90,7 @@ describe('AppMetricsErrorBoundary (Positive: catches, reports, renders a fallbac
       'fallback-app',
       `<script lang="ts">
        import AppMetricsErrorBoundary from './AppMetricsErrorBoundary.svelte';
-       import Exploding from './boundary-exploding-child.svelte';
+       import Exploding from './build/boundary-exploding-child.svelte';
      </script>
      <AppMetricsErrorBoundary>
        {#snippet fallback()}<text>something broke</text>{/snippet}
@@ -100,7 +106,7 @@ describe('AppMetricsErrorBoundary (Positive: catches, reports, renders a fallbac
       'reports-app',
       `<script lang="ts">
        import AppMetricsErrorBoundary from './AppMetricsErrorBoundary.svelte';
-       import Exploding from './boundary-exploding-child.svelte';
+       import Exploding from './build/boundary-exploding-child.svelte';
      </script>
      <AppMetricsErrorBoundary>
        {#snippet fallback()}<text>caught</text>{/snippet}
@@ -123,7 +129,7 @@ describe('AppMetricsErrorBoundary (Positive: catches, reports, renders a fallbac
       'native-channel-app',
       `<script lang="ts">
        import AppMetricsErrorBoundary from './AppMetricsErrorBoundary.svelte';
-       import Exploding from './boundary-exploding-child.svelte';
+       import Exploding from './build/boundary-exploding-child.svelte';
      </script>
      <AppMetricsErrorBoundary>
        {#snippet fallback()}<text>caught</text>{/snippet}
@@ -139,7 +145,7 @@ describe('AppMetricsErrorBoundary (Positive: catches, reports, renders a fallbac
       'passes-error-app',
       `<script lang="ts">
        import AppMetricsErrorBoundary from './AppMetricsErrorBoundary.svelte';
-       import Exploding from './boundary-exploding-child.svelte';
+       import Exploding from './build/boundary-exploding-child.svelte';
      </script>
      <AppMetricsErrorBoundary>
        {#snippet fallback({ error })}<text>caught: {error.message}</text>{/snippet}

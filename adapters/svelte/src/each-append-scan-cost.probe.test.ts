@@ -1,14 +1,15 @@
-// `ShimNode.insertOne` (dom-shim/shim-node.ts) resolved an `insertBefore` ref via
-// `this.children.indexOf(ref)` — a LINEAR scan, O(n) per insert and O(n²) aggregate on Svelte's
-// keyed `{#each}` reconciler. Fixed by `indexNearEnd`, a bounded backward scan; guarded here.
+// A keyed `{#each}` append must not look a node up by a linear scan of a standing list
+// Such a scan is O(n) per insert, so the whole reconciler turns O(n squared)
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
+import { createAnchor } from '@symbiote-native/engine';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
+import { countLongNodeScans } from './renderer-harness';
 
 if (globalThis.window === undefined)
   Object.assign(globalThis, { window: globalThis });
@@ -27,9 +28,8 @@ const settle = async (): Promise<void> => {
   await tick();
 };
 
-// Byte-identical shape to BenchmarkScreen.svelte's real `{#each rows as row (row.id)}
-// <BenchmarkRow .../>` — a keyed block over a growing array, replacing only the row body with a
-// bare tag since this file prices the RECONCILER's own insertion mechanics, not row rendering.
+// The shape of the benchmark screen's keyed block over a growing array
+// The row body is a bare tag, as this file prices the insertion mechanics and not row rendering
 const APP_SOURCE = [
   '<script>',
   '  let { rows: initialRows } = $props();',
@@ -66,73 +66,55 @@ async function compileApp(rootTag: number): Promise<Component> {
       css: 'external',
     }).js.code,
   );
-  const { default: App } = (await import(`file://${file}`)) as {
-    default: Component;
-  };
-  return App;
+  const mod: unknown = await import(`file://${file}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod))
+    throw new Error('App.svelte produced no default export');
+  const component: unknown = mod.default;
+  if (typeof component !== 'function')
+    throw new Error('App.svelte default export is not a component');
+  return component;
 }
 
-// Two widths, APPENDED held fixed at 200 (same discipline as F-80/F-81's
-// `append-cost-vs-standing.itest.ts`): if the scan is the O(standing) mechanism this file's
-// header predicts, `avgPerCall` at STANDING=4000 must sit far above STANDING=200's, not merely
-// scale with the fixed 200-row append.
+function appendRows(more: unknown): void {
+  const append: unknown = Reflect.get(globalThis, '__appendRows');
+  if (typeof append !== 'function') throw new Error('the probe has no append');
+  append(more);
+}
+
+// A count of zero proves nothing if the counter cannot see a scan
+describe('the node scan counter', () => {
+  it('sees a linear lookup of a node in a long list', () => {
+    const counter = countLongNodeScans();
+    const standing = Array.from({ length: 200 }, () => createAnchor());
+    standing.indexOf(standing[199]);
+
+    expect(counter.stop()).toBe(1);
+  });
+});
+
+// The append width stays fixed, so a scan that follows the standing count would grow
 const WIDTHS = [200, 4_000];
 
-describe('Svelte keyed {#each} append: shim-level indexOf scan cost', () => {
+describe('Svelte keyed {#each} append: linear node lookups', () => {
   for (const standing of WIDTHS) {
     const rootTag = 91_777 + standing;
     const appended = 200;
 
-    it(`appends ${String(appended)} rows onto ${String(standing)} standing`, async () => {
-      const { takeShimScanStats } = await import('./dom-shim/shim-node');
+    it(`appends ${String(appended)} rows onto ${String(standing)} standing without a scan`, async () => {
       const App = await compileApp(rootTag);
+      const mountCounter = countLongNodeScans();
       mount(rootTag, App, { rows: buildRows(0, standing) });
       await settle();
+      const mountScans = mountCounter.stop();
 
-      // The INITIAL build pays the identical mechanism: every row's `<view><text>` pair is two
-      // MORE ref-based inserts against the same trailing each-block anchor (confirmed by a
-      // throwaway counter on `insertOne` during development — standing=200 -> 402 ref-inserts,
-      // standing=4000 -> 8002, i.e. 2*standing+2, none of them `ref === null`). Pre-fix this was
-      // the SAME O(n^2) shape as the append case, just building the whole list from empty rather
-      // than growing it — a real candidate for F-44's still-open Create +40 ms and Replace +54 ms
-      // regressions, not only Append. Asserting it here, not just discarding it, is what proves
-      // the fix's reach.
-      const mountStats = takeShimScanStats();
-      expect(
-        mountStats.calls,
-        'mount itself never falls back to the full scan',
-      ).toBe(0);
-      expect(mountStats.scanned).toBe(0);
-
-      const appendRows = (
-        globalThis as { __appendRows?: (more: unknown) => void }
-      ).__appendRows;
-      expect(typeof appendRows, 'the probe could drive an append').toBe(
-        'function',
-      );
-      appendRows?.(buildRows(standing, appended));
+      const appendCounter = countLongNodeScans();
+      appendRows(buildRows(standing, appended));
       await settle();
-
-      const { calls, scanned } = takeShimScanStats();
-      const avgScanned = calls === 0 ? 0 : scanned / calls;
-
-      console.log(
-        `DEBUG shim indexOf scan: standing=${String(standing)} appended=${String(appended)} ` +
-          `calls=${String(calls)} scanned=${String(scanned)} avgPerCall=${avgScanned.toFixed(1)}`,
-      );
-
+      const appendScans = appendCounter.stop();
       unmount(rootTag);
 
-      // REGRESSION GUARD for the fix below. Before `indexNearEnd` existed, this read
-      // `calls=appended` and `avgScanned` tracking `standing` almost exactly — confirmed at
-      // standing=200 (avgPerCall 302.5) and standing=4 000 (avgPerCall 4 102.5), a ~13.6x rise
-      // for a 20x width increase, i.e. the O(n)-per-insert signature. `indexNearEnd`'s bounded
-      // tail scan now resolves every one of these refs without ever reaching the full scan, at
-      // ANY standing width — a zero here means the fast path held; a nonzero one means some ref
-      // in this run sat further from the end than `TAIL_SCAN_WINDOW` covers, which is real
-      // fallback work this test would then want to know about, not silently swallow.
-      expect(calls).toBe(0);
-      expect(scanned).toBe(0);
+      expect(mountScans, 'building the list from empty').toBe(0);
+      expect(appendScans, 'growing the standing list').toBe(0);
     });
   }
 });

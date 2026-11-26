@@ -6,7 +6,7 @@ description: How to write SymbioteNative apps with the Svelte adapter.
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside type="caution" title="Two known gaps">
-  Full component parity, the DOM-shim renderer seam, and native bootstrap are
+  Full component parity, the custom renderer seam, and native bootstrap are
   implemented and tested against `examples/svelte`, and Svelte is on the live
   framework switcher on the landing page. Two gaps worth knowing about today:
   `AppRegistry.setWrapperComponentProvider` is re-exported but currently ignored
@@ -18,15 +18,16 @@ import { Aside } from '@astrojs/starlight/components';
 </Aside>
 
 The Svelte adapter drives the same native Fabric engine as React, Vue, Angular, and
-Solid, but through a different seam than any of them. Svelte has no
-official custom-renderer API yet. `createRenderer` from `svelte/renderer` is
-still an unmerged proposal upstream. So instead of a framework-provided
-rendering hook, this adapter patches a handful of `globalThis` DOM classes.
-Stock, unmodified compiled Svelte output believes it's talking to the real
-DOM, while every call it makes actually routes into
-`@symbiote-native/engine`'s mutation API. Components are ordinary `.svelte`
-files. Nothing about authoring one is adapter-specific beyond the prop/event
-shape below.
+Solid, through Svelte's own custom renderer API: `createRenderer` from
+`svelte/renderer`. The API is experimental in Svelte itself and needs
+`svelte >= 5.59.1`. Components are compiled with `experimental.customRenderer`,
+and every node operation routes into `@symbiote-native/engine`'s mutation API.
+Components are ordinary `.svelte` files. Nothing about authoring one is
+adapter-specific beyond the prop/event shape below.
+
+The compiler rejects the constructs that need a DOM: `bind:` on an element,
+`on:`, `transition:`, `animate:`, `{@html}` and the `<svelte:window>`,
+`<svelte:document>`, `<svelte:body>` and `<svelte:head>` elements.
 
 <video
   poster={`${import.meta.env.BASE_URL}/svelte-demo.webp`}
@@ -50,7 +51,7 @@ shape below.
 </video>
 
 _The `examples/svelte` canary — the same component surface and engine as the
-React, Vue, Angular, and Solid canaries, driven through the DOM shim instead._
+React, Vue, Angular, and Solid canaries, driven through Svelte's custom renderer._
 
 ## Minimal component
 
@@ -101,12 +102,12 @@ See [Media queries and variables](/docs/learn/media-queries-and-vars/).
   A component that hands state back to its children (`Pressable`'s
   `pressed`) is consumed with a named `{#snippet children(state)}` block,
   Svelte's own twin of a scoped slot;
-- `TextInput`, `Switch`, and the Slider wrapper accept `bind:value` on top of
-  their existing `value`/`onValueChange` contract. `value = $bindable()` is
-  the declaration a wrapper author reaches for to add the same sugar to their
-  own controlled component;
-- Symbiote components forward no `bind:this` of their own. `{@attach fn}` is
-  the way to reach a host node from app code. It is the one directive-shaped
+- `text-input` and `switch` are tags, so they take the explicit `value`/`onValueChange`
+  pair, since `bind:` on an element is a compile error. The Slider wrapper accepts
+  `bind:value` on top of that contract. `value = $bindable()` is the declaration a
+  wrapper author reaches for to add the same sugar to their own controlled component;
+- `bind:this` on an element is a compile error, so `{@attach fn}` is the way
+  to reach a host node from app code. It is the one directive-shaped
   construct the Svelte compiler accepts on a component at all (`use:`,
   `class:` and `style:` are rejected there);
 - `<svelte:boundary>` is a real, Svelte-exclusive error-boundary primitive
@@ -115,8 +116,9 @@ See [Media queries and variables](/docs/learn/media-queries-and-vars/).
   in a broken state;
 - Metro needs `@symbiote-native/svelte/metro-svelte-transformer` wired as the
   Babel transformer for `.svelte` files, plus
-  `resolver.unstable_conditionNames: ['browser']` — without it Metro resolves
-  Svelte's server-side build and `mount()` throws
-  `lifecycle_function_unavailable` on the very first call.
+  `resolver.unstable_conditionNames: ['svelte-custom-renderer', 'browser']`,
+  and `compilerOptions.experimental.customRenderer` in `svelte.config.js`.
+  Without the condition Metro resolves Svelte's default runtime, which has no
+  `svelte/renderer`.
 
 Read the exact API surface in the [Svelte API reference](/docs/api/svelte/).

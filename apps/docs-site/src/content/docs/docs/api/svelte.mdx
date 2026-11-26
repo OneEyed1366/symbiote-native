@@ -12,14 +12,18 @@ needed. Import only what's still a real component or module from
 import { StyleSheet } from '@symbiote-native/svelte';
 ```
 
-Svelte drives the same engine as React/Vue/Angular/Solid, but through a different
-seam. Svelte has no official custom-renderer API yet (`createRenderer` from
-`svelte/renderer` is still an unmerged proposal), so this adapter patches a
-handful of `globalThis` DOM classes instead. Stock compiled Svelte output
-believes it's talking to the real DOM, while every call actually routes into
-`@symbiote-native/engine`'s mutation API. Components are ordinary `.svelte`
+Svelte drives the same engine as React/Vue/Angular/Solid, through Svelte's own
+custom renderer API (`createRenderer` from `svelte/renderer`). The API is
+experimental in Svelte itself and needs `svelte >= 5.59.1`. Components are
+compiled with `experimental.customRenderer`, and every node operation routes
+into `@symbiote-native/engine`'s mutation API. Components are ordinary `.svelte`
 files; nothing about authoring one is adapter-specific beyond the prop/event
 shape below.
+
+The compiler rejects the constructs that need a DOM: `bind:` on an element,
+`on:`, `transition:`, `in:`, `out:`, `animate:`, `{@html}` and
+`<svelte:window>`, `<svelte:document>`, `<svelte:body>`, `<svelte:head>`. Use
+`{@attach}`, `onX={...}` props and the runtime modules instead.
 
 ## Installation
 
@@ -32,12 +36,12 @@ pnpm add @symbiote-native/svelte react-native svelte
 root. `@symbiote-native/engine` is a peer dependency and installs alongside.
 Metro needs the package's own transformer for `.svelte` files
 (`@symbiote-native/svelte/metro-svelte-transformer`) and two settings that are
-easy to miss: `resolver.unstable_conditionNames: ['browser']` (without it
-Metro resolves Svelte's SSR build and `mount()` throws
-`lifecycle_function_unavailable`), and `compilerOptions.fragments: 'tree'` in
-`svelte.config.js` (so the compiler emits DOM-shim-friendly
-`document.createElement` calls instead of an `innerHTML` template). `examples/svelte`
-is the reference for the full config.
+easy to miss: `resolver.unstable_conditionNames: ['svelte-custom-renderer',
+'browser']` (without it Metro resolves Svelte's default runtime, which has no
+`svelte/renderer`), and `compilerOptions` in `svelte.config.js` with
+`fragments: 'tree'` and `experimental: { customRenderer:
+'@symbiote-native/svelte/renderer' }`. `examples/svelte` is the reference for
+the full config.
 
 ## Component shape
 
@@ -51,27 +55,29 @@ is the reference for the full config.
   primitive tag like `pressable` has no component body to render one from —
   wire `onPressIn`/`onPressOut` into a rune instead, see [Children](#children)
   below.
-- Refs: every primitive is a plain tag now, so `bind:this` reaches the
-  committed host node directly. See [refs and
+- Refs: `bind:this` on an element is a compile error, so a host node is
+  reached through `{@attach}`. See [refs and
   attachments](/docs/howtos/svelte-refs-and-attachments/) for the full picture,
   including `hostInstance()`/`findNodeHandle()`.
 - Styles: `style`/`class` props, plus a component's own scoped `<style>`
   block — see [Scoped styles](#scoped-styles-style) below.
-- Two-way binding: `value = $bindable()` on `TextInput`/`Switch`/[`Slider`](/docs/packages/slider/) —
-  see [Two-way binding](#two-way-binding-bindvalue) below.
+- Two-way binding: `value` + `onValueChange` on `text-input`/`switch`, and
+  `bind:value` on a component such as [`Slider`](/docs/packages/slider/).
+  See [Two-way binding](#two-way-binding-bindvalue) below.
 
 ## Common events
 
 ```svelte
 <pressable {onPress} {onLongPress} />
-<switch bind:value={enabled} />
-<text-input bind:value={text} onValueChange={(text, event) => onChange(event)} />
+<switch value={enabled} onValueChange={event => (enabled = event.value)} />
+<text-input value={text} onValueChange={event => (text = event.text)} />
 <view {onLayout} />
 ```
 
-`TextInput`'s `onValueChange` fires `(text, event)` — the same merged shape
-React uses, unlike Angular, which needs a second output for the raw event
-because an `EventEmitter` only carries one value.
+`onValueChange` fires with one change-event object, the same shape React
+uses: `event.text` or `event.value` carries the new value, and `event` is the
+native event. Angular needs a second output for the raw event, because an
+`EventEmitter` only carries one value.
 
 ## Children
 
@@ -102,13 +108,12 @@ rendered cell is a real Svelte snippet rather than a React node or a Vue slot.
   let node: unknown;
 </script>
 
-<view testID="target" bind:this={node} />
+<view testID="target" {@attach el => (node = el)} />
 ```
 
-Every primitive is an ordinary tag, so `bind:this` reaches the committed
-native node directly — no `{@attach}` indirection needed for a plain ref.
-`{@attach fn}` still works as an ordinary Svelte attachment when you want a
-mount/unmount pair rather than a single assignment. Imperative methods like
+`bind:this` on an element is rejected at compile time, so a plain ref is an
+`{@attach}` that stores the node. The attachment also takes a cleanup function
+when you want a mount/unmount pair. Imperative methods like
 `scroll-view`'s `scrollTo`/`scrollToEnd`/`flashScrollIndicators` live on the
 host node itself — reach them through `hostInstance(node)`. Full mechanism,
 including `findNodeHandle()`: [How to: refs and attachments in
@@ -116,19 +121,20 @@ Svelte](/docs/howtos/svelte-refs-and-attachments/).
 
 ## Two-way binding (`bind:value`)
 
-`Switch`, `TextInput`, and the [Slider](/docs/packages/slider/) wrapper each
-declare `value = $bindable()`:
+`bind:` is rejected on an element, so `switch` and `text-input` take the
+controlled `value` + `onValueChange` pair. A component can declare
+`value = $bindable()`, and the [Slider](/docs/packages/slider/) wrapper does:
 
 ```svelte
-<switch bind:value={enabled} />
-<text-input bind:value={text} />
+<switch value={enabled} onValueChange={event => (enabled = event.value)} />
+<text-input value={text} onValueChange={event => (text = event.text)} />
 <Slider bind:value={volume} minimumValue={0} maximumValue={1} />
 ```
 
-Supplying your own `onValueChange` on the same instance silently disables the
-`bind:` echo — a component can't detect that it's bound from the inside, so
-pick one form per instance. Full pattern, including `$bindable()` for a
-wrapper component of your own: [Two-way binding](/docs/howtos/two-way-binding/).
+Supplying your own `onValueChange` on a bound `Slider` silently disables the
+`bind:` echo, so pick one form per instance. The full pattern, including
+`$bindable()` for a wrapper component of your own, is in
+[Two-way binding](/docs/howtos/two-way-binding/).
 
 ## Scoped styles (`<style>`)
 

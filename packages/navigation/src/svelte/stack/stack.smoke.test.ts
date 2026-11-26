@@ -339,9 +339,8 @@ describe('Stack (real compiled index.svelte)', () => {
     });
 
     it('replaces the top route without growing the stack', async () => {
-      // why: replace() must swap the top route's content in place - a caller relying on "replace,
-      // not push" (e.g. a login screen replaced by home) would regress if this silently grew the
-      // stack instead.
+      // `replace` swaps the top route in place, as a login screen replaced by home relies on
+      // A silent push would grow the stack instead
       const handle = await mountStack();
       handle.replace('details');
       await tick();
@@ -363,17 +362,15 @@ describe('Stack (real compiled index.svelte)', () => {
     });
 
     it('honours initialRouteName over registration order', async () => {
-      // why: initialRouteName must win over "whichever <Screen> registered first" - the second
-      // registered screen ("details") mounts as the initial route when named explicitly.
+      // `initialRouteName` wins over registration order, so the second screen mounts when named
       await mountStack('initial-route', 'initialRouteName="details"');
       const wrapper = findLive(appRoot(), 'RNSScreenContentWrapper');
       expect(wrapper?.children?.[0]?.props?.testID).toBe('details');
     });
 
     it('folds screen options into the native header config', async () => {
-      // why: per-screen `options` must reach the native RNSScreenStackHeaderConfig view's props
-      // (title/largeTitle), not stay trapped in JS state - this is the only way a screen actually
-      // gets a native header.
+      // Per-screen `options` must reach the props of `RNSScreenStackHeaderConfig`
+      // That is the only way a screen gets a native header, so they cannot stay in JS state
       await mountStack(
         'options',
         '',
@@ -643,9 +640,8 @@ describe('Stack (real compiled index.svelte)', () => {
     });
 
     it('nests an inner stack so a modally presented screen can host a header', async () => {
-      // why: a `stackPresentation: "formSheet"` screen must mount inside its OWN nested
-      // RNSScreenStack (wrapped in RNSModalScreen) so it can still carry a native header - this is
-      // architecturally distinct from a plain pushed screen, not just a style variant.
+      // A `formSheet` screen mounts in its own nested `RNSScreenStack` inside `RNSModalScreen`
+      // That keeps its native header, so it differs from a plain pushed screen
       await mountStack(
         'modal',
         '',
@@ -711,8 +707,8 @@ describe('Stack (real compiled index.svelte)', () => {
     });
   });
 
-  // Tree-shape invariant, not a behavior scenario: Svelte emits a space text node between sibling
-  // tags and only the shim keeps it out of Fabric. The modal route mounts too, its branch differs
+  // Tree-shape invariant, not a behavior scenario: Svelte emits a space text node between tags
+  // The renderer blanks it, and the modal route is mounted too, as its branch differs
   describe('committed-tree hygiene', () => {
     it('commits no raw text outside a text container', async () => {
       await mountStack();

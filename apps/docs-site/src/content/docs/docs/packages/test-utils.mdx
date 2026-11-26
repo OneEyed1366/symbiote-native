@@ -195,6 +195,12 @@ under it.
     import { installFabric } from '@symbiote-native/test-utils';
     import { mount, unmount } from '@symbiote-native/svelte';
 
+    // React Native sets both before any app code runs, and Svelte reads them at first mount
+    if (globalThis.window === undefined) Object.assign(globalThis, { window: globalThis });
+    if (globalThis.navigator === undefined) {
+      Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
+    }
+
     const ROOT_TAG = 91_001;
     const fabric = installFabric();
     const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
@@ -210,6 +216,7 @@ under it.
         filename: `${name}.svelte`,
         fragments: 'tree',
         css: 'external',
+        experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
       });
       const file = join(__dirname, `${name}.mjs`);
       writeFileSync(file, result.js.code);
@@ -224,7 +231,7 @@ under it.
              let count = $state(0);
              $effect(() => { if (count < 1) count = count + 1; });
            </script>
-           <symbiote-text p={{}}>count {count}</symbiote-text>`,
+           <text>count {count}</text>`,
           'Counter',
         );
 
@@ -242,6 +249,9 @@ under it.
     whose own suites can't lean on a loader to transform `.svelte` source, as there is no
     `@sveltejs/vite-plugin-svelte` wired into this repo's Vitest config. So its tests compile
     real source through `svelte/compiler` by hand before mounting it, unlike the other three tabs.
+
+    The Vitest config also needs `svelte-custom-renderer` in both `resolve.conditions` and
+    `ssr.resolve.conditions`, so Svelte resolves to the build that has `svelte/renderer`.
 
   </TabItem>
   <TabItem label="Solid">

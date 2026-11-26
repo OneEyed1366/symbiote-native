@@ -4,17 +4,12 @@
 // nothing at all — it clones onto `React.Children.only(children)`
 // (TouchableNativeFeedback.js:289,339) — so the wrapper's two extra nodes were ours.
 //
-// TWO INDEPENDENT CONSEQUENCES OF ONE CAUSE, and that is deliberate
-// (`.claude/rules/test-harness-false-greens.md` §14): the COUNT alone cannot witness the
-// registration, because the tag resolves to the engine's anchor and commits nothing whether or not
-// a behavior is attached. The CLONE is what proves `../register` ran. Break-tested by dropping
-// `registerTouchableNativeFeedbackBehavior()` from `./register`: the count stays 1 and the clone
-// case fails on `nativeID`/`accessibilityLabel`.
-//
-// Labels are `id`, folded to `nativeID` — the same choice `bare-tag-authored.test.ts` makes and for
-// the same reason: on a tag that is not also an SVG element name the compiler lowercases the
-// attribute, so a `testID`-keyed locator silently finds nothing and a missing node reads as a
-// broken fix.
+// Two independent consequences of one cause, deliberately
+// The count alone cannot witness the registration, as the tag commits nothing either way
+// The clone proves `../register` ran, and fails without `registerTouchableNativeFeedbackBehavior()`
+
+// Labels are `id`, folded to `nativeID`, as in `bare-tag-authored.test.ts`
+// The compiler lowercases `testID` on such a tag, so a `testID` locator finds nothing
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
@@ -82,8 +77,8 @@ async function mountSource(source: string): Promise<number> {
     PROBE_OUT,
     compile(source, { ...COMPILE_OPTIONS, filename: 'TnfTag.svelte' }).js.code,
   );
-  // Node caches a dynamic import by resolved path, so each arm needs a fresh query string or it
-  // silently re-runs the previous arm's module (svelte-adapter-dom-shim §15).
+  // Node caches a dynamic import by resolved path, so each arm needs a fresh query string
+  // or it silently re-runs the previous arm's module
   const { default: Probe } = (await import(
     `file://${PROBE_OUT}?arm=${root}`
   )) as { default: Component };

@@ -4,16 +4,21 @@
   import type { Snippet } from 'svelte';
   import type { IDescriptor } from '@symbiote-native/components';
   import { hostProps } from './host-props';
+  import { captureHost } from './runes/attachments';
 
   let {
     descriptor,
     children,
     ref = $bindable(),
   }: { descriptor: IDescriptor; children?: Snippet; ref?: unknown } = $props();
+
+  const captureRef = captureHost(host => {
+    ref = host;
+  });
 </script>
 
 {#snippet own(node: IDescriptor)}
-  {#each node.children as child}
+  {#each node.children as child, index (index)}
     {#if typeof child === 'string'}
       {child}
     {:else}
@@ -26,7 +31,7 @@
 
 <svelte:element
   this={descriptor.type}
-  bind:this={ref}
+  {@attach captureRef}
   {@attach hostProps(descriptor.props)}
 >
   {@render own(descriptor)}

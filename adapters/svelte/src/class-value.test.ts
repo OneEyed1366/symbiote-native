@@ -23,13 +23,9 @@ if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
-// Both describe blocks below are Positive-only: `normalizeSvelteClass` and `resolveSvelteClass`
-// are total over IClassEntry / ISvelteClassValue — every value in that type either flattens to a
-// clsx string or passes through as a style, and neither branch throws. The one shape that would
-// need a throw to reject (`{ card: someString }` — a class-map key with a non-boolean value) is
-// already excluded at compile time by IClassMap's value type (class-value.ts's own header
-// comment), so there is nothing left for a runtime guard to catch — no Negative group, and no `as`
-// cast is used anywhere here to force such a value past the type checker.
+// Both describe blocks below are Positive-only, as both functions are total over their types
+// Every value either flattens to a clsx string or passes through as a style, and neither throws
+// The one shape that would need a throw, a class-map key with a non-boolean value, is a type error
 describe('normalizeSvelteClass', () => {
   // why: `class="card"` is the common case — a literal string most consumers pass — and it must
   // reach routeProp byte-for-byte unchanged; wrapping every class value in this function must not
@@ -39,10 +35,8 @@ describe('normalizeSvelteClass', () => {
     expect(normalizeSvelteClass(undefined)).toBeUndefined();
   });
 
-  // why: `{ active: isOn }` is Svelte's idiomatic clsx map on a COMPONENT prop, and Svelte itself
-  // only normalizes clsx shapes on element tags (skill §22b) — a component prop is handed over
-  // verbatim, so without this the map reaches resolveClassName's "already a resolved style"
-  // branch and silently merges as an inline style instead of painting a class.
+  // `{ active: isOn }` is Svelte's clsx map on a component prop, which Svelte hands over verbatim
+  // Unflattened, it would reach `resolveClassName` as a resolved style and merge as inline style
   it('flattens a clsx map to the truthy keys, in declaration order', () => {
     expect(
       normalizeSvelteClass({ card: true, active: false, wide: true }),
@@ -119,19 +113,15 @@ describe('resolveSvelteClass', () => {
     ]);
   });
 
-  // why: normalizing a clsx map to a string is only half the job — the host node needs the actual
-  // resolved style object, so resolveSvelteClass must carry the flattened string on through the
-  // style registry rather than stopping at normalizeSvelteClass's output.
+  // The host node needs the resolved style object, so the flattened string goes on to the registry
   it('resolves a clsx map through the registry', () => {
     expect(resolveSvelteClass({ card: true, missing: false })).toEqual({
       padding: 8,
     });
   });
 
-  // why: pins the disambiguation boundary at the RESOLVE step too, not just normalize — an
-  // already-resolved style must not be re-interpreted or corrupted on its way through
-  // resolveSvelteClass, matching the components (ScrollView, VirtualizedList) that call this
-  // directly on a value they cannot pre-classify as clsx-shaped or not.
+  // The disambiguation holds at the resolve step too, for components that call it on any value
+  // ScrollView and VirtualizedList cannot tell a clsx shape from a resolved style up front
   it('still returns a resolved style object as-is', () => {
     expect(resolveSvelteClass({ color: 'red' })).toEqual({ color: 'red' });
   });
@@ -180,8 +170,8 @@ async function loadParent(): Promise<Component> {
   return component;
 }
 
-// Positive-only, same reason as above: nothing in the ShimElement `set p` -> normalizeBagClasses
-// -> class-value.ts chain throws on a well-typed ISvelteClassValue.
+// Positive-only, same reason as above: nothing in the bag write, `normalizeBagClasses` and
+// `class-value.ts` chain throws on a well-typed `ISvelteClassValue`
 describe('a clsx `class` on a real compiled View', () => {
   beforeEach(() => {
     fabric.reset();
@@ -207,11 +197,8 @@ describe('a clsx `class` on a real compiled View', () => {
     rmSync(PARENT_OUT, { force: true });
   });
 
-  // why: proves the whole path end-to-end through the ADAPTER boundary, not just the pure
-  // function — a real compiled `<view class={{...}}>` must land the resolved style fields as
-  // ACTUAL props on the committed native node. A unit test of normalizeSvelteClass alone would
-  // not catch a wiring break at ShimElement's bag write (class-value.ts is only reached because
-  // `normalizeBagClasses` calls it there — `dom-shim/element.ts`).
+  // A compiled `<view class={{...}}>` must land the resolved style fields on the committed node
+  // A unit test of `normalizeSvelteClass` alone would miss a break in the bag write that calls it
   it('resolves each truthy key through the registry and keeps the explicit style winning', async () => {
     const Parent = await loadParent();
     mount(ROOT_TAG, Parent, { on: true });

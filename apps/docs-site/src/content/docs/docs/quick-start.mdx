@@ -118,11 +118,11 @@ pnpm install
     pnpm android
     ```
 
-    The Svelte example proves the engine can be driven with no framework
-    reconciler at all: `@symbiote-native/svelte` patches `globalThis` DOM classes so
-    stock compiled Svelte output believes it is talking to the real DOM, and
-    every DOM call it makes routes into the same mutation API every other
-    adapter drives.
+    The Svelte example drives the engine through Svelte's own custom renderer API
+    (`svelte/renderer`). Components compile with `experimental.customRenderer`,
+    and every node operation routes into the same mutation API every other
+    adapter drives. The API is experimental in Svelte itself and needs
+    `svelte >= 5.59.1`.
 
   </TabItem>
   <TabItem label="Solid">
@@ -140,8 +140,8 @@ pnpm install
     pnpm android
     ```
 
-    The Solid example proves the engine can be driven through Solid's own
-    official non-DOM seam: `@symbiote-native/solid` is a custom renderer built on
+    The Solid example drives the engine through Solid's own official non-DOM
+    seam. `@symbiote-native/solid` is a custom renderer built on
     `solid-js/universal`'s `createRenderer`, mapping each renderer operation
     onto the same tiny mutation API every other adapter drives.
 

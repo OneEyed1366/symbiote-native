@@ -86,8 +86,8 @@ async function mountSource(source: string): Promise<number> {
       filename: 'ActivityIndicatorTag.svelte',
     }).js.code,
   );
-  // Node caches a dynamic import by resolved path, so each arm needs a fresh query string or it
-  // silently re-runs the previous arm's module (svelte-adapter-dom-shim §15).
+  // Node caches a dynamic import by resolved path, so each arm needs a fresh query string
+  // or it silently re-runs the previous arm's module
   const { default: Probe } = (await import(
     `file://${PROBE_OUT}?arm=${root}`
   )) as { default: Component };
@@ -112,12 +112,9 @@ describe('Svelte: `activity-indicator` as a tag', () => {
     // only because the behavior built it, so this is what fails when `./register` is dropped.
     const host = hostOf('ind');
     expect(host.viewName).toBe('RCTView');
-    // The centering style and the spinner's whole payload — the size translation, the two defaults,
-    // the platform colour — are the ENGINE's rules now
-    // (`core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`), and this host builds its
-    // payload through the TypeScript `fabricProps`, which carries no copy of them. What is left for
-    // an adapter to prove is the half that is its own: the tag reached the behavior and the second
-    // node exists, which is exactly what fails when `./register` is dropped.
+    // The centering style and the spinner payload (size, defaults, colour) are engine rules, see
+    // `core/engine/cpp/tests/js/activity-indicator-payload.itest.ts`
+    // The adapter proves only that the tag reached the behavior, so the second node exists
     expect(host.children.map(node => node.viewName)).toEqual([
       'ActivityIndicatorView',
     ]);

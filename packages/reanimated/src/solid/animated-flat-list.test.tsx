@@ -48,9 +48,9 @@ async function scrollerOf(props: IProps) {
   return live.nodeOf(found.handle);
 }
 
-function enteringCancelled(): boolean {
-  return update.mock.calls.some(([, type, config]) => {
-    return type === LayoutAnimationType.ENTERING && config === undefined;
+function enteringSent(): boolean {
+  return update.mock.calls.some(([, type]) => {
+    return type === LayoutAnimationType.ENTERING;
   });
 }
 
@@ -70,13 +70,13 @@ describe('Animated.FlatList', () => {
   it('lets the rows animate in when the author does not say otherwise', async () => {
     await scrollerOf({});
 
-    expect(enteringCancelled()).toBe(false);
+    expect(enteringSent()).toBe(true);
   });
 
   it('skips the entering animation of the rows it mounts with when asked to', async () => {
     await scrollerOf({ skipEnteringExitingAnimations: true });
 
-    expect(enteringCancelled()).toBe(true);
+    expect(enteringSent()).toBe(false);
   });
 });
 

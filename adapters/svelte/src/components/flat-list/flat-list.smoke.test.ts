@@ -1,8 +1,5 @@
-// Real-execution proof (not just typecheck) that FlatList actually compiles/runs on top of a
-// real compiled VirtualizedList and still windows a plain `data` array — same pattern as
-// switch.smoke.test.ts / virtualized-list.smoke.test.ts: compile the REAL .svelte sources through
-// svelte/compiler, co-locate the compiled output next to its real sibling modules, installFabric(),
-// assert against the real committed Fabric tree.
+// FlatList compiles and runs on top of a real compiled VirtualizedList and still windows `data`
+// The real `.svelte` sources are compiled next to their siblings and asserted on the committed tree
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -42,9 +39,8 @@ const REFRESH_ROOT_OUT = join(
   __dirname,
   '.smoke-compiled-flat-refresh-root.mjs',
 );
-// Distinct from ROOT_OUT: Node's dynamic `import()` cache is keyed by resolved URL, so
-// re-writing ROOT_OUT with different content and re-importing the same path would silently hand
-// back an earlier test's cached module (the same reason REFRESH_ROOT_OUT is its own path).
+// Distinct from `ROOT_OUT`, as Node caches `import()` by URL
+// A rewritten path would hand back an earlier test's module
 const COLUMNS_ROOT_OUT = join(
   __dirname,
   '.smoke-compiled-flat-columns-root.mjs',
@@ -108,10 +104,8 @@ function compileFlatListWithVirtualizedList(): void {
     LIST_OUT,
   );
 
-  // Redirect FlatList's real `'../virtualized-list/index.svelte'` import to the compiled sibling
-  // written above (compile() does not rewrite import specifiers, and plain Node ESM cannot import
-  // a raw .svelte file — no svelte-aware loader is wired into this repo's vitest, per the
-  // svelte-adapter-dom-shim skill §15's "no .svelte-aware bundler" note).
+  // Redirects FlatList's `'../virtualized-list/index.svelte'` import to the compiled sibling above
+  // `compile()` does not rewrite specifiers, and Node cannot import a raw `.svelte` file
   const rawFlatSource = readFileSync(join(__dirname, 'index.svelte'), 'utf8');
   const flatSource = rawFlatSource.replace(
     "'../virtualized-list/index.svelte'",
@@ -235,18 +229,30 @@ async function loadMountableWithAccessibilityAndRefresh(): Promise<Component> {
   return mod.default as Component;
 }
 
-// No Negative group: flat-list-props.ts is a permissive bag (Omit over IVirtualizedListProps, every
-// field optional) with no runtime guard/throw path. The data-shaping helpers (chunkIntoRows,
-// expandRowViewability, rowKeyExtractor, ...) are core logic covered by @symbiote-native/components'
-// own tests; this file's job is proving the Svelte WIRING: which of VirtualizedList's two
-// getItem/getItemCount pairs gets selected (single-column passthrough vs numColumns row-chunking),
-// and that props forwarded onto the inner VirtualizedList actually reach the committed tree.
+type ICellNode = {
+  props: Record<string, unknown>;
+  children: readonly ICellNode[];
+};
+
+// The text strings painted by the items of one row
+function paintedTexts(row: ICellNode | undefined): string[] {
+  const texts: string[] = [];
+  for (const itemWrapper of row?.children ?? []) {
+    for (const textNode of itemWrapper.children) {
+      const text = textNode.props.text;
+      if (typeof text === 'string') texts.push(text);
+    }
+  }
+  return texts;
+}
+
+// No Negative group, as `flat-list-props.ts` is a permissive bag with no throw path
+// The data-shaping helpers are covered by the `@symbiote-native/components` tests
+// This file proves the wiring: which `getItem` pair is selected, and that forwarded props land
 describe('FlatList (real compiled index.svelte over a real compiled VirtualizedList)', () => {
   describe('Positive', () => {
-    // why: FlatList's single-column path (numColumns <= 1) must derive getItem/getItemCount from
-    // the plain `data` array and hand them straight to VirtualizedList unchanged — proving the
-    // convenience wrapper doesn't accidentally re-window or duplicate what VirtualizedList already
-    // does.
+    // The single-column path derives `getItem` and `getItemCount` from `data` and hands them over
+    // So the wrapper must not re-window or duplicate what VirtualizedList already does
     it('renders only the windowed slice of a plain data array, not every item', async () => {
       const FlatListRoot = await loadMountable();
       const data = Array.from(
@@ -268,10 +274,8 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       expect(content.children.length).toBeLessThan(ITEM_COUNT);
     });
 
-    // why: numColumns > 1 takes FlatList's OTHER branch (index.svelte's `{:else}` VirtualizedList
-    // instance) — data gets chunked into IRow entries via getRow/getRowCount instead of
-    // getSingleItem/getSingleCount, and each row must actually paint every item it packed, not
-    // just the first. Without this test the entire row-chunking wiring path had zero coverage.
+    // `numColumns > 1` takes the other branch, chunking `data` into rows through `getRow`
+    // Each row must paint every item it packed, not just the first
     it('packs data into rows and paints every item of each row when numColumns > 1', async () => {
       const NUM_COLUMNS = 2;
       const ROW_COUNT = 2;
@@ -291,35 +295,26 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       expect(content, 'content container painted').toBeDefined();
       if (content === undefined) return;
 
-      // One committed cell-measure wrapper per IRow, not per item — the row-chunking branch, not
-      // the single-column one (which would have produced NUM_COLUMNS * ROW_COUNT wrappers).
+      // One cell-measure wrapper per row, not per item as on the single-column path
       expect(content.children.length).toBe(ROW_COUNT);
 
       const paintedItems = new Set<string>();
       for (const cellWrapper of content.children) {
-        // rowItem's own view (flexDirection: 'row'), one level inside VirtualizedList's
-        // per-row measure wrapper. flexDirection travels through the style slot, so it only
-        // shows up in the flattened payload, not the author's raw prop bag.
+        // The row view sits one level inside the per-row measure wrapper
+        // `flexDirection` travels through the style slot, so it shows only in the flattened payload
         const row = cellWrapper.children[0];
         expect(
           row?.payload.flexDirection,
           'the row snippet painted flexDirection: row',
         ).toBe('row');
-        for (const itemWrapper of row?.children ?? []) {
-          for (const textNode of itemWrapper.children) {
-            const text = textNode.props.text;
-            if (typeof text === 'string') paintedItems.add(text);
-          }
-        }
+        for (const text of paintedTexts(row)) paintedItems.add(text);
       }
-      // Every item that went INTO chunkIntoRows must come back OUT painted — proves rowItem's
-      // {#each row.items ...} loop actually rendered each item, not just that the row count matched.
+      // Every item packed into a row must come back painted, not just the row count
       expect(paintedItems).toEqual(new Set(data));
     });
 
-    // why: FlatList's imperative handle (testID a11y forwarding, RefreshControl wiring) is thin
-    // delegation onto the inner VirtualizedList — proves the delegation actually reaches the
-    // committed tree, not just that the type surface compiles.
+    // The `testID` forwarding and RefreshControl wiring are thin delegation to the inner list
+    // The delegation must reach the committed tree, not just compile
     it('forwards testID and wires a real RefreshControl through to the inner VirtualizedList (gaps 1 and 2)', async () => {
       const FlatListRoot = await loadMountableWithAccessibilityAndRefresh();
       const data = ['row-0', 'row-1'];
@@ -327,9 +322,8 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       await tick();
       await tick();
 
-      // Gap 1: testID passed to <FlatList> reaches the committed RCTScrollView through the
-      // component-to-component forward onto <VirtualizedList> — walk the LIVE tree, not the
-      // recording's creation log.
+      // `testID` passed to `<FlatList>` reaches the committed `RCTScrollView` through the forward
+      // The live tree is walked, not the creation log
       const scrollView = live.findLive(
         live.appRoot(),
         node => node.payload.testID === 'flat-list-a11y',
@@ -340,16 +334,13 @@ describe('FlatList (real compiled index.svelte over a real compiled VirtualizedL
       ).toBeDefined();
       expect(scrollView?.viewName).toBe('RCTScrollView');
 
-      // …and an ARIA key survives the same hop UNDER ITS AUTHORED NAME, which is the half nothing
-      // asserted before. `pickAccessibilityProps` is the shared field list for all four list
-      // components and it forwards through a Svelte COMPONENT spread — so a hyphenated key is the
-      // thing most likely to be lost, and the engine's rule reads `aria-label` literally
-      // (`foldAriaProps`, `SymbioteFabricProps.cpp`). Folding it here instead would be a second
-      // implementation of a rule the device already runs.
+      // An ARIA key survives the same hop under its authored name, as the engine reads `aria-label`
+      // literally (`foldAriaProps` in `SymbioteFabricProps.cpp`)
+      // A hyphenated key is the likeliest to be lost in a component spread
       expect(scrollView?.payload['aria-label']).toBe('the list');
 
-      // Gap 2: onRefresh/refreshing set on <FlatList> produce a real RefreshControl
-      // (PullToRefreshView), attached as a sibling of the content container.
+      // `onRefresh` and `refreshing` on `<FlatList>` produce a real RefreshControl
+      // It is attached as a sibling of the content container
       const refresh = live.findLive(
         live.appRoot(),
         node => node.viewName === 'PullToRefreshView',

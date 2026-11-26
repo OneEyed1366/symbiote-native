@@ -589,6 +589,9 @@ function detachOne(
   // Marked whether or not this node carries a behavior, since the mark tells a later insert to walk
   // The node re-inserted is usually a plain container whose descendant holds the machine
   node.isTornDown = true;
+  // An owner pointing at its wrapper closes a loop through the wrapper's own hold on the owner
+  // A put-back after teardown therefore places the owner bare, without its wrapper
+  node.wrapper = undefined;
   // The rest of the body is the behavior's, so a node without one leaves here
   // Nine of ten nodes in a removed subtree are plain views, and the mark is all they owe
   const behavior = node.hostBehavior;

@@ -1,14 +1,6 @@
-// findNodeHandle, the Svelte adapter twin of adapters/react/src/host-instance.ts and
-// adapters/vue/src/host-instance/index.ts. RN's "ref/instance -> native reactTag" lookup, the
-// seam imperative-interop libraries (reanimated, gesture-handler, react-navigation) reach
-// through.
-//
-// A Svelte `bind:this={hostShim}` gives back a ShimElement (dom-shim/element.ts), not the raw
-// engine node directly — its `.engineNode` field IS the raw ISymbioteNode once the shim has
-// gone live (undefined before the first commit, same "uncommitted -> null" idempotent shape
-// RN's own findNodeHandle has). The node -> tag resolution itself belongs to the engine
-// (getNativeTag, keyed on the raw node in the commit mirror); this only adapts the
-// Svelte-shaped input (a ShimElement) onto it.
+// `findNodeHandle`, the ref to native `reactTag` lookup that interop libraries reach through
+// An element ref taken with `{@attach}` is the engine node itself, so it is the host instance
+// The tag is undefined until the first commit, so an uncommitted ref resolves to null as in RN
 import {
   componentOf,
   getNativeTag,
@@ -17,54 +9,24 @@ import {
   dlog,
   type IHostInstance,
 } from '@symbiote-native/engine';
-import type { ShimElement } from './dom-shim';
 
 export type { IHostInstance } from '@symbiote-native/engine';
 
-// `engineNode` alone does NOT identify a ShimElement: it is declared on the shared ShimNode base
-// (dom-shim/shim-node.ts), so a ShimText / ShimComment / ShimDocumentFragment satisfies it too,
-// and none of those is a host ref an interop library can hand back. `tagName` is ShimElement's
-// own field, so checking it makes the predicate mean what its name says.
-function isShimElement(value: unknown): value is ShimElement {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'engineNode' in value &&
-    'tagName' in value
-  );
-}
-
-// The typed imperative handle (measure/measureInWindow/measureLayout/setNativeProps/focus/blur)
-// a `bind:this` host ref carries — the Svelte twin of a React `ref.current`/Vue template ref
-// already being an `IHostInstance`. Every engine node carries those methods on its prototype, so
-// the toPublicInstance call below is the identity; this helper exists only to give app code a correctly
-// TYPED accessor off the SHIM value (`ShimElement`) instead of the bare `.engineNode` field,
-// with no `as` cast at the call site.
-// `unknown` rather than `ShimElement`, and the guard is what makes that sound. svelte2tsx bakes a
-// `bind:this` return type out of `lib.dom`'s tag maps — an SVG element type for `view`/`text`/
-// `image`/`switch`, `any` for the other seventeen — and neither map accepts augmentation
-// (`src/intrinsic-elements.ts` records the measurement). So an app CANNOT declare its ref as
-// `ShimElement` without a cast, and this is the accessor that exists to keep casts out of app
-// code. Declaring the parameter `unknown` moves the narrowing where it can actually be checked.
-export function hostInstance(shim: unknown): IHostInstance | undefined {
-  if (!isShimElement(shim)) return undefined;
-  const node = shim.engineNode;
-  return node !== undefined && isSymbioteNode(node)
-    ? toPublicInstance(node)
-    : undefined;
+// The typed handle (`measure`, `setNativeProps`, `focus`) of an element ref
+// The parameter is `unknown` and the guard narrows it, as the ref type svelte2tsx emits comes
+// from `lib.dom` tag maps that cannot be augmented, so app code would need an `as` cast
+export function hostInstance(ref: unknown): IHostInstance | undefined {
+  return isSymbioteNode(ref) ? toPublicInstance(ref) : undefined;
 }
 
 export function findNodeHandle(componentOrHandle: unknown): number | null {
   if (componentOrHandle === null || componentOrHandle === undefined)
     return null;
   if (typeof componentOrHandle === 'number') return componentOrHandle;
-  if (!isShimElement(componentOrHandle)) return null;
-  const node = componentOrHandle.engineNode;
-  if (node !== undefined && isSymbioteNode(node)) {
-    const tag = getNativeTag(node) ?? null;
-    dlog(`findNodeHandle: component=${componentOf(node)} tag=${tag}`);
-    return tag;
-  }
-  dlog('findNodeHandle: hostShim not live yet (engineNode undefined)');
-  return null;
+  if (!isSymbioteNode(componentOrHandle)) return null;
+  const tag = getNativeTag(componentOrHandle) ?? null;
+  dlog(
+    `findNodeHandle: component=${componentOf(componentOrHandle)} tag=${tag}`,
+  );
+  return tag;
 }

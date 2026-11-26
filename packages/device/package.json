@@ -84,6 +84,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run packages/device/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "prepare": "pnpm run ng:build",
     "typecheck": "tsc --build",
     "clean": "rm -rf build-ngc",
@@ -106,7 +108,7 @@
     "react": ">=19.0.0",
     "react-native": ">=0.86",
     "solid-js": ">=1.9.0",
-    "svelte": ">=5.56.0",
+    "svelte": ">=5.59.1",
     "vue": ">=3.5.0"
   },
   "peerDependenciesMeta": {

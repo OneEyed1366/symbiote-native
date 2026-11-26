@@ -49,8 +49,8 @@ const HOOK_SOURCES_FINGERPRINT =
 
 describe('the Reanimated release the hook controllers are ported against', () => {
   it('is the pinned Reanimated and Worklets pair', () => {
-    expect(versionOf('react-native-reanimated')).toBe('4.7.1');
-    expect(versionOf('react-native-worklets')).toBe('0.13.0');
+    expect(versionOf('react-native-reanimated')).toBe('4.7.2');
+    expect(versionOf('react-native-worklets')).toBe('0.13.1');
   });
 
   it('has hook sources identical to the ones the controllers were written against', () => {

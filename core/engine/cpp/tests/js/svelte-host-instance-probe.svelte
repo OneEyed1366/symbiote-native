@@ -6,4 +6,9 @@
   });
 </script>
 
-<view testID="ref-box" bind:this={box} />
+<view
+  testID="ref-box"
+  {@attach node => {
+    box = node;
+  }}
+/>

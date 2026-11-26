@@ -1,7 +1,8 @@
-// Something a library holds against a native view follows the node's Fabric family, so it is
-// attached after the first commit, attached again when a reparent re-creates the family and let go
-// when the node leaves the tree
+// Something a library holds against a native view follows the node's Fabric family
+// It attaches after the first commit and again when a reparent re-creates the family
+// It is let go when the node leaves the tree
 import { getFamilyGeneration, whenCommitted } from './imperative';
+import { recordSetReleaseMark } from './mutation-buffer';
 import { noteNodeBinding } from './node-binding-gate';
 import { registerPostCommit, unregisterPostCommit } from './post-commit';
 import type { ISymbioteNode } from './node-types';
@@ -70,6 +71,8 @@ export function bindToNode(
     generation: undefined,
   };
   const standing = bindings.get(node) ?? new Set<IBinding>();
+  // The narrowed teardown walk skips untagged nodes, so a bound one asks to be kept, once
+  if (standing.size === 0) recordSetReleaseMark(node);
   standing.add(binding);
   bindings.set(node, standing);
   watched.add(node);

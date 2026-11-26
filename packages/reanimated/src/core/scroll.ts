@@ -59,17 +59,36 @@ export function scrollOffsetWriter(
   };
 }
 
+const warnWithoutTag = (tag: number | null): void => {
+  if (!tag) logger.warn(NOT_INITIALIZED_WARNING);
+};
+
 // The handler listens to the tag of the ref for as long as the ref has one
 export function observeScrollOffset(
   animatedRef: Pick<AnimatedRef, 'observe'>,
   eventHandler: IEventHandlerInternal<RNNativeScrollEvent>,
+  onTag: (tag: number | null) => void = warnWithoutTag,
 ): () => void {
   return animatedRef.observe(tag => {
-    if (!tag) {
-      logger.warn(NOT_INITIALIZED_WARNING);
-      return undefined;
-    }
+    onTag(tag);
+    if (!tag) return undefined;
     eventHandler.workletEventHandler.registerForEvents(tag);
     return () => eventHandler.workletEventHandler.unregisterFromEvents(tag);
   });
+}
+
+// Setup runs before any view exists, so only a ref still without a tag a turn later is a mistake
+export function observeScrollOffsetFromSetup(
+  animatedRef: Pick<AnimatedRef, 'observe'>,
+  eventHandler: IEventHandlerInternal<RNNativeScrollEvent>,
+): () => void {
+  let latestTag: number | null = null;
+  const stop = observeScrollOffset(animatedRef, eventHandler, tag => {
+    latestTag = tag;
+  });
+  const verdict = setTimeout(() => warnWithoutTag(latestTag), 0);
+  return () => {
+    clearTimeout(verdict);
+    stop();
+  };
 }

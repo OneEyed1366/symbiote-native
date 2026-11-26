@@ -64,6 +64,8 @@
     "access": "public"
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run adapters/angular/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "prepare": "node -e \"require('node:fs').existsSync('build/angular/index.js')||process.exit(1)\" || pnpm run ng:build",
     "prepack": "pnpm run ng:build",
     "clean": "rm -rf build",

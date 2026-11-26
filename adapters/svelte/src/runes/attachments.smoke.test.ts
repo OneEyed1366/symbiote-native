@@ -1,14 +1,7 @@
-// Real-execution proof that `{@attach fn}` on one of this adapter's components reaches the
-// COMMITTED host node — compiled by the real svelte compiler, mounted through the real render
-// pipeline, asserted against a real fake Fabric. `{@attach}` is the only directive-shaped Svelte
-// feature legal on a component (the compiler rejects use:/transition:/class:/style: there), so it
-// is also the only route by which a third-party Svelte action reaches a node here, via
-// `fromAction` — which the last test round-trips end to end.
-//
-// No Negative group: neither `createAttachmentsSync` nor `pickAttachmentProps` has a throwing
-// path — both are total over their input (an object with or without symbol-keyed attachment
-// props). The one non-happy-path branch (a null/undefined host) is a documented no-op, covered
-// under Positive below rather than invented as a "rejects" case that doesn't exist.
+// Proves `{@attach fn}` on a component of this adapter reaches the COMMITTED host node
+// Third-party actions come in by `fromAction`, since `{@attach}` is the only directive legal there
+
+// No Negative group: both helpers are total over their input, and a null host is a no-op
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -16,11 +9,10 @@ import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
-import { propOf } from '@symbiote-native/engine';
+import { propOf, type ISymbioteNode } from '@symbiote-native/engine';
 import { createAttachmentKey } from 'svelte/attachments';
 import { mount, unmount } from '../render';
 import { createAttachmentsSync, pickAttachmentProps } from './attachments';
-import type { ShimElement } from '../dom-shim';
 
 if (globalThis.window === undefined)
   Object.assign(globalThis, { window: globalThis });
@@ -30,7 +22,7 @@ if (globalThis.navigator === undefined) {
 
 const ROOT_TAG = 91_902;
 // Compiled next to the adapter's own components so the fixture's `../runes/attachments` import
-// resolves the way a real component's does.
+// resolves the way a real component's does
 const COMPONENTS_DIR = join(__dirname, '..', 'components');
 const HOST_OUT = join(COMPONENTS_DIR, '.smoke-compiled-attachments-view.mjs');
 const PARENT_OUT = join(
@@ -41,8 +33,8 @@ const ACTION_OUT = join(
   COMPONENTS_DIR,
   '.smoke-compiled-attachments-action.mjs',
 );
-// Each compiled file sits next to its real source so that source's own relative imports still
-// resolve; a name unique to THIS suite keeps concurrently-running suites from racing on the path.
+// Each file sits next to its real source so that source's relative imports resolve
+// The name is unique to this suite, so concurrent suites do not race on the path
 const BARE_TAG_OWNER_OUT = join(
   COMPONENTS_DIR,
   'modal',
@@ -86,25 +78,22 @@ async function loadComponent(outPath: string): Promise<Component> {
   return component;
 }
 
-// The seam under test is what a COMPONENT does to forward `{@attach}` down to the host tag it
-// owns, and this is that shape in fifteen lines. It used to be `View.svelte`; there is no View
-// component any more (a view is the `view` tag), so the fixture is written out rather than read
-// off disk — which also makes the suite about the rune instead of about one component.
+// The shape a component uses to forward `{@attach}` to the host tag it owns
+// It is written inline, so the suite is about the helper and not about one component
 const HOST_SOURCE = `<script>
   import { createAttachmentsSync } from '../runes/attachments';
   let { children, ...rest } = $props();
-  let hostShim = $state.raw(null);
+  let hostNode = $state.raw(null);
   const syncAttachments = createAttachmentsSync();
-  $effect(() => { syncAttachments(hostShim, rest); });
+  $effect(() => { syncAttachments(hostNode, rest); });
 </script>
-<view p={rest} bind:this={hostShim}>{@render children?.()}</view>`;
+<view p={rest} {@attach node => { hostNode = node; }}>{@render children?.()}</view>`;
 
 function compileHost(): void {
   compileToFile(HOST_SOURCE, 'AttachmentHost.svelte', HOST_OUT);
 }
 
 // Node caches import() by path, so each differently-SOURCED parent needs its own filename
-// (svelte-adapter-dom-shim skill §15's harness gotchas).
 const SWAP_PARENT = `<script>
   import Host from './.smoke-compiled-attachments-view.mjs';
   let { onEvent, onCapture } = $props();
@@ -131,25 +120,19 @@ const ACTION_PARENT = `<script>
 </script>
 <Host testID="action-target" {@attach fromAction(action, () => arg)} />`;
 
-interface IEvent {
+type IEvent = {
   name: string;
-  node: ShimElement;
+  node: ISymbioteNode;
   value: unknown;
-}
+};
 
 type ISetter = (next: string) => void;
 
 let events: IEvent[] = [];
 let setValue: ISetter | null = null;
 
-function record(name: string, node: ShimElement, value?: unknown): void {
+function record(name: string, node: ISymbioteNode, value?: unknown): void {
   events.push({ name, node, value });
-}
-
-// Through the engine's accessor: a node's props live in the host now, not on the node.
-function hostProp(element: ShimElement, key: string): unknown {
-  const node = element.engineNode;
-  return node === undefined ? undefined : propOf(node, key);
 }
 
 function captureSetter(setter: ISetter): void {
@@ -172,11 +155,8 @@ afterEach(() => {
   rmSync(BARE_TAG_OWNER_PARENT_OUT, { force: true });
 });
 
-describe('Positive — createAttachmentsSync', () => {
-  // why: `createAttachmentsSync` is wired from `$effect(() => syncAttachments(hostShim, rest))`,
-  // and the host ref can legitimately be null/undefined before `bind:this` settles or after
-  // teardown — the sync function must be a safe no-op there rather than throwing on a nullable
-  // ref every component that adopts this pattern passes through on every mount.
+describe('Positive: createAttachmentsSync', () => {
+  // The host ref is null before the attachment runs and after teardown, so the sync must be a no-op
   it('is a no-op when the host is null or undefined, and calls nothing', () => {
     const sync = createAttachmentsSync();
     const attachmentKey = createAttachmentKey();
@@ -187,9 +167,8 @@ describe('Positive — createAttachmentsSync', () => {
   });
 });
 
-// The forwarding helper the list family relies on: those rebuild their child's props by name (or
-// through a string-keyed Record), which drops symbol keys silently.
-describe('Positive — pickAttachmentProps', () => {
+// The list family rebuilds its child's props by name, which drops symbol keys silently
+describe('Positive: pickAttachmentProps', () => {
   it('carries the attachment keys across and leaves everything else behind', () => {
     const attachmentKey = createAttachmentKey();
     const otherSymbol = Symbol('not-an-attachment');
@@ -205,9 +184,7 @@ describe('Positive — pickAttachmentProps', () => {
     expect(picked[attachmentKey]).toBe(attachment);
   });
 
-  // why: an ordinary Symbol (not one created by createAttachmentKey) must NOT be forwarded — the
-  // filter keys off the attachment marker's description, not "any symbol", or an unrelated
-  // symbol-keyed prop would silently leak through the forwarding helper.
+  // The filter keys off the attachment marker's description, so an unrelated symbol must not leak
   it('drops a symbol key that carries no attachment marker', () => {
     const otherSymbol = Symbol('not-an-attachment');
     const picked = pickAttachmentProps({ [otherSymbol]: 'ignored' });
@@ -215,11 +192,9 @@ describe('Positive — pickAttachmentProps', () => {
   });
 });
 
-describe('Positive — {@attach} on a Symbiote component', () => {
-  // why: the attachment must receive the real, COMMITTED host node — not a template prototype,
-  // not a detached clone — since every real use (dispatching a command, reading a Fabric tag)
-  // needs the live node. Unmount must fire the teardown, or every attachment leaks its cleanup.
-  it('invokes the attachment with the committed host ShimElement, and tears it down on unmount', async () => {
+describe('Positive: {@attach} on a Symbiote component', () => {
+  // Dispatching a command or reading a Fabric tag needs the live node, and unmount must clean up
+  it('invokes the attachment with the committed host node, and tears it down on unmount', async () => {
     compileToFile(SWAP_PARENT, 'Parent.svelte', PARENT_OUT);
     const Parent = await loadComponent(PARENT_OUT);
     mount(ROOT_TAG, Parent, { onEvent: record, onCapture: captureSetter });
@@ -228,12 +203,8 @@ describe('Positive — {@attach} on a Symbiote component', () => {
 
     expect(events.map(entry => entry.name)).toEqual(['attach:first']);
     const node = events[0].node;
-    expect(node.tagName).toBe('view');
-    // The real proof it is the COMMITTED node, not a detached template prototype: the shim only
-    // creates an engine node on insertion into a live tree, and the fake Fabric only hands out a
-    // tag for a node it actually created.
-    expect(node.engineNode).toBeDefined();
-    expect(hostProp(node, 'testID')).toBe('attach-target');
+    expect(node.component).toBe('RCTView');
+    expect(propOf(node, 'testID')).toBe('attach-target');
 
     unmount(ROOT_TAG);
     expect(events.map(entry => entry.name)).toEqual([
@@ -242,11 +213,8 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     ]);
   });
 
-  // why: a DYNAMIC attachment expression (`which === 'first' ? first : second`) compiles to a
-  // STABLE prop whose VALUE never changes — the read that changes lives inside the wrapper body.
-  // Delegating to Svelte's own `attach()` is what makes the swap observable at all; a hand-rolled
-  // identity-diff on the prop would never see it (this is the exact bug the file's own header
-  // comment records having hit first).
+  // A dynamic expression compiles to a stable prop whose reads live inside the wrapper body
+  // Delegating to Svelte's `attach()` makes the swap observable, a diff of the prop would miss it
   it('tears down only the attachment that changed, then runs the new one on the same node', async () => {
     compileToFile(SWAP_PARENT, 'Parent.svelte', PARENT_OUT);
     const Parent = await loadComponent(PARENT_OUT);
@@ -267,15 +235,8 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     expect(events[2].node).toBe(events[0].node);
   });
 
-  // why: Modal owns its host node as a bare `modal` TAG, so the attach forwarding it needs is its
-  // own four lines of `createAttachmentsSync`, not something a wrapped-component ancestor supplies
-  // for free. This is the case that proves those lines are wired: a real shipped component,
-  // compiled from source, reaching its committed node.
-  //
-  // Modal is the subject on purpose, not RefreshControl or either Touchable variant that filled
-  // this role before: a hidden modal commits zero nodes, so it keeps a component body of its own.
-  // Any component that renders a bare tag AND calls `createAttachmentsSync` serves, but this one
-  // will not need rehoming the next time a wrapper is deleted.
+  // Modal owns a bare `modal` tag, so the forwarding is its own and no wrapped ancestor supplies it
+  // It is the subject because a hidden modal commits zero nodes, so it keeps its own component body
   it('reaches the committed host node of a component that owns a bare tag', async () => {
     compileToFile(
       readFileSync(join(COMPONENTS_DIR, 'modal', 'index.svelte'), 'utf8'),
@@ -299,13 +260,11 @@ describe('Positive — {@attach} on a Symbiote component', () => {
     await tick();
 
     expect(events.map(entry => entry.name)).toEqual(['attach:touchable']);
-    expect(hostProp(events[0].node, 'testID')).toBe('touchable-target');
+    expect(propOf(events[0].node, 'testID')).toBe('touchable-target');
   });
 
-  // why: `fromAction` is the sanctioned bridge for a third-party Svelte ACTION (the ecosystem's
-  // own `use:` idiom) into this adapter, since `use:` itself is illegal on a component. Init,
-  // update-on-param-change, and destroy-on-unmount are the three calls a real action author
-  // expects — all three must actually fire, not just the first.
+  // `fromAction` bridges a third-party action, as `use:` is illegal on a component
+  // Init, update on a changed param and destroy on unmount must all fire
   it('round-trips a real Svelte action through fromAction', async () => {
     compileToFile(ACTION_PARENT, 'ActionParent.svelte', ACTION_OUT);
     const Parent = await loadComponent(ACTION_OUT);
@@ -315,7 +274,7 @@ describe('Positive — {@attach} on a Symbiote component', () => {
 
     expect(events.map(entry => entry.name)).toEqual(['action:init']);
     expect(events[0].value).toBe('one');
-    expect(hostProp(events[0].node, 'testID')).toBe('action-target');
+    expect(propOf(events[0].node, 'testID')).toBe('action-target');
 
     setValue?.('two');
     await tick();

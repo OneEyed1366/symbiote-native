@@ -109,15 +109,10 @@ real `@Output()`.
       let pressed = $state(false);
     </script>
 
-    <!-- Event handlers on a bare host tag go through the `p={{ … }}` bag — an
-         individual `on*` attribute is silently misrouted through Svelte's own
-         DOM event system instead of the engine. -->
     <pressable
-      p={{
-        onPress: () => console.log('pressed'),
-        onPressIn: () => (pressed = true),
-        onPressOut: () => (pressed = false),
-      }}
+      onPress={() => console.log('pressed')}
+      onPressIn={() => (pressed = true)}
+      onPressOut={() => (pressed = false)}
     >
       <text class={pressed ? 'down' : 'up'}>{pressed ? 'Release' : 'Press me'}</text>
     </pressable>
@@ -163,14 +158,17 @@ real `@Output()`.
 ## API takeaway
 
 React is the only adapter where `pressable` still exposes state through a
-children render function, `children: (state) => ReactNode`. The `pressable`
-tag on Vue, Angular, Svelte, and Solid has no render-prop channel
-for its children, so each one instead reads `onPressIn`/`onPressOut`
-directly and mirrors `pressed` into its own local reactive state, then derives
-a class or style from that: Vue's `@press-in`/`@press-out`, Angular's
-`(pressIn)`/`(pressOut)` `@Output()`s, Solid's `onPressIn`/`onPressOut` props
-setting a signal, and Svelte's `onPressIn`/`onPressOut` inside the `p={{ … }}`
-bag every event handler on a bare host tag needs. All five still read from the
-same shared press state machine underneath. `StyleSheet.create` works
-identically to a CSS class if you'd rather keep style objects inline — see the
-[Styling guide](/docs/learn/styling/).
+children render function, `children: (state) => ReactNode`.
+
+The `pressable` tag on the other four has no render-prop channel for its
+children. Each one reads the press-in and press-out events, mirrors `pressed`
+into its own reactive state, and derives a class or style from it:
+
+- Vue: `@press-in` and `@press-out`.
+- Angular: the `(pressIn)` and `(pressOut)` `@Output()`s.
+- Solid: `onPressIn` and `onPressOut` props that set a signal.
+- Svelte: `onPressIn` and `onPressOut` attributes.
+
+All five read from the same shared press state machine underneath.
+`StyleSheet.create` works identically to a CSS class if you'd rather keep style
+objects inline. See the [Styling guide](/docs/learn/styling/).

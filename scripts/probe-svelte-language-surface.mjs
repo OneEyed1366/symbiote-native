@@ -1,18 +1,10 @@
-// Answers "does the Svelte adapter support construct X?" with the COMPILER, not from memory.
-//
-// Compiles one probe component per Svelte language construct with this adapter's own compiler
-// options and reports (a) whether it compiles at all, (b) which svelte/internal/client runtime
-// functions it emits, and (c) which raw DOM members those touch. Cross-reference the output
-// against adapters/svelte/src/dom-shim/*'s implemented surface: a construct that emits a call
-// reaching a member the shim does not define is unsupported, whether or not it typechecks.
-//
-// The single most load-bearing result here is the element-vs-component split: app code in this
-// project never authors a DOM element (it composes <View>/<Text>/… from @symbiote-native/svelte),
-// so every ELEMENT-only directive is unreachable by construction rather than unimplemented — the
-// same reachability argument svelte-adapter-dom-shim skill §7 makes for dev warnings.
-//
+// Answers "does the Svelte adapter support construct X?" with the COMPILER, not from memory
+
+// Compiles one probe component per construct with this adapter's own compiler options
+// Reports whether it compiles, which runtime functions it emits and which DOM members it touches
+
 // Run:  node scripts/probe-svelte-language-surface.mjs
-// Re-run on every `svelte` version bump (skill §8's checklist).
+// Re-run on every `svelte` version bump
 
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -25,8 +17,13 @@ const require = createRequire(join(REPO_ROOT, 'adapters/svelte/package.json'));
 const { compile } = require('svelte/compiler');
 const svelteVersion = require('svelte/package.json').version;
 
-// Mirrors adapters/svelte/svelte.config.js and metro-svelte-transformer.cjs.
-const OPTIONS = { generate: 'client', fragments: 'tree', css: 'external' };
+// Mirrors examples/svelte/svelte.config.js and metro-svelte-transformer.cjs
+const OPTIONS = {
+  generate: 'client',
+  fragments: 'tree',
+  css: 'external',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+};
 
 // Emitted by every probe; carries no signal about the construct under test.
 const UNIVERSAL = new Set([
@@ -240,12 +237,11 @@ for (const [probeGroup, name, source] of PROBES) {
 console.log('\n--- every runtime fn emitted above ---');
 console.log([...emitted.keys()].sort().join(' '));
 
-// The probe above runs the COMPILER only. A construct can compile perfectly and still be dead
-// under the DOM shim ({@html} emits $.html(), which has nothing to render into on a native tree)
-// — that is the shim's defining weakness, and the guard for it is a PREPROCESSOR, a separate
-// stage svelte.config.js registers and `compile()` never invokes. Re-running the same sources
-// through it here keeps the two verdicts side by side, so "ok" above is never mistaken for
-// "supported".
+// The probe above runs the COMPILER only, and a construct can compile and still be web-only
+// The guard for that is a preprocessor, a stage `compile()` never invokes
+
+// Re-running the same sources through it keeps both verdicts side by side
+// so "ok" above is never mistaken for "supported"
 const { forbidWebOnlyConstructs } = await import(
   new URL(
     '../adapters/svelte/src/preprocessor/forbid-web-only-constructs.ts',
@@ -258,11 +254,11 @@ console.log(
   '\n--- preprocessor verdict (svelte.config.js `preprocess`, NOT compile()) ---',
 );
 for (const [, name, source] of PROBES) {
+  const filename = `${name}.svelte`;
   try {
-    preprocessor.markup({ content: source, filename: `${name}.svelte` });
+    preprocessor.markup({ content: source, filename });
   } catch (error) {
-    console.log(
-      `  REJECTED  ${name.padEnd(22)} ${String(error.message).replace(`${name}.svelte: `, '')}`,
-    );
+    const reason = String(error.message).replace(`${filename}: `, '');
+    console.log(`  REJECTED  ${name.padEnd(22)} ${reason}`);
   }
 }

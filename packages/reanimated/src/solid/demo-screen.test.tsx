@@ -21,6 +21,15 @@ vi.mock('react-native-reanimated/src/updateProps', () => ({
   updateProps: vi.fn(),
 }));
 
+// The headless `JSReanimated` has no `setViewStyle`, which the native CSS manager calls
+vi.mock('react-native-reanimated/src/css/native', () => ({
+  CSSManager: class {
+    update(): void {}
+    unmountCleanup(): void {}
+  },
+  markNodeAsRemovable: vi.fn(),
+}));
+
 beforeEach(() => {
   host.fabric.reset();
   stubCancelAnimationFrame();

@@ -1,17 +1,13 @@
-// RN's `role` / `aria-*` keys must reach the engine identically down both spellings an app can now
-// write: attributes on the bare tag, and one `p={{…}}` bag.
-//
-// The FOLD is the device's rule (`foldAriaProps`, `SymbioteFabricProps.cpp`) and this harness holds
-// no copy of it, so what this file asserts is the half above it — which was always the half that
-// made it a Svelte file rather than an engine one. **The rule reads the hyphenated name literally**,
-// so anything that renamed or reshaped a key on the way down leaves it looking at a bag it does not
-// recognise, and the failure is silent: accessibility simply stops, on device, with every suite
-// green. Svelte's compiler lowercases every static attribute name, which makes that a live hazard
-// here and not a theoretical one.
-//
-// The rule's own eleven cases: `core/engine/cpp/tests/js/aria-payload.itest.ts`.
-//
-// It had a THIRD arm until the wrappers were deleted; the two left are the two an app has.
+// RN's `role` and `aria-*` keys must reach the engine identically in both spellings of an app
+// Attributes on the bare tag, and one `p` bag
+
+// The fold is the device's rule (`foldAriaProps` in `SymbioteFabricProps.cpp`), held nowhere here
+// This file asserts the half above it, which is what makes it a Svelte file and not an engine one
+
+// The rule reads the hyphenated name literally, so a renamed or reshaped key fails silently
+// Accessibility stops on device with every suite green, and Svelte lowercases static names
+
+// The rule's own eleven cases are in `core/engine/cpp/tests/js/aria-payload.itest.ts`
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
@@ -60,10 +56,8 @@ function committedPayload(testID: string): Record<string, unknown> {
   return found.payload;
 }
 
-// Mount AND read in one call, with the recording cleared first. `appRoot()` searches the CREATION
-// log, so mounting two arms and then reading both finds the FIRST arm's surface for each — the
-// mirror-tree version of this file had the same trap from the other end (it kept only the LAST
-// root) and threw `no committed node carries testID …`. Each arm is read while it is the only tree.
+// Mounts and reads in one call, with the recording cleared first
+// `appRoot()` searches the creation log, so two mounted arms would read the first one's surface
 async function mountAndRead(
   source: string,
   rootTag: number,
@@ -93,9 +87,8 @@ afterAll(() => {
   rmSync(PROBE_OUT, { force: true });
 });
 
-// One authored intent per case, spelled two ways: as attributes the compiler writes through
-// `setAttribute`, and as the single `p` property set. The two reach `routeProp` by different
-// mechanisms inside the shim, which is why both are worth a mount.
+// One intent per case, spelled two ways: attributes written through `setAttribute`, and one `p` bag
+// The two reach `routeProp` by different routes inside the renderer, so both are worth a mount
 const attributeArm = (testID: string, attributes: string): string =>
   `<view testID="${testID}" ${attributes}></view>`;
 

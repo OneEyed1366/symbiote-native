@@ -24,20 +24,24 @@ are peer dependencies and stay top-level dependencies of the app.
 
 ## Status matrix
 
-`view`, `text`, `pressable`,
-`image`, `image-background`, `scroll-view`, `text-input`, `switch`, `checkbox`,
-`activity-indicator`, `safe-area-view`, `modal`, `refresh-control`,
-`input-accessory-view`, `button`, `touchable-opacity`,
-`touchable-native-feedback`, `touchable-without-feedback`,
-`touchable-highlight`, and `sticky-header` are lowercase tags an app writes
-directly — React, Vue, Svelte, and Solid resolve them with no import; Angular
-resolves them once its `imports` array carries `SYMBIOTE_ELEMENTS`. There is
-no per-adapter wrapper component left for these, so the framework differences
-that used to live in each adapter's own render bridge (`descriptorToReact`,
-`descriptorToVue`, a hand-authored Svelte host tag, Solid's
-`descriptorToSolid`) mostly don't apply to them anymore — a `pressable` on
-React and a `pressable` on Solid commit the identical Fabric tree, built by
-the same shared host behavior in `@symbiote-native/components`/`@symbiote-native/engine`.
+These are lowercase tags an app writes directly:
+
+- `view`, `text`, `pressable`, `image`, `image-background`, `scroll-view`
+- `text-input`, `switch`, `checkbox`, `button`, `activity-indicator`
+- `safe-area-view`, `modal`, `refresh-control`, `input-accessory-view`
+- `touchable-opacity`, `touchable-native-feedback`, `touchable-without-feedback`,
+  `touchable-highlight`
+- `sticky-header`
+
+React, Vue, Svelte, and Solid resolve them with no import. Angular resolves them
+once its `imports` array carries `SYMBIOTE_ELEMENTS`.
+
+There is no per-adapter wrapper component left for these. The differences that
+used to live in each adapter's own render bridge (`descriptorToReact`,
+`descriptorToVue`, a hand-authored Svelte host tag, Solid's `descriptorToSolid`)
+mostly don't apply to them anymore. A `pressable` on React and a `pressable` on
+Solid commit the identical Fabric tree, built by the same shared host behavior in
+`@symbiote-native/components` and `@symbiote-native/engine`.
 
 What still differs by framework:
 
@@ -52,10 +56,10 @@ What still differs by framework:
   outputs for this and is unaffected.
 - **Lists** (`FlatList`, `SectionList`, `VirtualizedList`,
   `VirtualizedSectionList`) and `KeyboardAvoidingView` are the one family
-  still a genuine per-framework component: `renderItem`/the cell content
+  still a genuine per-framework component. `renderItem`/the cell content
   returns a framework element (`ReactNode`, a Vue slot, a Svelte snippet, a
-  Solid render function), which is exactly the shape a tag cannot express —
-  see each framework's own API page for the render-item signature.
+  Solid render function), which is exactly the shape a tag cannot express.
+  See each framework's own API page for the render-item signature.
 - **`Animated.*` wrapping** stays per-adapter — see the [Animations
   guide](/docs/learn/animations/) for how each framework hands an animated
   value into a tag's `style` prop and what `createAnimatedComponent` still
@@ -90,45 +94,45 @@ Framework-specific when the prop contains framework values:
 | `checkbox`   | `onValueChange` | `@value-change`                   | `[onValueChange]` | `onValueChange` | `onValueChange` | `{ value: boolean }` |
 | `view`       | `onLayout`      | `@layout`                         | `(layout)`      | `onLayout`      | `onLayout`      | `ISymbioteEvent` |
 
-`text-input`'s React/Vue callback fires as `(text, event)` — one value merged
-from what used to be two separate callbacks. Angular can't do that in one
-`EventEmitter`, so it keeps a second, separate `(change)` output for the raw
-event alongside text-only `(valueChange)`. Svelte's `onValueChange` fires the
-identical `(text, event)` shape React's does — the adapter is a flat
-object-bag adapter (every prop, handlers included, rides one object handed to
-the shim element's `p` setter), so there is no per-event translation layer to
-begin with: the callback prop name is RN's own name, unchanged. Solid's
-`onValueChange` fires the same `(text, event)` shape too, as an ordinary
-callback prop: Solid JSX props reach the component as plain getters, with no
-compiler-level event translation.
+`text-input`'s React, Vue, Svelte and Solid callback fires with one change event
+that carries `text` (and `value` on a `switch`). It merges what used to be two
+separate callbacks.
+
+Angular can't do that in one `EventEmitter`, so it keeps a second, separate
+`(change)` output for the raw event alongside text-only `(valueChange)`. Svelte
+and Solid pass the callback prop straight through under RN's own name, with no
+per-event translation layer.
 
 Angular's names (`(press)`, `(longPress)`, `(valueChange)`, `(change)`,
 `(layout)`) are all real `@Output()` `EventEmitter`s, bound like
-`(press)="handler($event)"`. The one permanent exception is the scroll-family
-events (`onScroll`, `onScrollBeginDrag`, `onScrollEndDrag`,
-`onMomentumScrollBegin`, `onMomentumScrollEnd`) on `scroll-view` and the list
-components, which stay plain callbacks bound as an `@Input()` —
-`[onScroll]="handler"` — because they can carry an `Animated.event(...)`
-marker for native-driven scroll, and `@Output()` only binds a template
-listener expression, never an arbitrary value. Svelte has no `@Output()`
-equivalent at all — every event on every component, scroll-family included,
-is a plain callback prop, so this Angular-only exception has no Svelte
-counterpart to carve out. Solid has no `@Output()` equivalent either, for the
-same reason.
+`(press)="handler($event)"`.
+
+The one permanent exception is the scroll-family events (`onScroll`,
+`onScrollBeginDrag`, `onScrollEndDrag`, `onMomentumScrollBegin`,
+`onMomentumScrollEnd`) on `scroll-view` and the list components. They stay plain
+callbacks bound as an `@Input()`, as in `[onScroll]="handler"`.
+
+They can carry an `Animated.event(...)` marker for native-driven scroll, and
+`@Output()` only binds a template listener expression, never an arbitrary value.
+Svelte and Solid have no `@Output()` equivalent, so every event there is a plain
+callback prop and the exception has nothing to carve out.
 
 Svelte's own two-way-binding primitive, the nearest equivalent to Vue's
 `v-model`, is `$bindable()` (`let { value = $bindable() } = $props()`, wired
-with `bind:value={x}` at the call site). `text-input`/`switch`
-(and `Slider`, from the separate `@symbiote-native/slider` package) declare
-`value` this way, so both styles work: `<text-input bind:value={x} />` and the
-explicit `<text-input value={x} onValueChange={setX} />` that Svelte shares
-with React. Supplying `onValueChange` on the same instance as `bind:value`
-takes over the echo — the component can't detect binding from the inside, so
-pass one or the other, not both, on one control. See [How to: two-way bind a
-value](/docs/howtos/two-way-binding/) for the full picture. Solid has no
-`bind:value`/`v-model` sugar of its own on these components: `value` and
-`onValueChange` are always explicit, the same pair React uses without the
-sugar.
+with `bind:value={x}` at the call site). It only works on a component, since
+the compiler rejects `bind:` on an element.
+
+`Slider`, from the separate `@symbiote-native/slider` package, declares
+`value` this way, so `<Slider bind:value={x} />` works. `text-input` and
+`switch` are tags, so they take the explicit pair that Svelte shares with
+React: `<text-input value={x} onValueChange={event => (x = event.text)} />`.
+
+Supplying `onValueChange` on the same instance as `bind:value` takes over the
+echo, so pass one or the other on a control. See [How to: two-way bind a
+value](/docs/howtos/two-way-binding/) for the full picture.
+
+Solid has no `bind:value`/`v-model` sugar of its own on these components:
+`value` and `onValueChange` are always explicit, the same pair React uses.
 
 ## Framework event idioms side by side
 
@@ -194,13 +198,14 @@ adapter (or a native-view wrapper package) drives directly.
 
 A render function returns a `Descriptor` tree — a tiny framework-agnostic node
 description. For a primitive tag (`view`, `switch`, `modal`, ...), the engine's
-own `IHostBehavior.buildStructure` consumes this directly at attach time — no
-adapter is involved. The `descriptorToReact`/`descriptorToVue`/`descriptorToSolid`
-bridges (and Svelte's equivalent host-tag wiring) still exist for the one
-family that remains a genuine per-framework component — the lists
-(`FlatList`, `SectionList`, `VirtualizedList`, `VirtualizedSectionList`) and
-`KeyboardAvoidingView` — since a list's cell content is a real framework
-element, not a `Descriptor`.
+own `IHostBehavior.buildStructure` consumes this directly at attach time, with no
+adapter involved.
+
+The `descriptorToReact`/`descriptorToVue`/`descriptorToSolid` bridges (and Svelte's
+equivalent host-tag wiring) still exist for the one family that remains a genuine
+per-framework component. That family is the lists (`FlatList`, `SectionList`,
+`VirtualizedList`, `VirtualizedSectionList`) and `KeyboardAvoidingView`, since a
+list's cell content is a real framework element, not a `Descriptor`.
 
 | Export             | Signature                                        | Description                                                                                                                                                |
 | ------------------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |

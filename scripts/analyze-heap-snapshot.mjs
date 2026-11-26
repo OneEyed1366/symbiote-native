@@ -1,25 +1,17 @@
-// Tallies a Hermes/Chrome `.heapsnapshot` or `.heaptimeline` by constructor: how many live
-// objects of each kind, and how many bytes they hold. Both formats share the same
-// node/edge/strings tables, so an allocation-timeline recording works here too.
-//
-// Why this lives in the repo rather than being retyped each time: "is adapter X leaking / why is
-// it heavier than adapter Y" is a recurring question, and DevTools' own summary view cannot be
-// diffed across two runs or pasted into a review.
-//
-//   node scripts/analyze-heap-snapshot.mjs ~/Desktop/Heap-*.heaptimeline Shim Symbiote Animated
-//
-// Trailing arguments are substring filters, reported as their own section on top of the global
-// top-25 — that is where adapter-specific classes (ShimElement, ShimText, SymbioteNode, ...) show
-// up.
-//
-// A SECOND file turns this into a diff, which is the mode that actually answers "is it leaking":
-// one snapshot cannot tell "holds 1216 of these" apart from "grows by 1216 a minute".
-//
-//   node scripts/analyze-heap-snapshot.mjs early.heapsnapshot later.heapsnapshot Shim Symbiote
-//
-// Take both on the SAME screen with GC forced (DevTools' trash icon) before each, minutes apart.
-// A constructor whose count climbs is the leak; one that merely sits at a big number is the
-// working set.
+// Tallies a Hermes/Chrome `.heapsnapshot` or `.heaptimeline` by constructor: live objects and bytes
+// Both formats share one node/edge/strings table, so an allocation-timeline recording works too
+
+// "Is adapter X leaking" recurs, and the DevTools summary cannot be diffed or pasted into a review
+//   node scripts/analyze-heap-snapshot.mjs ~/Desktop/Heap-*.heaptimeline Symbiote Animated
+
+// Trailing arguments are substring filters, shown above the global top-25
+// That is where adapter-specific classes such as `SymbioteNode` show up
+
+// A second file makes it a diff, which answers "is it leaking" where one snapshot cannot
+//   node scripts/analyze-heap-snapshot.mjs early.heapsnapshot later.heapsnapshot Symbiote
+
+// Take both on the same screen with GC forced (the DevTools trash icon), minutes apart
+// A constructor whose count climbs is the leak, one that sits at a big number is the working set
 
 import { readFileSync } from 'node:fs';
 
@@ -34,8 +26,17 @@ if (files.length === 0) {
   process.exit(1);
 }
 
+const BYTES_PER_MB = 1_048_576;
+const megabytes = bytes => (bytes / BYTES_PER_MB).toFixed(2);
+
 function tallyOf(file) {
-  const raw = JSON.parse(readFileSync(file, 'utf8'));
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(file, 'utf8'));
+  } catch (error) {
+    console.error(`cannot read ${file} as a heap snapshot: ${error.message}`);
+    process.exit(1);
+  }
   const meta = raw.snapshot.meta;
   const nodeFields = meta.node_fields;
   const stride = nodeFields.length;
@@ -64,7 +65,7 @@ function tallyOf(file) {
 
   console.log(`file        ${file}`);
   console.log(`node_count  ${raw.snapshot.node_count}`);
-  console.log(`total       ${(totalSize / 1048576).toFixed(2)} MB of self_size\n`);
+  console.log(`total       ${megabytes(totalSize)} MB of self_size\n`);
   return tally;
 }
 
@@ -79,7 +80,7 @@ function show(title, list, render) {
 }
 
 const oneLine = row =>
-  `${String(row.count).padStart(12)} ${(row.size / 1048576).toFixed(2).padStart(8)} MB  ${row.kind.padEnd(13)} ${row.name}`;
+  `${String(row.count).padStart(12)} ${megabytes(row.size).padStart(8)} MB  ${row.kind.padEnd(13)} ${row.name}`;
 const bySize = (a, b) => b.size - a.size;
 const matchesFilter = row => filters.some(f => row.name.includes(f));
 
@@ -114,7 +115,7 @@ if (files.length === 1) {
   const growthLine = row =>
     `${String(row.before).padStart(10)} → ${String(row.after).padEnd(10)} ${(row.growth > 0 ? '+' : '') + String(row.growth)}`.padEnd(
       38,
-    ) + `${(row.size / 1048576).toFixed(2).padStart(8)} MB  ${row.kind.padEnd(13)} ${row.name}`;
+    ) + `${megabytes(row.size).padStart(8)} MB  ${row.kind.padEnd(13)} ${row.name}`;
 
   console.log('            before → after      growth       bytes  kind          name');
   show(

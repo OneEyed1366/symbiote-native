@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { hostInstance } from '@symbiote-native/svelte/native-view-bridge';
+  import {
+    captureHost,
+    hostInstance,
+  } from '@symbiote-native/svelte/native-view-bridge';
   import { hooks } from './runes/hooks';
   import type { IAnimatedScrollViewProps } from './animated-scroll-view-props';
 
@@ -17,6 +20,9 @@
 
   const ownRef = useAnimatedRef();
   let element: unknown = $state.raw(undefined);
+  const captureElement = captureHost(host => {
+    element = host;
+  });
 
   useObservedScrollOffset(ownRef, scrollViewOffset, scrollViewOffset !== undefined);
 
@@ -27,6 +33,6 @@
   });
 </script>
 
-<scroll-view bind:this={element} p={{ scrollEventThrottle: EVERY_FRAME, ...rest }}>
+<scroll-view {@attach captureElement} p={{ scrollEventThrottle: EVERY_FRAME, ...rest }}>
   {@render children?.()}
 </scroll-view>

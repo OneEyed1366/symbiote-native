@@ -27,7 +27,10 @@ import {
   componentOf,
   fabricProps,
   isAnchor,
+  isRawTextNode,
   propsOf,
+  RAW_TEXT_COMPONENT,
+  textOf,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
@@ -83,10 +86,9 @@ export type ILiveTree = {
   /**
    * The subtree as one line — `RCTView(RCTText(RCTRawText "hello"))`.
    *
-   * Byte-compatible with the string the stand-in's own `serialize` produced, so a converted
-   * expectation does not have to be rewritten: same bracketing, same empty separator between
-   * siblings, the raw text's own string quoted after its name. It reads the FLATTENED tree, which
-   * is the right comparison — the committed tree it is being read against cannot hold an anchor.
+   * Byte-compatible with the stand-in's own `serialize`: same bracketing, no separator
+   * between siblings, the raw text quoted after its name
+   * Reads the FLATTENED tree, as a commit holds no anchor
    */
   serialize: (root: ISymbioteNode) => string;
   /**
@@ -98,25 +100,40 @@ export type ILiveTree = {
   texts: (root: ISymbioteNode) => string[];
 };
 
-export function createLiveTree(host: IRecordingHost): ILiveTree {
-  const kidsOf = (handle: ISymbioteNode): ISymbioteNode[] =>
-    childrenOf(handle).flatMap(child =>
-      isAnchor(child) ? kidsOf(child) : [child],
-    );
+export type ILiveTreeOptions = {
+  /** Keeps an empty raw text, for a test about the node and not the painted screen */
+  keepBlankText?: boolean;
+};
 
-  const nodeOf = (handle: ISymbioteNode): ILiveNode => ({
-    viewName: componentOf(handle),
-    tagName: host.find(one => one.handle === handle)?.tagName ?? '',
-    props: propsOf(handle),
-    get payload(): Record<string, unknown> {
-      return fabricProps(handle, propsOf(handle));
-    },
-    handle,
-    instanceHandle: host.find(one => one.handle === handle)?.instanceHandle,
-    get children(): ILiveNode[] {
-      return kidsOf(handle).map(nodeOf);
-    },
-  });
+export function createLiveTree(
+  host: IRecordingHost,
+  options: ILiveTreeOptions = {},
+): ILiveTree {
+  const shouldKeepBlankText = options.keepBlankText === true;
+  const kidsOf = (handle: ISymbioteNode): ISymbioteNode[] =>
+    childrenOf(handle).flatMap(child => {
+      if (isAnchor(child)) return kidsOf(child);
+      // Mirrors the commit walk in `SymbioteTree.cpp`, which skips a raw text until it has text
+      const isBlank = isRawTextNode(child) && textOf(child) === '';
+      return !shouldKeepBlankText && isBlank ? [] : [child];
+    });
+
+  const nodeOf = (handle: ISymbioteNode): ILiveNode => {
+    const recorded = host.find(one => one.handle === handle);
+    return {
+      viewName: componentOf(handle),
+      tagName: recorded === undefined ? '' : recorded.tagName,
+      props: propsOf(handle),
+      get payload(): Record<string, unknown> {
+        return fabricProps(handle, propsOf(handle));
+      },
+      handle,
+      instanceHandle: recorded?.instanceHandle,
+      get children(): ILiveNode[] {
+        return kidsOf(handle).map(nodeOf);
+      },
+    };
+  };
 
   const walkLive = (
     root: ISymbioteNode,
@@ -153,7 +170,7 @@ export function createLiveTree(host: IRecordingHost): ILiveTree {
       const one = (handle: ISymbioteNode): string => {
         const name = componentOf(handle);
         const text =
-          name === 'RCTRawText'
+          name === RAW_TEXT_COMPONENT
             ? ` "${String(fabricProps(handle, propsOf(handle)).text)}"`
             : '';
         const kids = kidsOf(handle);
@@ -166,7 +183,7 @@ export function createLiveTree(host: IRecordingHost): ILiveTree {
     texts: (root): string[] => {
       const out: string[] = [];
       const visit = (handle: ISymbioteNode): void => {
-        if (componentOf(handle) === 'RCTRawText') {
+        if (componentOf(handle) === RAW_TEXT_COMPONENT) {
           out.push(String(fabricProps(handle, propsOf(handle)).text));
         }
         for (const child of kidsOf(handle)) visit(child);
@@ -199,11 +216,8 @@ export type ILiveCensus = {
 /**
  * Count the retained subtree, asking no host.
  *
- * This replaces `censusRetainedTree` in the anchor-cost probes, and the replacement is not a
- * convenience. `censusRetainedTree` delegates to `treeHost().census()`, which the TypeScript applier
- * answers truthfully and NOTHING ELSE does — the native host returns zeroes deliberately (census is
- * off the ABI, `native-tree-host.ts` says why), so a probe reading it on a device has always seen
- * nothing. A number only the stand-in can produce is the definition of a mirror measurement.
+ * Replaces `censusRetainedTree`, which asks `treeHost().census()` and only the TypeScript applier
+ * answers it truthfully, the native host returns zeroes (`native-tree-host.ts` says why)
  *
  * What those probes actually claim is about the ENGINE: how many nodes the adapter allocated, and
  * how many of them are anchors. Both are read here off the engine's own child links and its own

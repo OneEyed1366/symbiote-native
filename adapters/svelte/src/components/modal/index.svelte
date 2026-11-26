@@ -1,19 +1,8 @@
 <script lang="ts" module>
-  // Modal: the Svelte lifecycle half. RCTModalHostView is an ordinary Fabric host node
-  // committing through the SAME childSet as the rest of the tree (no second JS surface). The
-  // style math (backdrop override, container/host styles, presentationStyle default), the
-  // visible gate, and the iOS keep-alive reducer all live framework-agnostic in
-  // @symbiote-native/components and are shared verbatim with React/Vue (core/components/src/
-  // state/modal.ts + view/render-modal.ts); Svelte supplies only the lifecycle:
-  //   - $state over the keep-alive reducer (switchReducer's twin: modalReducer)
-  //   - a $effect arming the keep-alive on show, and the native dismiss dropping it (iOS)
-  //   - the descriptor bridge: renderModal() always paints the SAME fixed shape (one
-  //     modal host wrapping one view container — only prop VALUES vary,
-  //     never structure, per svelte-adapter-dom-shim skill §15), so rather than building a
-  //     generic Descriptor->Svelte walker (there is none, and none is needed) this hand-authors
-  //     the two literal host tags and reads renderModal()'s computed props off the fixed
-  //     `root.props` / `root.children[0].props` positions, exactly like React's createElement
-  //     chain and Vue's h() chain do.
+  // Svelte lifecycle half of Modal: `$state` over `modalReducer`, a `$effect` arms the keep-alive
+  // Style math, the visible gate and the reducer are shared in `@symbiote-native/components`
+
+  // `renderModal()` paints one fixed shape, so both host tags are hand-authored from its props
   import type { IModalProps } from './modal-props';
 
   export type { IModalProps };
@@ -31,8 +20,7 @@
     warnAboutModalProps,
   } from '@symbiote-native/components';
   import { dlog, Platform } from '@symbiote-native/engine';
-  import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { forwardAttachments } from '../../runes/attachments';
   import { setVirtualizedListScope } from '../virtualized-list/nested-scope';
 
   let rawProps: IModalProps = $props();
@@ -131,15 +119,11 @@
 
   // See View.svelte's note on `{@attach}` — bound to the modal host itself, the node this
   // component owns (the inner container view is Modal's own structural child).
-  let hostShim = $state.raw<ShimElement | null>(null);
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, rawProps);
-  });
+  const forwardToHost = forwardAttachments(() => rawProps);
 </script>
 
 {#if shouldRender}
-  <modal p={root.hostBag} bind:this={hostShim}>
+  <modal p={root.hostBag} {@attach forwardToHost}>
     <view p={root.containerBag}>
       {@render rawProps.children?.()}
     </view>

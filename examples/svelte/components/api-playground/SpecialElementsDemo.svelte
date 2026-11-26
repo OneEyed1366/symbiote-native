@@ -1,30 +1,22 @@
 <script lang="ts">
-  // Special Elements section. <svelte:window|document|body|head> are No — forbidden at build
-  // time by preprocessor/forbid-web-only-constructs.ts, use the RN twins (Dimensions/AppState/
-  // StatusBar) instead — no demo, they cannot compile. <svelte:element> and <svelte:boundary> are
-  // Yes; <svelte:options> is Partial (a per-FILE compiler directive, not something a runtime
-  // widget can meaningfully toggle) and gets a text panel instead of a live widget.
+  // Special Elements section: the `<svelte:window|document|body|head>` tags cannot compile
+  // `preprocessor/forbid-web-only-constructs.ts` forbids them, use the RN twins instead
+  // `<svelte:element>` and `<svelte:boundary>` are live, and `<svelte:options>` gets a text panel
+  import { hostProps } from '@symbiote-native/svelte/native-view-bridge';
   import ActionButton from '../ActionButton.svelte';
   import BoundaryChild from './BoundaryChild.svelte';
-  import { hostProps } from './shim-node-guard';
 
   const ACCENT = '#b18cf5';
 
-  // <svelte:element this={...}> — a host tag chosen at runtime. Ordinary markup names the tag
-  // literally; this spelling is what `packages/navigation/src/svelte` needs to reach a CAPITALIZED
-  // native Fabric view (RNSScreen, RNSSearchBar) that has no lowercase name of its own.
-  //
-  // `{@attach hostProps(...)}` rather than plain attributes is a preference here, not a
-  // requirement — `setAttribute` routes every key through `routeProp` now, so a dynamic tag lands
-  // its props the same way a literal one does
-  // (.claude/rules/svelte-shim-element-global-must-be-an-ancestor.md).
+  // `<svelte:element this={...}>` picks the host tag at runtime
+  // `packages/navigation/src/svelte` needs it to reach a capitalized native view like `RNSScreen`
+
+  // `{@attach hostProps(...)}` writes the whole bag on the dynamic tag in one step
   let dynamicTag = $state<'view' | 'text'>('view');
   function toggleDynamicTag(): void {
     dynamicTag = dynamicTag === 'view' ? 'text' : 'view';
   }
-  // `testID` rides inside the SAME bag as `style` — a plain attribute on a dynamic tag is just as
-  // dead as a plain `p={bag}` attribute would be (both go through the generic setAttribute
-  // codegen, which ShimElement only mirrors into a cosmetic internal Map, never into routeProp).
+  // `testID` rides in the same bag as `style`, as a plain `p={bag}` on a dynamic tag fails
   const dynamicTagBag = $derived(
     dynamicTag === 'text'
       ? {
@@ -42,10 +34,8 @@
         },
   );
 
-  // <svelte:boundary> — a real init-time throw, caught by the `failed` snippet, with `onerror`
-  // and `reset()` both exercised. A component's <script> body runs once, at creation — flipping
-  // `shouldThrow` on an already-mounted BoundaryChild would never re-throw, so it is wrapped in
-  // {#key shouldThrow} to force a fresh instance (and a fresh init) on every toggle.
+  // `<svelte:boundary>` catches a real init-time throw in the `failed` snippet
+  // A script body runs once, so `{#key shouldThrow}` recreates the child on each toggle
   let shouldThrow = $state(false);
   let lastBoundaryError = $state<string | undefined>(undefined);
   function triggerThrow(): void {

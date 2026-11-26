@@ -1,16 +1,7 @@
-// Proves the ScrollView pipeline for real: compiles a parent that writes the bare `<scroll-view>`
-// TAG through svelte/compiler, mounts it via this adapter's own mount(), and asserts against a real
-// fake-Fabric recorder. Two things are proven, and they are the two the deleted wrapper used to
-// carry:
-//   1. the tag paints the nested intrinsic shape (RCTScrollView(RCTScrollContentView(...))),
-//      which the ENGINE builds from `buildStructure` — no component instance anywhere.
-//   2. the imperative surface — scrollTo/scrollToEnd/flashScrollIndicators — is reachable from a
-//      `bind:this` through `hostInstance()`, which is what replaced the wrapper's exported
-//      functions.
-//
-// NO index.svelte HERE ANY MORE: `Animated.ScrollView` needs no component (the engine resolves an
-// AnimatedNode on any host node), and the imperative handle is on `ISymbioteNode`'s own
-// prototype — `bind:this` already types every command.
+// Proves the `<scroll-view>` tag on the fake Fabric recorder, compiled and mounted for real
+// The tag paints the nested `RCTScrollView(RCTScrollContentView)` shape built by `buildStructure`
+
+// The imperative surface is reachable from an `{@attach}` host through `hostInstance()`
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -93,9 +84,7 @@ async function loadParent(
   return mod.default as Component;
 }
 
-// window.__scrollRef mirrors the deleted wrapper test's trick: expose the bind:this value outside
-// the compiled tree so the test can reach the host instance from here. What it holds is now a
-// ShimElement rather than a component instance, which is exactly the change under test.
+// `window.__scrollRef` exposes the attached host outside the compiled tree
 async function loadMountable(): Promise<Component> {
   return loadParent(
     `<script>
@@ -104,7 +93,7 @@ async function loadMountable(): Promise<Component> {
          window.__scrollRef = el;
        });
      </script>
-     <scroll-view bind:this={el} p={{ contentContainerStyle: { padding: 8 } }}>
+     <scroll-view {@attach node => { el = node; }} p={{ contentContainerStyle: { padding: 8 } }}>
        <view p={{}}></view>
      </scroll-view>`,
     'ScrollParent.svelte',
@@ -122,21 +111,15 @@ function scrollHandle(): {
     (globalThis as { __scrollRef?: unknown }).__scrollRef,
   );
   if (host === undefined)
-    throw new Error('bind:this never resolved to a host instance');
+    throw new Error('the attachment never resolved to a host instance');
   return host;
 }
 
-// No Negative group: the scroll-view tag's prop surface (scroll-view-props.ts) is a permissive bag
-// with no runtime guard/throw path — every field is optional and every value the type allows is
-// handled. All scenarios below are Positive: the tag mounts, exposes its imperative surface, and
-// forwards native events, without ever needing to reject an input.
+// No Negative group: the prop bag of `scroll-view-props.ts` has no runtime guard or throw path
 describe('the scroll-view tag (real compiled source)', () => {
   describe('Positive', () => {
-    // why: proves the two-level intrinsic shape ScrollView must produce for Fabric to actually
-    // clip+scroll content (RCTScrollView wrapping RCTScrollContentView), and that
-    // contentContainerStyle reaches the content container rather than being dropped or misrouted
-    // to the outer clip view. With the wrapper gone this shape comes from `buildStructure`, so a
-    // failure here means the engine never built the content node at all.
+    // Fabric needs `RCTScrollView` wrapping `RCTScrollContentView` to clip and scroll
+    // `contentContainerStyle` must land on the content node, not on the outer clip view
     it('commits the nested scroll-view/content shape', async () => {
       const ScrollParent = await loadMountable();
       mount(ROOT_TAG, ScrollParent);
@@ -158,12 +141,9 @@ describe('the scroll-view tag (real compiled source)', () => {
       // tag rules. The content node's padding above is the routing half, which is the adapter's.
     });
 
-    // why: `bind:this` is the only way app code drives a scroll view imperatively (RN parity:
-    // scrollTo/scrollToEnd/flashScrollIndicators). The Svelte-specific risk is the accessor, not
-    // the command semantics (those are engine-level) — this proves what the framework hands back
-    // reaches a real dispatchViewCommand against the right native node, which is the whole claim
-    // that licensed deleting the wrapper's exported functions.
-    it('dispatches scrollTo through the bind:this host instance', async () => {
+    // App code drives a scroll view imperatively through the attached host (RN parity)
+    // The risk is the accessor, since command semantics live in the engine
+    it('dispatches scrollTo through the attached host instance', async () => {
       const ScrollParent = await loadMountable();
       mount(ROOT_TAG, ScrollParent);
       await tick();
@@ -177,8 +157,7 @@ describe('the scroll-view tag (real compiled source)', () => {
       expect(fabric.commands[0]?.viewName).toBe('RCTScrollView');
     });
 
-    // why: a second, independent command through the same accessor — proves the node carries the
-    // FULL imperative surface, not just the first method that happened to work.
+    // A second command through the same accessor shows the node carries the FULL imperative surface
     it('dispatches flashScrollIndicators through the same host instance', async () => {
       const ScrollParent = await loadMountable();
       mount(ROOT_TAG, ScrollParent);
@@ -192,9 +171,7 @@ describe('the scroll-view tag (real compiled source)', () => {
       expect(fabric.commands[0]?.args).toEqual([]);
     });
 
-    // why: the reverse direction — a real native `topScroll` event must reach the user's `onScroll`
-    // with the native payload untouched, proving the Svelte event wiring (bag -> routeProp ->
-    // handler) doesn't drop or reshape the event now that the callback rides the `p` bag.
+    // A native `topScroll` event must reach `onScroll` untouched through the `p` bag
     it('forwards a real onScroll native event to the handler', async () => {
       const EventParent = await loadParent(
         `<script>
@@ -228,11 +205,8 @@ describe('the scroll-view tag (real compiled source)', () => {
       expect(scrolled).toBe(payload);
     });
 
-    // why: the `refresh-control` tag must attach as a real sibling of the content (iOS attachment
-    // mode), not a props-only stub — pull-to-refresh is a real native gesture surface, so a
-    // silently-inert refresh control would ship broken UX with no error anywhere. The app now
-    // writes the tag as an ordinary CHILD, which the scroll behavior claims; the deleted wrapper
-    // took a `refreshControl` object prop and rendered that child itself.
+    // `refresh-control` must attach as a real sibling of the content on iOS, not a props-only stub
+    // The app writes it as an ordinary CHILD, which the scroll behavior claims
     it('renders refresh-control as a childless sibling before content (iOS attachment)', async () => {
       const RefreshParent = await loadParent(
         `<scroll-view>

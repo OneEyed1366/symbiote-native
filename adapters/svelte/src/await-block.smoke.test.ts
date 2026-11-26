@@ -1,17 +1,12 @@
-// Real execution of `{#await}` against the DOM shim — until this file existed the construct was
-// only ever COMPILE-verified (the preprocessor allows it, `tsc --build` sees nothing), and nothing
-// in the repo had ever run `$.await_block` (svelte/internal/client/dom/blocks/await.js).
-//
-// It matters because `{#await}` is by construction "render one branch, then swap it after mount":
-// the pending branch is scheduled in a microtask and each later branch is installed by a
-// `BranchManager` — the same offscreen-fragment/detached-anchor machinery §17 of the
-// svelte-adapter-dom-shim skill records a hard crash in. So every assertion here checks the EXACT
-// committed Fabric child list, not just "something rendered": a stray anchor, a leftover branch,
-// or a duplicated subtree is exactly the failure shape this construct can produce.
-//
-// Harness shape is mount-pipeline.smoke.test.ts's (compile real Svelte source to a uniquely-named
-// file under build/, dynamic-import it) — the unique name is mandatory, Node caches import() by
-// path (skill §15).
+// Real execution of `{#await}` through the renderer, which was only compile-verified before
+// Nothing ran `$.await_block` (svelte/internal/client/dom/blocks/await.js) until this file
+
+// `{#await}` renders one branch, then swaps it after mount through a `BranchManager`
+// So every assertion checks the exact committed Fabric child list: a stray anchor, a leftover
+// branch or a duplicated subtree is the failure shape this construct can produce
+
+// Harness as in `mount-pipeline.smoke.test.ts`: compile real source to a uniquely-named file
+// under build/ and dynamic-import it, as Node caches `import()` by path
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -79,11 +74,9 @@ async function compileComponent(
   return component;
 }
 
-// root-element.ts inserts an unlabeled `view` between the box-none AppContainer and the
-// mounted component (skill §15), so the component's own top-level nodes are the WRAPPER's
-// children. Reading them off `fabric.appRoot()` (which re-reads the latest child set) rather than
-// `fabric.find()` is deliberate: find() walks the creation log and would still report a branch
-// that has since been swapped out.
+// `root-element.ts` inserts an unlabeled `view` between the AppContainer and the component
+// So the component's top-level nodes are the wrapper's children, read off `fabric.appRoot()`
+// as `fabric.find()` walks the creation log and would still report a swapped-out branch
 function appChildren(): ILiveNode[] {
   const wrapper = live.nodeOf(live.appRoot()).children[0];
   expect(wrapper, 'the root wrapper view committed').toBeDefined();
@@ -98,10 +91,9 @@ function serialize(nodes: readonly ILiveNode[]): string {
   return nodes.map(node => live.serialize(node.handle)).join('');
 }
 
-// Marks a branch with a unique testID AND a Text child, so a leftover branch shows up both as an
-// extra entry in testIds() and as an extra subtree — a bare marker view would hide a duplicated
-// child set. Packed edge-to-edge: whitespace between sibling symbiote-* tags becomes a real
-// RCTRawText node (skill §16).
+// Marks a branch with a unique `testID` and a Text child, so a leftover branch shows up as an
+// extra `testIds()` entry and as an extra subtree
+// Packed edge-to-edge, as whitespace between sibling tags becomes a real `RCTRawText`
 function branchMarkup(id: string, label: string): string {
   return `<view p={{ testID: '${id}' }}><text p={{}}>${label}</text></view>`;
 }
@@ -123,11 +115,8 @@ function deferred(): IDeferred {
 }
 
 describe('{#await} (real compiled output, real fake-Fabric)', () => {
-  // No true Negative group: `mount()` never throws out of any scenario here, including a
-  // rejected promise — {#await}'s own job is to catch that rejection and render `{:catch}`
-  // instead of letting it propagate. That scenario is grouped separately below as "Recovers"
-  // rather than folded into Positive (it exercises the error PATH, not the success path) or
-  // mislabeled Negative (nothing is asserted to throw).
+  // No Negative group: `mount()` never throws here, as `{#await}` catches a rejection itself
+  // and renders `{:catch}`, which is grouped separately below as "Recovers"
   describe('Positive (resolves successfully)', () => {
     // why: the core await contract — pending renders first, then swaps to the resolved value once
     // the promise settles, with the pending subtree fully gone rather than left alongside it.
@@ -162,10 +151,8 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       );
     });
 
-    // why: the short form has no pending snippet at all, so the block must contribute a real engine
-    // anchor (not an empty RCTRawText) while unresolved — the "empty text node is an anchor" rule
-    // from dom-shim/text.ts, exercised here through a construct that has no other branch to fall
-    // back on if that rule is wrong.
+    // The short form has no pending snippet, so the block must contribute a real engine anchor
+    // and not an empty `RCTRawText` while unresolved
     it('renders nothing until resolution in the `{#await expr then value}` short form', async () => {
       const Awaiter = await compileComponent(
         `<script>let { promise } = $props();</script>` +
@@ -177,9 +164,8 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       mount(ROOT_TAG, Awaiter, { promise: gate.promise });
       await tick();
 
-      // No pending branch exists, so the block contributes NO native node — its anchor must be a
-      // real engine anchor the commit walk skips, never an empty RCTRawText (dom-shim/text.ts's
-      // "an empty text node is an anchor" rule). A stray node here would be a genuine paint bug.
+      // No pending branch exists, so the block contributes no native node: its anchor is an
+      // engine anchor the commit walk skips, never an empty `RCTRawText`
       expect(appChildren()).toHaveLength(0);
 
       gate.resolve('late');
@@ -192,10 +178,8 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       );
     });
 
-    // why: the re-entrancy case — the first promise's `.then` still fires after it was replaced,
-    // and await.js's own `destroyed` guard is what must keep it from re-installing a stale branch.
-    // Without this, a fast-changing async prop (e.g. a search-as-you-type query) could flash a
-    // response for a request the user has already moved on from.
+    // Re-entrancy: a replaced promise's `.then` still fires, and the `destroyed` guard of
+    // await.js must keep it from installing a stale branch
     it('handles a NEW promise swapped in while the first is still pending', async () => {
       // The component publishes its setter onto the props object so the test can drive the swap
       // through the same reactive path app code would.
@@ -244,11 +228,9 @@ describe('{#await} (real compiled output, real fake-Fabric)', () => {
       );
     });
 
-    // why: three sibling {#await} blocks inside one keyed {#each}, resolving OUT of order. Each
-    // block owns its own anchor inside the shared each-block parent, so a mis-ordered insertion
-    // (the ShimNode.insertBefore/anchor path) shows up as a permuted child list, and a leaked
-    // anchor shows up as an extra child — this is the case that actually exercises anchor identity
-    // across multiple independent await instances, which the single-block tests above cannot.
+    // Three sibling `{#await}` blocks in one keyed `{#each}`, resolving out of order
+    // A mis-ordered insertion shows up as a permuted child list, a leaked anchor as an extra child
+    // The single-block tests above cannot exercise anchor identity across several await instances
     it('interleaves block anchors correctly when nested inside {#each}', async () => {
       const List = await compileComponent(
         `<script>let { rows } = $props();</script>` +

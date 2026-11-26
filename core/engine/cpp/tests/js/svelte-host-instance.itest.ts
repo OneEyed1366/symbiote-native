@@ -1,19 +1,13 @@
-// hostInstance / findNodeHandle against the REAL committed Fabric tag, replacing
-// adapters/svelte/src/host-instance.test.ts's `installFabric()` half. That mirror assigned each
-// node a unique, sequential fake tag, so `getNativeTag(node) === expected` was a real claim there.
-// The recording host does the opposite on purpose — every node reads back the same `NO_TAG`
-// sentinel — so the identical assertion under `installRecordingFabric()` compares two sentinels
-// and proves nothing (mirror-elimination.md, "A tag comparison whose two sides are both NO_TAG
-// sentinels proves nothing").
-//
-// The "live" cases drive a REAL compiled `.svelte` probe through `bind:this`, exactly like the
-// original test's compiled-source harness — except the source is a real file next to this one
-// (esbuild's `.svelte` loader), not a string compiled and dynamic-imported at test time (there is
-// no filesystem to write to and no module loader to import with, here).
-//
-// The "not yet live" cases drop the original's `createRootShimElement`/`getShimDocument` harness —
-// both internal, unexported modules — in favor of duck-typing the SAME shape `isShimElement`
-// checks (`engineNode` + `tagName`), which stays entirely on the adapter's public surface.
+// `hostInstance` / `findNodeHandle` against the REAL committed Fabric tag
+// The recording host reads every node back as the same `NO_TAG` sentinel, so comparing tags
+// under `installRecordingFabric()` would compare two sentinels and prove nothing
+
+// The "live" cases drive a REAL compiled `.svelte` probe that stores its node with `{@attach}`
+// The source is a real file next to this one (esbuild's `.svelte` loader), since the host has
+// no filesystem to write to and no module loader to import with
+
+// The "not a node" cases pass a plain object that `isSymbioteNode` rejects
+// That stays on the adapter's public surface
 
 import {
   findNodeHandle,
@@ -30,13 +24,12 @@ import {
   it,
   report,
 } from './harness';
-// esbuild resolves this through the `.svelte` loader in `scripts/run-itests.mjs`.
+// esbuild resolves this through the `.svelte` loader in `scripts/run-itests.mjs`
 import Probe from './svelte-host-instance-probe.svelte';
 
 const ROOT_TAG = 1;
-// The exact shape `isShimElement` duck-types (adapters/svelte/src/host-instance.ts) for a shim
-// whose `engineNode` has never gone live — a ref captured before the component's first commit.
-const NOT_YET_LIVE = { engineNode: undefined, tagName: 'view' };
+// An object that is not an engine node, which a ref must never resolve to an instance or a tag
+const NOT_A_NODE = { tagName: 'view' };
 
 const tick = (): Promise<void> =>
   new Promise(resolve => {
@@ -45,7 +38,7 @@ const tick = (): Promise<void> =>
   });
 
 describe('Svelte hostInstance / findNodeHandle on the real engine', () => {
-  it('grafts a real measure/setNativeProps handle onto a bind:this ref, and findNodeHandle agrees with the committed tag', async () => {
+  it('grafts a real measure/setNativeProps handle onto an {@attach} ref, and findNodeHandle agrees with the committed tag', async () => {
     let captured: unknown;
     const surface = mount(ROOT_TAG, Probe, {
       onCapture: (box: unknown) => {
@@ -79,7 +72,7 @@ describe('Svelte hostInstance / findNodeHandle on the real engine', () => {
     if (relabeled === undefined)
       throw new Error('unreachable: probe view missing');
     expect(relabeled.props.accessibilityLabel).toBe('grafted');
-    // A re-commit re-clones the same node — the tag never changes underneath a live ref.
+    // A re-commit re-clones the same node, so the tag never changes underneath a live ref
     expect(relabeled.tag).toBe(before);
     unmount(ROOT_TAG);
   });
@@ -88,16 +81,16 @@ describe('Svelte hostInstance / findNodeHandle on the real engine', () => {
     expect(findNodeHandle(42)).toBe(42);
   });
 
-  it('hostInstance resolves to undefined for null, undefined and a not-yet-live shim', () => {
+  it('hostInstance resolves to undefined for null, undefined and an object that is not a node', () => {
     expect(hostInstance(null)).toBe(undefined);
     expect(hostInstance(undefined)).toBe(undefined);
-    expect(hostInstance(NOT_YET_LIVE)).toBe(undefined);
+    expect(hostInstance(NOT_A_NODE)).toBe(undefined);
   });
 
-  it('findNodeHandle resolves to null for null, undefined and a not-yet-live shim', () => {
+  it('findNodeHandle resolves to null for null, undefined and an object that is not a node', () => {
     expect(findNodeHandle(null)).toBe(null);
     expect(findNodeHandle(undefined)).toBe(null);
-    expect(findNodeHandle(NOT_YET_LIVE)).toBe(null);
+    expect(findNodeHandle(NOT_A_NODE)).toBe(null);
   });
 });
 

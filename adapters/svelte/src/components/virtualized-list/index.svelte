@@ -11,15 +11,12 @@
     buildListReducerInputs,
     buildListScrollProps,
     buildScrollViewHandle,
-    buildSeparatorHandles,
     buildViewabilityPairs,
-    buildSeparatorProps,
     clearTimers,
     cellStyleOf,
     createInitialListState,
     createListHandlers,
     createListNesting,
-    isSeparatorGapInRange,
     listEffectSignature,
     listHasMore,
     listStyleOf,
@@ -35,12 +32,9 @@
     type IListNesting,
     type IListState,
     type IScrollViewHandle,
-    type ISeparatorProps,
-    type ISeparators,
     type ITimerSlot,
   } from '@symbiote-native/components';
   import { dlog, type ISymbioteNode } from '@symbiote-native/engine';
-  import type { ShimElement } from '../../dom-shim';
   import {
     pickAccessibilityProps,
     type IVirtualizedListHandle,
@@ -55,17 +49,17 @@
     getVirtualizedListScope,
     setVirtualizedListScope,
   } from './nested-scope';
-  import { createAttachmentsSync } from '../../runes/attachments';
+  import { createSeparatorOverrides } from './separator-overrides';
+  import { captureHost, forwardAttachments } from '../../runes/attachments';
 
   let props: IProps<ItemT> = $props();
 
-  // Raw state keeps the shim element by identity, the engine's WeakMap mirror keys on it
-  let hostShim = $state.raw<ShimElement | null>(null);
-
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, props);
+  // Raw state keeps the engine node by identity, `null` before the attachment ran
+  let hostNode = $state.raw<ISymbioteNode | null>(null);
+  const captureHostNode = captureHost(node => {
+    hostNode = node;
   });
+  const forwardToHost = forwardAttachments(() => props);
 
   // The offset commanded before the engine node is live, a fresh object re-applies a repeat
   let commandedOffset = $state.raw<{ x: number; y: number } | undefined>(
@@ -76,13 +70,18 @@
   let separatorVersion = $state(0);
 
   const scrollHandle: IScrollViewHandle = buildScrollViewHandle(
-    () => hostShim?.engineNode ?? null,
+    () => hostNode,
   );
 
   const listState: IListState<ItemT> = createInitialListState<ItemT>();
-  // Plain Map, `separatorVersion` is the invalidation signal a read tracks
-  // eslint-disable-next-line svelte/prefer-svelte-reactivity
-  const separatorOverrides = new Map<number, Partial<ISeparatorProps<ItemT>>>();
+  const separators = createSeparatorOverrides<ItemT>({
+    count: () => listState.metrics.count,
+    itemAt: index => narrowed.getItem(narrowed.data, index),
+    version: () => separatorVersion,
+    bump: () => {
+      separatorVersion += 1;
+    },
+  });
   const viewableTimer: ITimerSlot = { current: null };
   const batchTimer: ITimerSlot = { current: null };
 
@@ -120,7 +119,7 @@
 
   function scrollToPixel(offset: number, animated: boolean): void {
     const target = scrollTargetOf(offset, narrowed.horizontal);
-    if (hostShim?.engineNode === undefined) {
+    if (hostNode === null) {
       dlog(`VirtualizedList scrollTo offset=${offset} pending-ref`);
       commandedOffset = target;
       return;
@@ -172,7 +171,7 @@
     horizontal: narrowed.horizontal,
     getState: () => listState,
     dispatch,
-    getContainerNode: () => hostShim?.engineNode ?? null,
+    getContainerNode: () => hostNode,
     getHasMore: () => listHasMore(listState),
     keyFor,
     handlers: () => handlers,
@@ -187,7 +186,7 @@
     clearCommandedOffset: () => {
       commandedOffset = undefined;
     },
-    getNode: () => hostShim?.engineNode ?? null,
+    getNode: () => hostNode,
     keyFor,
   });
   const makeCellMeasure = handlers.makeCellMeasure;
@@ -196,23 +195,11 @@
     return (): void => dispatch({ kind: LIST_ACTION_KIND.cellFocused, index });
   }
 
-  function mergeSeparator(
-    gapIndex: number,
-    patch: Partial<ISeparatorProps<ItemT>>,
-  ): void {
-    if (!isSeparatorGapInRange(gapIndex, listState.metrics.count)) return;
-    separatorOverrides.set(gapIndex, {
-      ...separatorOverrides.get(gapIndex),
-      ...patch,
-    });
-    separatorVersion += 1;
-  }
-
   // Instance exports for `bind:this`, the twin of React's `useImperativeHandle`
   const handle = buildListHandle({
     dispatch,
     scrollHandle,
-    getNode: () => hostShim?.engineNode ?? null,
+    getNode: () => hostNode,
   });
   export function scrollToOffset(
     ...args: Parameters<IVirtualizedListHandle['scrollToOffset']>
@@ -278,6 +265,7 @@
     };
   });
 
+  const hasHeader = $derived(props.header !== undefined);
   // One prop (`p={bag}`) lands on the host tag, the bag is built field by field
   const outerBag = $derived(
     buildListScrollProps(
@@ -306,7 +294,6 @@
   });
 
   const refreshControlProps = $derived(refreshControlPropsOf(narrowed));
-  const hasHeader = $derived(props.header !== undefined);
   // One keyed walk over spacers and cells, a cell moving between regions keeps its instance
   const windowPlan = $derived.by(() => {
     void separatorVersion;
@@ -322,27 +309,13 @@
   const footerStyle = $derived(
     listStyleOf(narrowed, narrowed.listFooterComponentStyle),
   );
-
-  // Reads `separatorVersion`, a plain Map read alone would not re-track
-  function separatorPropsFor(index: number): ISeparatorProps<ItemT> {
-    void separatorVersion;
-    return buildSeparatorProps(
-      narrowed.getItem(narrowed.data, index),
-      narrowed.getItem(narrowed.data, index + 1),
-      separatorOverrides.get(index),
-    );
-  }
-
-  function separatorsFor(index: number): ISeparators {
-    return buildSeparatorHandles(index, mergeSeparator);
-  }
 </script>
 
 {#snippet cellContent(index: number)}
   {@const info = {
     item: narrowed.getItem(narrowed.data, index),
     index,
-    separators: separatorsFor(index),
+    separators: separators.handlesFor(index),
   }}
   {@const ListItem = itemComponentOf(props)}
   {#if ListItem}
@@ -352,13 +325,13 @@
   {/if}
   {#if props.separator && index < metrics.count - 1}
     <view p={{}}>
-      {@render props.separator(separatorPropsFor(index))}
+      {@render props.separator(separators.propsFor(index))}
     </view>
   {/if}
 {/snippet}
 
 {#snippet listBody()}
-  <!-- The shim drops the whitespace text nodes between these siblings (dom-shim/text.ts) -->
+  <!-- The renderer blanks the whitespace text between these siblings -->
   {#if hasHeader}
     <view p={{ style: headerStyle }}>
       {@render props.header?.()}
@@ -440,15 +413,15 @@
 {/snippet}
 
 {#if nesting.isNested}
-  <view p={nestedBag} bind:this={hostShim}>
+  <view p={nestedBag} {@attach captureHostNode} {@attach forwardToHost}>
     {@render listBody()}
   </view>
 {:else if narrowed.horizontal}
-  <horizontal-scroll-view p={outerBag} bind:this={hostShim}>
+  <horizontal-scroll-view p={outerBag} {@attach captureHostNode} {@attach forwardToHost}>
     {@render scrollBody()}
   </horizontal-scroll-view>
 {:else}
-  <scroll-view p={outerBag} bind:this={hostShim}>
+  <scroll-view p={outerBag} {@attach captureHostNode} {@attach forwardToHost}>
     {@render scrollBody()}
   </scroll-view>
 {/if}

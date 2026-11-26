@@ -1,11 +1,7 @@
 <script lang="ts" module>
-  // SectionList: the public list-of-sections component. A thin wrapper over
-  // VirtualizedSectionList, mirroring RN's layering (SectionList -> VirtualizedSectionList ->
-  // VirtualizedList). All section-flattening / windowing / imperative-scroll logic lives below;
-  // this layer re-exposes the same surface under the SectionList name and delegates the handle
-  // (a Svelte `bind:this` on THIS component resolves to whatever THIS component exports, so the
-  // wrapper must re-declare + delegate rather than re-exporting the child's exports directly) —
-  // the Svelte twin of the React/Vue SectionList.
+  // The public list-of-sections component, a thin wrapper over `VirtualizedSectionList` as in RN
+  // A `bind:this` here resolves to this component's own exports, so the handle is re-declared and
+  // delegated, as re-exporting the child's exports directly would not reach it
   import type {
     ISectionListProps,
     ISectionListHandle,
@@ -18,10 +14,8 @@
 <script lang="ts" generics="ItemT">
   import VirtualizedSectionList from '../virtualized-section-list/index.svelte';
   import { pickAccessibilityProps } from '../virtualized-list/virtualized-list-props';
-  import type {
-    IVirtualizedSectionListHandle,
-    IScrollViewHandle,
-  } from '../virtualized-list/virtualized-list-props';
+  import type { IScrollViewHandle } from '@symbiote-native/components';
+  import type { IVirtualizedSectionListHandle } from '../virtualized-section-list/virtualized-section-list-props';
   import type { ISectionListProps as IProps } from './section-list-props';
   import { pickAttachmentProps } from '../../runes/attachments';
   import type { ISymbioteNode } from '@symbiote-native/engine';
@@ -30,8 +24,7 @@
 
   let inner = $state.raw<IVirtualizedSectionListHandle | null>(null);
 
-  // Forwarded as a component-prop spread onto VirtualizedSectionList (a compiled Svelte
-  // component, not a symbiote-* host tag — see flat-list/index.svelte's identical comment).
+  // Spread onto `VirtualizedSectionList`, a compiled component and not a host tag, as in flat-list
   const accessibilityProps = $derived(pickAccessibilityProps(props));
 
   export function scrollToLocation(params: {

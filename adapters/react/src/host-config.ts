@@ -1,7 +1,5 @@
-// react-reconciler host config in MUTATION mode. Every host operation maps onto
-// shared's tiny mutation API; shared owns all Fabric-specific work (tag
-// allocation, view-name resolution, clone-on-write, events). This is the
-// canary: a known-good driver exercising shared end to end.
+// `react-reconciler` host config in mutation mode: each host operation maps onto the engine's
+// mutation API, and the engine owns tag allocation, view names, clone-on-write and events
 
 import createReconciler from 'react-reconciler';
 import { createContext } from 'react';
@@ -25,18 +23,13 @@ import {
   NoEventPriority,
 } from './reconciler-constants';
 import { toPublicInstance, type IHostInstance } from './host-instance';
-// Intrinsic JSX type -> Fabric component name. The name table + resolver live once in
-// @symbiote-native/components, shared by every adapter so the names can't drift (one engine, one
-// Fabric). The table is Metro-split (.ios/.android, filename selects, no Platform.OS read).
-// Adding a primitive is one entry in each name table there, plus its thin
-// component in components.ts: no host-config logic per primitive.
+// Intrinsic JSX type to Fabric component name: the table and resolver live once in
+// `@symbiote-native/components`, Metro-split by filename, so no adapter's names drift
+// Adding a primitive is one entry per name table there plus its thin component in `components.ts`
 import { descriptorFor } from '@symbiote-native/components';
-// A bare intrinsic tag has no wrapper to apply RN's per-primitive prop folds (id -> nativeID,
-// Text's ellipsizeMode / allowFontScaling defaults), so the renderer is the layer that must.
-// Shared with every other adapter, driven by the same HOST_PRIMITIVES spec.
-// WHICH native view a primitive commits can depend on a prop (TextInput's `multiline`), and that
-// prop can be a runtime value — so the choice is made here, where it is known. Identity for every
-// primitive that declares no alternative.
+// A bare intrinsic tag has no wrapper to apply RN's per-primitive prop folds, so this layer does
+// The native view a primitive commits can depend on a runtime prop (TextInput's `multiline`)
+// Identity for every primitive that declares no alternative
 import { resolveIntrinsicTag } from '@symbiote-native/components/resolve-intrinsic';
 
 type IProps = Record<string, unknown>;
@@ -45,28 +38,17 @@ type IHostContext = {
   isInsideText: boolean;
 };
 
-// React-reserved prop keys that must never reach Fabric. `children` is the element
-// tree (handled via appendChild). `ref`/`key` are React 19 plain props: the reconciler
-// reads `props.ref` for commitAttachRef but does NOT strip it from the props it hands a
-// host config, so `ref.current` (the public instance, a bag of methods like measure /
-// focus) would serialize into folly::dynamic and throw "not convertible to dynamic" on
-// Android. Stripping here is the host config's job, exactly as RN's own renderer does.
+// React-reserved keys never reach Fabric, and `children` goes through `appendChild`
+// `ref` and `key` are plain props in React 19 that the reconciler leaves in
+// So `ref.current` would serialize into folly::dynamic and throw "not convertible" on Android
 function isReservedProp(key: string): boolean {
   return key === 'children' || key === 'ref' || key === 'key';
 }
 
 /**
- * `Object.keys`, not `Object.entries`, and it is measured rather than stylistic.
- *
- * `entries` allocates the outer array AND a two-element array per key, eagerly, before the loop
- * starts; `keys` allocates one array of strings and the lookup is a property read the engine is
- * about to do anyway. This runs ONCE PER NODE CREATED — ten thousand times on a thousand-row create.
- * Priced on `-O` Hermes by `object-iteration-cost.itest.ts` over a four-key bag: 0.42 us against
- * 0.23, so **0.19 us per node, ~1.9 ms of a 102 ms create**.
- *
- * `for…in` is cheaper still (0.14) and is NOT used: it walks the prototype chain, and an inherited
- * key would be routed as a prop. A reconciler's props object has no prototype today, which is a fact
- * about today rather than a contract.
+ * `Object.keys`, not `Object.entries`, which allocates a pair array per key on every created node
+ * Priced in `object-iteration-cost.itest.ts`, and `for...in` is out: it walks the prototype
+ * chain, so an inherited key would be routed as a prop
  */
 function applyProps(node: ISymbioteNode, props: IProps): void {
   for (const key of Object.keys(props)) {
@@ -84,8 +66,7 @@ function applyUpdate(
     if (isReservedProp(key)) continue;
     if (!Object.hasOwn(newProps, key)) routeProp(node, key, undefined);
   }
-  // Same `Object.keys` reason as `applyProps` above — this walk runs once per UPDATED node, which on
-  // a `partial` step is every row on the screen.
+  // Same `Object.keys` reason as `applyProps`, and this walk runs once per updated node
   for (const key of Object.keys(newProps)) {
     if (isReservedProp(key)) continue;
     const value = newProps[key];
@@ -93,9 +74,9 @@ function applyUpdate(
   }
 }
 
-// The reconciler's Container slot: the primary root (SymbioteSurface, from createContainer)
-// OR a portal target (an already-mounted ISymbioteNode elsewhere in the SAME surface's tree —
-// createPortal(children, node)). Mirrors the Vue renderer's identical IHostElement union.
+// The reconciler's Container slot: the primary root (`SymbioteSurface`) or a portal target, an
+// already-mounted `ISymbioteNode` of the same surface (`createPortal(children, node)`)
+// Mirrors the Vue renderer's `IHostElement` union
 type IContainer = SymbioteSurface | ISymbioteNode;
 
 function isSurfaceContainer(
@@ -104,11 +85,25 @@ function isSurfaceContainer(
   return container instanceof SymbioteSurface;
 }
 
+type IContainerOps = Pick<
+  SymbioteSurface,
+  'appendChild' | 'insertBefore' | 'removeChild'
+>;
+
+// A surface is its own ops, a portal target gets the engine functions bound to it
+function containerOps(container: IContainer): IContainerOps {
+  if (isSurfaceContainer(container)) return container;
+  return {
+    appendChild: child => appendChild(container, child),
+    insertBefore: (child, before) => insertBefore(container, child, before),
+    removeChild: child => removeChild(container, child),
+  };
+}
+
 let currentUpdatePriority = NoEventPriority;
 
-// Run the callback at discrete priority. Native events and component-owned timers both enter
-// React outside its render loop; callers pair this with flushExternalUpdate when the result must
-// paint synchronously.
+// Runs the callback at discrete priority, as native events and component-owned timers enter React
+// outside its render loop, and callers pair it with `flushExternalUpdate` to paint synchronously
 export function withDiscretePriority(run: () => void): void {
   const previous = currentUpdatePriority;
   currentUpdatePriority = DiscreteEventPriority;
@@ -157,9 +152,8 @@ const reconciler = createReconciler<
   getPublicInstance: instance => toPublicInstance(instance),
 
   prepareForCommit: () => null,
-  // Called once per commit with the PRIMARY root's own container only — never with a portal's
-  // target (portal mutations recommit as part of the same surface's tree walk, since the target
-  // must be a node already inside that surface; see create-portal.ts).
+  // Called once per commit with the primary root's own container only, never a portal target
+  // (portal mutations recommit within the same surface's tree walk, see `create-portal`)
   resetAfterCommit: container => {
     if (isSurfaceContainer(container)) container.commit();
   },
@@ -171,24 +165,17 @@ const reconciler = createReconciler<
   shouldSetTextContent: () => false,
 
   createInstance(type, props, _container, hostContext) {
-    // The INTRINSIC tag, kept in a binding rather than inlined, because it is needed twice: once
-    // to resolve the Fabric view name and once to hand the engine below. The host-behavior
-    // registry is keyed by TAG and never by Fabric name — `pressable` and a plain `View`
-    // both resolve to `RCTView`, so keying by the resolved name would put a press machine on every
-    // view in the app (`core/engine/src/host-behavior.ts`).
+    // The intrinsic tag is needed twice: for the Fabric view name and for the engine below
+    // Host behaviors are keyed by tag, not Fabric name, as `pressable` and a plain `View` both
+    // resolve to `RCTView` (`core/engine/src/host-behavior.ts`)
     const tag = resolveIntrinsicTag(type, props);
     const descriptor = descriptorFor(tag);
     if (hostContext.isInsideText && !descriptor.isText) {
       throw new Error(`<${type}> can't be nested inside <text>`);
     }
-    // The third argument is what makes a host behavior reachable AT ALL on this adapter. Dropping
-    // it degrades silently: `createElement`'s default is `tag = component`, so the lookup runs
-    // against `RCTView` / `RCTImageView`, matches nothing, and every behavior simply never
-    // attaches — no throw, no log, and no test goes red, because React ships no `register` entry
-    // today and so has never had a behavior to lose. That absence is exactly what hid this: the
-    // other four adapters all pass it (vue `renderer/index.ts`, svelte `dom-shim/element.ts`,
-    // solid `renderer.ts`, angular `renderer/index.ts`), and React is the one that did not.
-    //
+    // The third argument makes a host behavior reachable on this adapter, as `createElement`
+    // otherwise defaults the tag to `component` and the lookup runs against `RCTView`
+    // Nothing throws or logs when it is dropped, and the other four adapters all pass it
     const node = createElement(descriptor.component, descriptor.isText, tag);
     applyProps(node, props);
     return node;
@@ -202,26 +189,19 @@ const reconciler = createReconciler<
 
   appendInitialChild: (parent, child) => appendChild(parent, child),
   appendChild: (parent, child) => appendChild(parent, child),
-  appendChildToContainer: (container, child) => {
-    if (isSurfaceContainer(container)) container.appendChild(child);
-    else appendChild(container, child);
-  },
+  appendChildToContainer: (container, child) =>
+    containerOps(container).appendChild(child),
   insertBefore: (parent, child, before) => insertBefore(parent, child, before),
-  insertInContainerBefore: (container, child, before) => {
-    if (isSurfaceContainer(container)) container.insertBefore(child, before);
-    else insertBefore(container, child, before);
-  },
+  insertInContainerBefore: (container, child, before) =>
+    containerOps(container).insertBefore(child, before),
   removeChild: (parent, child) => removeChild(parent, child),
-  removeChildFromContainer: (container, child) => {
-    if (isSurfaceContainer(container)) container.removeChild(child);
-    else removeChild(container, child);
-  },
+  removeChildFromContainer: (container, child) =>
+    containerOps(container).removeChild(child),
 
   finalizeInitialChildren: () => false,
   commitUpdate(node, type, oldProps, newProps) {
-    // A primitive whose native view depends on a prop (TextInput's `multiline`) can change view on
-    // an update. The node keeps its identity — an app's ref stays live — and the commit walk
-    // re-creates the Fabric node because its viewName no longer matches the committed one.
+    // A prop can change a primitive's native view (TextInput's `multiline`) on update
+    // The node keeps its identity so a ref stays live, the commit walk re-creates the Fabric node
     setNodeComponent(
       node,
       descriptorFor(resolveIntrinsicTag(type, newProps)).component,
@@ -235,10 +215,8 @@ const reconciler = createReconciler<
   resetTextContent: () => {},
   hideTextInstance: node => setText(node, ''),
   unhideTextInstance: (node, text) => setText(node, text),
-  // `Activity mode="hidden"` and a re-suspending `Suspense` both reach the tree through these.
-  // They were no-ops, so hidden content went on painting — stacked on top of whatever replaced
-  // it — and only the mount/unmount half of Activity appeared to work. The engine owns the
-  // reversible half (see setNodeHidden): the author's own style stays untouched underneath.
+  // `Activity mode="hidden"` and a re-suspending `Suspense` both reach the tree through these
+  // The engine owns the reversible half (`setNodeHidden`), the author's own style stays untouched
   hideInstance: node => setNodeHidden(node, true),
   unhideInstance: node => setNodeHidden(node, false),
 
@@ -260,10 +238,8 @@ const reconciler = createReconciler<
 
   maySuspendCommit: () => false,
   NotPendingTransition: null,
-  // react's Context IS the runtime value react-reconciler's ReactContext wants
-  // (it reads _currentValue off it); the two libraries' type defs model
-  // Consumer/Provider differently and cannot be reconciled structurally. This is
-  // a type-def mismatch only, flagged here so a future @types fix forces cleanup.
+  // A `react` Context is the runtime value `react-reconciler` wants as `ReactContext`, but the two
+  // libraries' type defs model `Consumer` and `Provider` differently
   // @ts-expect-error cross-library Context type-def mismatch (runtime-correct)
   HostTransitionContext: createContext<unknown>(null),
   resetFormInstance: () => {},
@@ -278,9 +254,8 @@ const reconciler = createReconciler<
   waitForCommitToBeReady: () => null,
 });
 
-// Native-event and timer callbacks both update React from outside the reconciler. Put the update
-// on the discrete lane and synchronously commit it; otherwise a delayed Pressable transition can
-// mutate state but remain visually stale until some unrelated later event flushes React work.
+// Native-event and timer callbacks update React from outside the reconciler, so the update goes on
+// the discrete lane and commits synchronously, or a delayed `Pressable` transition stays stale
 export function flushExternalUpdate(run: () => void): void {
   withDiscretePriority(run);
   // @ts-expect-error flushSyncWork exists at runtime in react-reconciler 0.33

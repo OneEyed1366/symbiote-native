@@ -47,6 +47,7 @@
     "access": "public"
   },
   "scripts": {
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "test": "node --test src/index.test.cjs"
   }
 }

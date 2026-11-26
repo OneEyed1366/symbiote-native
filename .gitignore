@@ -114,3 +114,6 @@ scripts/verdaccio/stamps.json
 examples/*/.npmrc
 .claude/ralph-loop.local.md
 examples/*/artifacts/
+
+# nx task cache and project-graph cache
+.nx/

@@ -335,7 +335,7 @@ against new shadow tree, and native views update.
 **Events fall out of the seam rather than being a subsystem.** At `createNode` the adapter passes an
 `instanceHandle`, and Fabric hands that same handle back when an event fires. In React it is the
 fiber; here it is the retained-tree node. The engine normalizes the raw native event onto a listener
-on that node, and the adapter maps its own template syntax (`@click`, `on:click`, `(click)`) onto it.
+on that node, and the adapter maps its own template syntax (`@click`, `onPress`, `(click)`) onto it.
 
 **Bootstrap.** The native host raises a Fabric surface (`RCTFabricSurface` on iOS) through stock RN's
 `AppRegistry`, which mints a `rootTag`. SymbioteNative's entry registers a _runnable_ rather than a

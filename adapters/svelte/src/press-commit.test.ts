@@ -1,12 +1,11 @@
 // A press on a `<pressable>` must not strand an update to one of its DESCENDANTS.
 //
-// The regression this pins, fixed in `commitTargeted`: `setNodePressed` dirties the pressed node,
-// so a same-tick child write bubbles one step, meets it already dirty, and stops — the commit
-// publishes the pressed node and clears flags without descending, stranding the child forever.
+// Pins the `commitTargeted` fix: `setNodePressed` dirties the pressed node
+// A same-tick child write then bubbles one step and stops at it, so the child was stranded forever
 
-// Belongs in the ADAPTER suite: it needs a framework whose update writes ONLY the child (Svelte's
-// fine-grained reactivity) — Vue/Solid rewrite the prop on the node itself and hide the bug. Read
-// TWO layers — `committed` alone can't tell a lost commit from a write that never happened.
+// It needs a framework whose update writes only the child, as Svelte's fine-grained reactivity does
+// Vue and Solid rewrite the prop on the node itself and hide the bug
+// Two layers are read, as `committed` alone cannot tell a lost commit from a write never made
 import { describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { writeFileSync, rmSync } from 'node:fs';
@@ -62,7 +61,7 @@ function committed(): unknown {
     .testID;
 }
 
-/** What the shim wrote onto the engine node, whether or not a commit carried it. */
+/** What the renderer wrote onto the engine node, whether or not a commit carried it. */
 function onEngineNode(): unknown {
   // Through the engine's own accessors, not fields: a node's children and its standing props are
   // both DERIVED from the host's tree plus the pending op log, and neither is on the node.
@@ -122,7 +121,7 @@ describe('a pressable tag and its descendants', () => {
     fabric.fireEvent(handle, 'topTouchEnd');
     await waitUntil(() => presses === 1, 'onPress fired');
     await settle();
-    expect(onEngineNode(), 'the shim wrote the child prop').toBe('v11');
+    expect(onEngineNode(), 'the renderer wrote the child prop').toBe('v11');
     expect(committed(), 'and the commit carried it').toBe('v11');
 
     // The press must not have left the node unreachable: an ordinary update still commits.
