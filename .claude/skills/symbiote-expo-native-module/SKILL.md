@@ -19,11 +19,11 @@ you're wrapping has a visible native view; read this one if it doesn't.
 Reference case, decided 2026-07 while planning `@symbiote-native/sensors` (wraps
 `expo-sensors` sdk-57, pilot component = `Accelerometer` only — the other 7 sensor families
 follow later by the same recipe). All facts below were verified by reading the actual
-vendored source, not from memory or upstream docs alone: `.vendors/expo` is a shared git
-checkout (via the `.vendors` symlink used across other projects too) — read a specific SDK's
-files with `git -C .vendors/expo show origin/sdk-57:<path>` after `git -C .vendors/expo fetch
-origin sdk-57`; do **not** `git checkout`/switch its branch, that mutates a checkout other
-projects also read.
+vendored source, not from memory or upstream docs alone. The Expo source is a local git
+checkout that other projects share. Read a specific SDK's files with
+`git -C <expo checkout> show origin/sdk-57:<path>` after
+`git -C <expo checkout> fetch origin sdk-57`. Do **not** `git checkout` or switch its branch:
+that mutates a checkout other projects also read.
 
 ## 1. Dependency scope — `expo-modules-core` directly, never the `expo` meta-package
 
@@ -63,9 +63,9 @@ it against the target SDK version for every future Expo package, don't assume it
 ## 2. Do NOT vendor/copy native code — this is a different autolinking mechanism
 
 `symbiote-third-party-native-view` mandates physically copying the wrapped library's native
-source into a package-local `.rn-<lib>` folder, because CocoaPods' `source_files` resolution
-walks the filesystem with `Dir.glob` and **never crosses a symlink** — and pnpm always hides
-the real package behind a `.pnpm` store symlink. That workaround does **not** apply here.
+source into a package-local `.rn-<lib>` folder. CocoaPods resolves `source_files` with
+`Dir.glob`, which **never crosses a symlink**, and pnpm always hides the real package behind
+a `.pnpm` store symlink. That workaround does **not** apply here.
 
 `expo-modules-autolinking` resolves packages through its own JS/Ruby layer, and its
 `src/utils.ts` (verified at `sdk-57`) does this before ever handing a path to CocoaPods or
@@ -114,10 +114,10 @@ failure, it's a silent runtime hijack. So the wrapped package is a **dependency 
 folder only**, its JS entry point (`main`/`module` in its `package.json`) is never imported
 from our code.
 
-Instead, hand-port the class hierarchy into `packages/<lib>/src/core/`, same spirit as
+Instead, hand-port the class hierarchy into `packages/<lib>/src/core/`. It is the same spirit as
 `packages/splash-screen` porting `react-native-bootsplash`'s pure JS into `core/hide.ts` (see
-the `components_split_logic_view_lifecycle` invariant in the root CLAUDE.md) — but here the
-reason is a concrete hard-import break, not just architectural preference:
+the `components_split_logic_view_lifecycle` invariant in the root CLAUDE.md). Here the reason
+is a concrete hard-import break, not just architectural preference:
 
 - Port the base class (`DeviceSensor`) and each sensor class (`Accelerometer`, …) verbatim,
   changing only the one import line to pull `PermissionResponse`/`PermissionStatus` from
@@ -163,14 +163,13 @@ Required, once per native host app (not per wrapped package):
 ```
 
 Wire this into `examples/<app>`. `examples/react` currently exists only as a bare, unwired RN
-scaffold (no `use_expo_modules!`, no Gradle fallback, doesn't even depend on
-`@symbiote-native/sensors`) — every `examples/react` path in the narrative below describes
-where the work *should* live per convention, not where it *does* live on disk today. Before
-repeating any step below, `grep -n -i expo` the Podfile to confirm the wiring is actually
-there — don't assume the convention held. Once wired once at
+scaffold: no `use_expo_modules!`, no Gradle fallback, no `@symbiote-native/sensors` dependency.
+Every `examples/react` path in the narrative below describes where the work *should* live per
+convention, not where it *does* live on disk today. Before repeating any step below,
+`grep -n -i expo` the Podfile to confirm the wiring is actually there. Once wired once at
 the app level, any *future* expo-modules-core-based package is auto-discovered with zero further
-app changes — unlike the per-package `react-native.config.cjs`/podspec proxy the native-view
-skill requires for every new RN-CLI-autolinked wrapper.
+app changes. The native-view skill differs: every new RN-CLI-autolinked wrapper needs its own
+`react-native.config.cjs` and podspec proxy.
 
 **iOS — done and verified end-to-end (2026-07, accelerometer pilot).** All fixes below are
 reproduced directly in `examples/react/ios/Podfile` rather than worked around.
@@ -344,7 +343,7 @@ reproduced directly in `examples/react/ios/Podfile` rather than worked around.
 ```
 §4d_android_bootstrap := {
   hard_wall: "expo-autolinking-settings Gradle plugin (ExpoAutolinkingSettingsPlugin.kt,
-              .vendors/expo origin/sdk-57 packages/expo-modules-autolinking/android/
+              expo repo, origin/sdk-57, packages/expo-modules-autolinking/android/
               expo-gradle-plugin) hardcodes require.resolve('expo-modules-autolinking/
               package.json',{paths:[require.resolve('expo/package.json')]}), and the shared
               AutolinkingCommandBuilder.baseCommand (used by SettingsManager#resolve AND
@@ -489,9 +488,9 @@ do not reach for `installFabric()`/`fabric.find`/`fabric.fireEvent` for this sha
 
 The correct precedent is upstream's own test pattern, verified in
 `expo-sensors/src/__tests__/Accelerometer-test.native.ts` and
-`expo-sensors/mocks/ExponentAccelerometer.ts`: inject a fake native-module object in place of
-the real `requireNativeModule` resolution (a plain object with `vi.fn()`/stub
-`addListener`/`isAvailableAsync`/`setUpdateInterval`), then assert against it directly —
+`expo-sensors/mocks/ExponentAccelerometer.ts`. Inject a fake native-module object in place of
+the real `requireNativeModule` resolution: a plain object with `vi.fn()`/stub
+`addListener`/`isAvailableAsync`/`setUpdateInterval`. Then assert against it directly,
 e.g. `Accelerometer._nativeModule.setUpdateInterval` was called with the right args. No Fabric
 fake, no ViewConfig, no `installFabric()`.
 
@@ -606,29 +605,30 @@ pattern in React first" convention (see the Workstream B pilot-order precedent f
 services that already exist from day one.
 
 When porting several sensor families from the same upstream package in one pass, dispatch one
-agent per sensor and have none of them touch the shared `core/index.ts`/`react/index.ts`/
-`vue/index.ts`/`angular/index.ts` barrels — merge those by hand afterward, otherwise concurrent
+agent per sensor. None of them touches the shared `core/index.ts`/`react/index.ts`/
+`vue/index.ts`/`angular/index.ts` barrels. Merge those by hand afterward, otherwise concurrent
 agents conflict on the same file.
 
 Beyond the uniform `DeviceSensor` subclass + `addListener`/`setUpdateInterval` recipe, two shape
 variants can show up — read these before wrapping the next Expo sensor-shaped module:
 
-- **Platform-split native module (`LightSensor`)**: when upstream ships a real native module on
-  one platform and a JS-level stub on the other (`ExpoLightSensor.ts` vs `ExpoLightSensor.ios.ts`
-  always reporting unavailable), port it as a FOLDER under `core/native/` following this repo's
-  folder-as-module convention (`exponent-light-sensor/{index.ts,index.ios.ts,index.android.ts}`),
-  not a flat file — `index.ts` re-exports the stub variant so headless/vitest resolution never
-  calls `requireNativeModule` outside a real RN runtime, while Metro still picks the real
-  per-platform file at bundle time.
+- **Platform-split native module (`LightSensor`)**: upstream ships a real native module on one
+  platform and a JS-level stub on the other. Here `ExpoLightSensor.ios.ts`, unlike
+  `ExpoLightSensor.ts`, always reports unavailable.
+  - Port it as a FOLDER under `core/native/`, not a flat file, following this repo's
+    folder-as-module convention (`exponent-light-sensor/{index.ts,index.ios.ts,index.android.ts}`).
+  - `index.ts` re-exports the stub variant, so headless/vitest resolution never calls
+    `requireNativeModule` outside a real RN runtime.
+  - Metro still picks the real per-platform file at bundle time.
 - **Free-function module, not a `DeviceSensor` subclass (`Pedometer`)**: not every Expo sensor
   fits the `addListener`/`setUpdateInterval`/`isAvailableAsync` class shape — `Pedometer` upstream
   is a set of free functions (`watchStepCount`, `getStepCountAsync`, plain permission functions)
-  with no shared instance to hang state off. Port it as free functions in `core/pedometer.ts`
-  (do NOT force it to extend `DeviceSensor`), and give it a reactive hook/composable/service that
-  wraps `watchStepCount` in the same subscribe-on-mount/unsubscribe-on-unmount shape as every
-  other sensor's hook, for cross-framework consistency, while leaving the one-shot async functions
-  (`getStepCountAsync`, `isAvailableAsync`, permission functions) as plain re-exports from the
-  barrel — no adapter-specific wrapping needed since they're already framework-agnostic.
+  with no shared instance to hang state off.
+  - Port it as free functions in `core/pedometer.ts`. Do NOT force it to extend `DeviceSensor`.
+  - Give it a reactive hook/composable/service that wraps `watchStepCount`, with the same
+    subscribe-on-mount/unsubscribe-on-unmount shape as every other sensor's hook.
+  - Leave the one-shot async functions (`getStepCountAsync`, `isAvailableAsync`, permission
+    functions) as plain re-exports from the barrel. They are already framework-agnostic.
 
 ## 8. Resolved — `DeviceMotion` on Android needed NO native fix; three debugging-methodology
    traps caused the whole illusion of a bug
@@ -736,11 +736,11 @@ variants can show up — read these before wrapping the next Expo sensor-shaped 
 
 ## 9. `@symbiote-native/expo-modules-link` - the hand-maintained-registration pain from §4/§7 is now automated (2026-07, redesigned as an aggregator 2026-08-05)
 
-The recurring Android pain documented above and in §7's "This does NOT remove the other two
-registration points" note — `app/build.gradle`'s `implementation project(':expo-<pkg>')` and
-`MainApplication.kt`'s hand-maintained `ModulesProvider` map, both needing one new line per
-package with no compile error on omission, only a runtime `Cannot find native module` crash —
-is now closed by `packages/expo-modules-link`.
+`packages/expo-modules-link` now closes the recurring Android pain documented above and in §7's
+"This does NOT remove the other two registration points" note. Two places needed one new line
+per package: `app/build.gradle`'s `implementation project(':expo-<pkg>')` and
+`MainApplication.kt`'s hand-maintained `ModulesProvider` map. A missed line gave no compile
+error, only a runtime `Cannot find native module` crash.
 
 **It is an aggregator: ONE process, ONE pass over the app's `node_modules`, regenerating the
 registration blocks from scratch.** The app - not the wrapper package - owns the trigger:
@@ -829,11 +829,12 @@ rather than guessed at - guessing where the region ends would eat the developer'
 a hand-edit to either file in any consuming app — this closes the exact gap §7 flagged as
 NOT solved by the `settings.gradle` exclude-list. iOS per-package *linking* already self-healed
 via its own `use_expo_modules!(exclude: [...])` (§`Accepted side effect`) before this package
-existed, so there was no recurring gap to close there — but a second, genuinely recurring iOS
-gap DID exist and is now also closed: per-package `Info.plist` usage-description strings (see
-below). The one-time per-app bootstrap (Podfile `use_expo_modules!` monkey-patch reproduction,
-`SymbioteExpoModulesFactory`, bridging header) remains fully manual either way — it is a
-one-time, whole-Xcode-project operation, not a per-package one, so it was never in scope.
+existed. But a second, genuinely recurring iOS gap DID exist and is now also closed:
+per-package `Info.plist` usage-description strings (see below).
+
+The one-time per-app bootstrap remains fully manual either way: the Podfile
+`use_expo_modules!` monkey-patch reproduction, `SymbioteExpoModulesFactory`, the bridging
+header. It is a whole-Xcode-project operation, not a per-package one, so it was never in scope.
 
 ```
 §9b_ios_infoplist_permission_strings := {
@@ -936,7 +937,7 @@ one-time, whole-Xcode-project operation, not a per-package one, so it was never 
    adapting upstream's mock-native-module pattern (§6) — see §7 for the two shape variants.
 3. One-time `examples/react` native wiring: Podfile `use_expo_modules!`, Android Gradle
    autolinking apply, `NSMotionUsageDescription` in Info.plist, AppDelegate/MainApplication
-   bootstrap, Android runtime permission — see §4 (`SymbioteExpoModulesFactory` on iOS) and the
+   bootstrap, Android runtime permission. See §4 (`SymbioteExpoModulesFactory` on iOS) and the
    dedicated Android section above this checklist.
 4. Verify: `pod install` then grep `Pods.xcodeproj/project.pbxproj` for the native module
    class; Android Gradle autolinking generation succeeds; `xcodebuild`/`gradlew assembleDebug`
@@ -947,7 +948,7 @@ one-time, whole-Xcode-project operation, not a per-package one, so it was never 
 
 ## 10. Batch survey 2026-09-03 — audio/notifications/location/file-system/sqlite/task-manager
 
-Six packages researched against `.vendors/expo` origin/sdk-57 before any port started, to find
+Six packages researched against the Expo source at origin/sdk-57 before any port started, to find
 where this skill's recipe (plain `requireNativeModule` + EventEmitter) stops applying. Findings,
 not yet implemented — this section is the map for whoever ports these next.
 
@@ -1285,12 +1286,28 @@ not yet implemented — this section is the map for whoever ports these next.
 }
 ```
 
+## 15. What only an example typecheck catches in a view wrapper (measured 2026-11-26)
+
+The package build passes with all of these. In CI the `expo-*` arms of
+`scripts/check-packed-consumer-bundles.mjs` catch them: packed tarballs, type check, no bundle.
+Locally, run `typecheck` in the examples after a sync.
+
+- A Solid or Svelte wrapper type needs `Pick<IViewProps, 'class'>`. The core already forwards
+  `class`, so the screen works on a device while `typecheck` rejects it.
+- Svelte `bind:this` gives the instance exports only. A getter of the core handle cannot be exported,
+  so `gl-view.svelte` exports `getContextId()` and the `./svelte` entry redeclares `IGLViewHandle`.
+- `@symbiote-native/gl` names `WebGL2RenderingContext`, so an app needs a lib that declares it.
+  Vue apps take `DOM`. A Solid app takes `WebWorker`: `DOM` gives the `JSX.Element` of `solid-js`
+  a real `Node` and broke 1469 lines of one example.
+- Without `DOM` that `JSX.Element` is `any`, as `Node` is unresolved. So the callback of
+  `<Show when={x}>{value => ...}` gets no parameter type: annotate it, `(value: () => T) =>`.
+
 ## References
 
-- `symbiote-new-package-skeleton` — read FIRST if the package doesn't exist yet at all: resolves
-  whether a brand-new package should start as a bare-skeleton (reserve-the-npm-name only, no
-  functional code — see `packages/local-auth`), core-only, or the full parity this skill
-  otherwise assumes.
+- `symbiote-new-package-skeleton`: read FIRST if the package doesn't exist yet at all. It
+  resolves how a brand-new package starts: a bare skeleton, core-only, or the full parity this
+  skill otherwise assumes. A bare skeleton only reserves the npm name, with no functional code
+  (see `packages/local-auth`).
 - `symbiote-third-party-native-view` — the native-VIEW sibling skill; read it first if the
   package you're wrapping has a `codegenNativeComponent`. The `.rn-<lib>` vendoring recipe and
   the CocoaPods symlink-glob gotcha it documents do **not** apply to expo-modules-core-based
@@ -1302,9 +1319,9 @@ not yet implemented — this section is the map for whoever ports these next.
   `native-link.json`; read its own README for the manifest shape and the app-side setup.
 - `symbiote-sfc-style-compiler` / root CLAUDE.md Build & platform section — this repo's own
   Metro pipeline, the reason `expo`'s own Metro config/babel preset must never be installed.
-- `.vendors/expo` — shared git checkout across projects via the `.vendors` symlink; read a
-  specific SDK's files with `git -C .vendors/expo show origin/sdk-57:<path>` (fetch the ref
-  first if missing), never `git checkout`/switch its branch.
+- The Expo source checkout: local, shared across projects. Read a specific SDK's files with
+  `git -C <expo checkout> show origin/sdk-57:<path>` (fetch the ref first if missing), never
+  `git checkout`/switch its branch.
 - `symbiote-docs-site-package-template` — once the wrapper package is done, read this for the
   docs-site `.mdx` page's canonical `## API` section shape (Signature/config/return-value
   sub-tables fit an Expo module's async-function + hook surface, same as `splash-screen`'s).
