@@ -118,7 +118,8 @@ function FileCalls(props: { form: IForm }) {
               const reader = file().readableStream().getReader();
               const first = await reader.read();
               reader.releaseLock();
-              return { viaReadableStream: first.value?.byteLength, viaStream: file().stream() !== undefined };
+              const viaReadableStream = first.value instanceof Uint8Array ? first.value.byteLength : undefined;
+              return { viaReadableStream, viaStream: file().stream() !== undefined };
             },
           },
           {
@@ -214,7 +215,11 @@ const PickerCard = defineComponent(
     const mimeTypes = ref('');
     const initialUri = ref('');
     const isMultiple = ref(false);
-    const picked = (files: File | File[] | null) => (Array.isArray(files) ? files : files === null ? [] : [files]).map(item => item.uri);
+    const picked = (files: File | File[] | null) => {
+      if (files === null) return [];
+      const list = Array.isArray(files) ? files : [files];
+      return list.map(item => item.uri);
+    };
     return () => (
       <>
         <Card testID="file-system-picker-card" title="System pickers">

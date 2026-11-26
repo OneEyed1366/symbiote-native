@@ -1,7 +1,12 @@
 import { defineComponent, ref } from 'vue';
 import { Platform } from '@symbiote-native/vue';
 import { LivePhotoView } from '@symbiote-native/live-photo/vue';
-import type { ILivePhotoAsset, ILivePhotoContentFit, ILivePhotoViewHandle } from '@symbiote-native/live-photo/vue';
+import type {
+  ILivePhotoAsset,
+  ILivePhotoContentFit,
+  ILivePhotoLoadError,
+  ILivePhotoViewHandle,
+} from '@symbiote-native/live-photo/vue';
 import { ActionButton } from '../components/ActionButton';
 import { Explorer, Scenario } from '../components/Scenario';
 import { Card, ChoiceRow, ResultRow, ScreenShell, ToggleRow, lineColorOf } from '../components/ScreenShell';
@@ -117,7 +122,7 @@ const Player = defineComponent<{ source: ILivePhotoAsset | null }>(
             onLoadStart={() => log('load start')}
             onPreviewPhotoLoad={() => log('preview photo loaded')}
             onLoadComplete={() => log('ready to play')}
-            onLoadError={error => log(`load error: ${error.message}`)}
+            onLoadError={(error: ILivePhotoLoadError) => log(`load error: ${error.message}`)}
             onPlaybackStart={() => log('playback start')}
             onPlaybackStop={() => log('playback stop')}
           />

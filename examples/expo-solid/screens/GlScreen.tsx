@@ -29,7 +29,9 @@ function HeadlessScenario(props: { color: string }) {
       <ActionButton testID="gl-headless-run" title="Render offscreen" color={props.color} onPress={() => void run()} />
       <ResultRow testID="gl-headless-result" label="createContextAsync" value={result().line} />
       <Show when={result().snapshot}>
-        {snapshot => <image testID="gl-headless-image" source={{ uri: snapshot().localUri }} class="gl-snapshot" />}
+        {(snapshot: () => NonNullable<IHeadlessResult['snapshot']>) => (
+          <image testID="gl-headless-image" source={{ uri: snapshot().localUri }} class="gl-snapshot" />
+        )}
       </Show>
     </Scenario>
   );
