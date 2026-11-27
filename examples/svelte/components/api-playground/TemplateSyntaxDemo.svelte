@@ -5,7 +5,6 @@
   // preprocessor/forbid-web-only-constructs.ts), so it is not demoed.
   import { dlog, whenCommitted } from '@symbiote-native/engine';
   import { hostInstance } from '@symbiote-native/svelte';
-  import { isShimElement } from './shim-node-guard';
   import ActionButton from '../ActionButton.svelte';
   import NumberStepper from './NumberStepper.svelte';
 
@@ -72,7 +71,6 @@
   // `measuredWidth` stuck at `undefined` forever, with nothing on screen but "measuring…".
   let measuredWidth = $state<number | undefined>(undefined);
   function measureAttach(node: unknown): void {
-    if (!isShimElement(node)) return;
     const host = hostInstance(node);
     if (host === undefined) return;
     whenCommitted(host, () => {

@@ -17,13 +17,19 @@ ever mounted at a time, exactly like Tab.
   Drawer reaches the same swipe-to-open/close and
   `front`/`back`/`slide`/`permanent` behavior as `@react-navigation/drawer`, but
   not byte-for-byte parity with it. `PanResponder` + `Animated` cover the
-  gesture and the transform math; a few pieces of the real drawer's surface are
-  not ported: no `configureGestureHandler` escape hatch, no declarative
-  gesture-relationship composition against a nested `ScrollView` or another
-  `PanResponder`, no UI-thread `useDrawerProgress` `SharedValue` (`progress`
-  here is a plain JS-thread value), and
-  `hideStatusBarOnOpen`/`keyboardDismissMode`/`statusBarAnimation`/`overlayStyle`
-  are not wired up. This is a deliberate scope boundary, not a bug.
+  gesture and the transform math.
+
+  A few pieces of the real drawer's surface are not ported:
+
+  - no `configureGestureHandler` escape hatch
+  - no declarative gesture-relationship composition against a nested
+    `ScrollView` or another `PanResponder`
+  - no UI-thread `useDrawerProgress` `SharedValue` (`progress` here is a plain
+    JS-thread value)
+  - `hideStatusBarOnOpen`, `keyboardDismissMode`, `statusBarAnimation` and
+    `overlayStyle` are not wired up
+
+  This is a deliberate scope boundary, not a bug.
 </Aside>
 
 ## Usage
@@ -180,9 +186,9 @@ Angular, a snippet in Svelte, a render prop over an accessor in Solid.
     `Drawer`'s content markup is a `Snippet` **with a parameter** (`drawerContent`), read from
     the navigator's own `children` — Svelte's twin of React's render-prop and Vue's scoped slot.
     Sibling markers (`<DrawerScreen>` after `<DrawerScreen>`, the snippet call right after) are
-    packed edge-to-edge with zero whitespace between them: a stray text node between two tags
-    that don't accept text children compiles to a real invalid child on-device (see the
-    `svelte-adapter-dom-shim` skill). `Drawer` reads `<DrawerScreen>` markers off a
+    packed edge-to-edge with zero whitespace between them.
+    A stray text node between two tags that don't accept text children compiles to a real
+    invalid child on-device. `Drawer` reads `<DrawerScreen>` markers off a
     context-based collector rather than scanning `children` directly, the same registration
     mechanism [Stack's `<Screen>`](/docs/navigation/stack/) uses.
 

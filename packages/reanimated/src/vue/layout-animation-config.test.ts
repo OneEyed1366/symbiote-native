@@ -21,9 +21,9 @@ afterEach(() => unmount(ROOT_TAG));
 
 const fade = () => ({ animations: {}, initialValues: {}, callback: undefined });
 
-function enteringCancelled(): boolean {
-  return update.mock.calls.some(([, type, config]) => {
-    return type === LayoutAnimationType.ENTERING && config === undefined;
+function enteringSent(): boolean {
+  return update.mock.calls.some(([, type]) => {
+    return type === LayoutAnimationType.ENTERING;
   });
 }
 
@@ -40,7 +40,7 @@ describe('LayoutAnimationConfig', () => {
       ),
     );
 
-    expect(enteringCancelled()).toBe(true);
+    expect(enteringSent()).toBe(false);
   });
 
   it('lets the views under it animate in when it does not skip', async () => {
@@ -50,7 +50,7 @@ describe('LayoutAnimationConfig', () => {
       ),
     );
 
-    expect(enteringCancelled()).toBe(false);
+    expect(enteringSent()).toBe(true);
   });
 
   it('skips a view nested under other views, not only its own children', async () => {
@@ -60,7 +60,7 @@ describe('LayoutAnimationConfig', () => {
       ),
     );
 
-    expect(enteringCancelled()).toBe(true);
+    expect(enteringSent()).toBe(false);
   });
 
   it('leaves views outside it alone', async () => {
@@ -71,6 +71,6 @@ describe('LayoutAnimationConfig', () => {
       ]),
     );
 
-    expect(enteringCancelled()).toBe(false);
+    expect(enteringSent()).toBe(true);
   });
 });

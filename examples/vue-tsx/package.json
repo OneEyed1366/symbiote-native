@@ -30,8 +30,8 @@
     "@vue/runtime-core": "^3.5.13",
     "react": "19.2.3",
     "react-native": "0.86.0",
-    "react-native-reanimated": "4.7.1",
-    "react-native-worklets": "0.13.0"
+    "react-native-reanimated": "4.7.2",
+    "react-native-worklets": "0.13.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

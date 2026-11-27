@@ -1,10 +1,8 @@
 # @symbiote-native/test-utils
 
-The **shared fake-Fabric test harness** of [SymbioteNative](../../README.md) — one
-`installRecordingFabric()` that puts a fresh, faithful fake `nativeFabricUIManager` on
-`globalThis` and returns a handle recording what a renderer did. It replaces the per-file fake
-slot every headless test used to copy-paste (×65 across the repo) with one implementation, shared
-by the engine, every adapter, and the example apps' own colocated `vitest` suites.
+The shared headless test harness of [SymbioteNative](../../README.md). `installRecordingFabric()`
+installs a recording tree host and a minimal `nativeFabricUIManager`, and returns a handle to what
+a renderer did. The engine, every adapter and the example apps' `vitest` suites share it.
 
 > New to SymbioteNative? The [root README](../../README.md) has the architecture and the
 > [Testing](../../README.md#testing) section this package's harness is the foundation of.
@@ -42,17 +40,15 @@ test('tap increments the counter', () => {
 ```
 
 Call `installRecordingFabric()` ONCE per test file, at module scope, and `.reset()` the handle
-between tests. Do not re-install per test: the engine's `getSlot()` (`core/engine/src/fabric.ts`)
-reads the slot's methods once and caches them for the process lifetime, so a second
-`installRecordingFabric()` after anything has committed swaps the global while the engine keeps
-writing through the handle it already bound — the new recorder just stays empty, with nothing to
-signal why. File-level isolation comes from the test runner; `reset()` is what separates tests
-within a file.
+between tests. Do not re-install per test. The engine's `getSlot()` (`core/engine/src/fabric.ts`)
+reads the slot's methods once and caches them for the life of the process. A second
+`installRecordingFabric()` swaps the global, but the engine keeps the slot it already bound.
+File-level isolation comes from the test runner, and `reset()` separates tests within a file.
 
 ## What `installRecordingFabric()` gives you
 
-- **`find(predicate)`** and **`findAll(predicate)`** — every AUTHORED node the ops ever named
-  (clones excluded), searched in CREATION order. This is the creation LOG, not a live tree: a node
+- **`find(predicate)`** and **`findAll(predicate)`** search the nodes created since the last
+  `reset()`, in CREATION order. This is the creation LOG, not a live tree: a node
   the app removed still answers `find` — see "Reading the live tree" below for a residency
   question ("is this still mounted") the log can't answer.
 - **`fireEvent(handle, topLevelType, nativeEvent?)`** — delivers a native event to whatever handler
@@ -60,22 +56,21 @@ within a file.
 - **`commits`**, **`commands`**, **`responderHandovers`**, **`accessibilityEvents`** — counters and
   logs of what the engine asked the platform to do, for tests asserting "exactly N commits" or
   inspecting an imperative call (`dispatchCommand`, `setIsJSResponder`, `sendAccessibilityEvent`).
-- **`reset()`** — clears the recordings and counters (the registered event handler survives), for
-  reusing one `installRecordingFabric()` call across several assertions in one test. **`forget()`**
-  additionally drops the `find`/`findAll` creation log itself — a file that mounts a fresh tree per
-  case and reuses `testID`s needs this, or `find` keeps answering with an earlier case's node.
+- **`reset()`** clears the creation log, the counters and the call logs. The authored tree and the
+  registered event handler survive.
+- **`forget()`** does what `reset()` does and also drops the records of all nodes.
 
 This host **records what it's handed and derives nothing** — no flattening, no clone protocol, no
 view-name rewriting. `propsOf(handle)` reads the author's own bag (`style` is still an object);
 `payloadOf(handle)` (below) is what the engine would actually hand Fabric. A question about
 committed SHAPE (what Fabric kept, renamed, or flattened) belongs in
-`core/engine/cpp/tests/js` — asking it here gets `undefined`, not a plausible guess.
+`core/engine/cpp/tests/js`. Under this host `committedPayloadOf()` throws.
 
 ## Reading the live tree
 
-`createLiveTree(fabric)` is a lens **over** the recording host, for residency questions the
-creation log can't answer (a popped route, an evicted list cell, a portal toggled off) — it walks
-the engine's own live child links, so a removed node stops appearing:
+`createLiveTree(fabric)` is a lens **over** the recording host. It answers what the creation log
+can't: a popped route, an evicted list cell, a portal toggled off. It walks the engine's own live
+child links, so a removed node stops appearing:
 
 ```ts
 import { createLiveTree } from '@symbiote-native/test-utils';
@@ -115,26 +110,25 @@ dispatch code cross the host once per event, not once per ancestor" assertions.
 throws (naming `label`) on timeout — the honest replacement for a fixed `setTimeout` tick count,
 which is only a proxy for "the framework has settled" and breaks under a loaded test run.
 `waitForQuiet(sample, label, options?)` waits until `sample()` returns the same value across
-`stableTicks` consecutive macrotasks AND `quietMs` of wall time, then returns the settled value —
-the shape for "work has stopped arriving" (a batched commit, a zoneless change-detection pass, a
-press-timing timer). `advanceTicks(count)` and `advanceMs(durationMs?)` are kept for the genuine
+`stableTicks` consecutive macrotasks AND `quietMs` of wall time, then returns the settled value.
+Use it for "work has stopped arriving": a batched commit, a zoneless change-detection pass, a
+press-timing timer. `advanceTicks(count)` and `advanceMs(durationMs?)` are kept for the genuine
 "let the queue drain" case — a fixed number of macrotasks, or a fixed wall-time window. Do not
 raise a tick count to fix a flaky test — that trades a fast failure for a slow one and keeps the
 race; reach for `waitUntil`/`waitForQuiet` instead.
 
 ## What it does NOT do
 
-- It is not a mocking framework — there's nothing to configure beyond calling
-  `installRecordingFabric()`; the fake always behaves like real Fabric's clone-on-write contract.
+- It is not a mocking framework. The recorder has nothing to configure: it records what the renderer
+  asked for and does not emulate Fabric's clone-on-write.
 - It does not stand in for on-device verification — see [Testing](../../README.md#testing) for how
   this headless layer and the on-device `Detox` layer divide the work.
 
 ## Related packages
 
-- [`@symbiote-native/engine`](../engine) — the package whose commit path this fake stands in for;
-  every adapter's headless test drives the real engine against this fake slot instead of real Fabric.
+- [`@symbiote-native/engine`](../engine): an adapter's headless test drives the real engine, and
+  the recorder takes the place of the native tree host.
 
 ## Test it
 
-This package has no tests of its own — it _is_ the test double every other package's `vitest` suite
-imports.
+The package's own suites are `src/*.test.ts` and run with the repository's `vitest`.

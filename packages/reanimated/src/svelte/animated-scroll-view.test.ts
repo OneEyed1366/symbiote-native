@@ -1,5 +1,6 @@
 import { createLiveTree } from '@symbiote-native/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from 'react-native-reanimated/src/common';
 import { WorkletEventHandler } from 'react-native-reanimated/src/WorkletEventHandler';
 import { installWrapperHost } from '../../test-support/wrapper-host';
 import { mountSvelte } from '../../test-support/mount-svelte';
@@ -9,6 +10,7 @@ import { createAnimatedRef } from '../core/animated-ref';
 import { createSharedValue } from '../core/shared-value';
 import AnimatedScrollView from './animated-scroll-view.svelte';
 import { hooks } from './runes/hooks';
+import ScrollOffsetFixture from './scroll-offset.fixture.svelte';
 import '../register';
 
 type IHandler = WorkletEventHandler<object>;
@@ -91,6 +93,19 @@ describe('Animated.ScrollView with a scrollViewOffset', () => {
     await mountScrollView({});
 
     expect(registered).toHaveLength(0);
+  });
+});
+
+describe('useScrollOffset on the ref of an Animated.ScrollView', () => {
+  it('listens to the view, and reports no ref that is still to get one', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    unmountTree = await mountSvelte(ROOT_TAG, ScrollOffsetFixture, {});
+    await settle();
+
+    expect(registered).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 

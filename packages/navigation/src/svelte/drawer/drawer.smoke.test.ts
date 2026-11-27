@@ -1,9 +1,6 @@
-// Drawer, driven through the REAL compiled index.svelte against a fake Fabric.
-//
-// Nothing is substituted: the drawer writes bare `<view>` tags and takes PanResponder,
-// Dimensions, AnimatedValue and timing straight from @symbiote-native/engine. It used to import
-// `Animated` from the adapter's main barrel, which forced an alias module here because that barrel
-// re-exports `.svelte` sources Vite's plain test transform cannot parse.
+// Drawer, driven through the real compiled `index.svelte` against a fake Fabric
+// Nothing is substituted: it writes bare `<view>` tags and takes `PanResponder`, `Dimensions`
+// and `timing` straight from `@symbiote-native/engine`
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
@@ -28,9 +25,8 @@ if (globalThis.navigator === undefined) {
 
 const ROOT_TAG = 91_703;
 
-// rAF is not a Node global; the engine's `timing` (driven by every openDrawer/closeDrawer/
-// toggleDrawer call and by a gesture release) reads it at .start() time. Same shim, same reason,
-// as vue/drawer/drawer.test.ts.
+// rAF is not a Node global, and the engine's `timing` reads it at `.start()` time
+// Every open, close and toggle call and every gesture release goes through it, as in the Vue test
 let frameClock = 0;
 const pendingFrames = new Map<number, (time: number) => void>();
 let nextFrameId = 1;
@@ -56,10 +52,8 @@ function installRequestAnimationFrame(): void {
   });
 }
 
-// Drawer reads the screen width off Dimensions.get('window').width to resolve the swipe edge
-// zone (isSwipeStartInEdge) - headless has no DeviceInfo native module, so seed a concrete width
-// once; every gesture test in this file drags against this same value (Dimensions is a
-// module-level singleton, same convention as react/drawer/drawer.test.tsx).
+// Drawer reads the width from `Dimensions.get('window')` to resolve the swipe edge zone
+// Headless has no DeviceInfo module, so a width is seeded once for every gesture test below
 Dimensions.set({ window: { width: 375, height: 812, scale: 1, fontScale: 1 } });
 
 const fabric = installRecordingFabric();
@@ -170,10 +164,9 @@ function overlayNode(): IFabricNode | undefined {
 type ITouchFrame = { x: number; y: number; t: number };
 const TOUCH_ID = 1;
 
-// Fires a start -> N moves -> end touch sequence at Drawer's own root, mirroring
-// react/drawer/drawer.test.tsx's `swipe()` - proves index.svelte actually wires
-// `PanResponder.create(...)`'s config into `rootProps` and that the engine's responder
-// negotiation reaches it, which core/drawer-options.test.ts (pure math only) cannot prove.
+// Fires a start, N moves and an end touch at the Drawer root, as the React drawer test does
+// It proves `index.svelte` wires the `PanResponder` config into `rootProps`, which the pure
+// math test in `core/drawer-options.test.ts` cannot
 function swipe(path: readonly ITouchFrame[]): void {
   const node = drawerRootNode();
   const handle = node.instanceHandle;
@@ -213,35 +206,22 @@ const OPEN_SWIPE: readonly ITouchFrame[] = [
   { x: 130, y: 400, t: 1_060 },
 ];
 
-// Coverage note (gesture math): shouldClaimDrawerSwipe / resolveSwipeIntent / resolveDragProgress
-// (core/drawer-options) are pure functions already closed by drawer-options.test.ts. What is
-// Svelte-lifecycle-specific and NOT covered there is whether index.svelte actually WIRES
-// PanResponder.create's config into rootProps and reaches the router - the two gesture tests
-// below prove that end-to-end via fabric.fireEvent, the same technique
-// react/drawer/drawer.test.tsx's `swipe()` uses; no `as` cast is needed since a touch is built as
-// a plain object literal, never narrowed from `unknown`.
-//
-// This layer's own dispatch surface (openDrawer/closeDrawer/toggleDrawer/jumpTo,
-// drawerRouterReducer) never throws - every branch is a total function over its input (an unknown
-// route name is a documented no-op, not a rejection). So there is no throwing "Negative" group
-// here; the second group below is boundary/no-op behavior, named for what it actually is.
+// The gesture math is pure and closed by `drawer-options.test.ts`
+// What it cannot show is that `index.svelte` wires the `PanResponder` config into `rootProps`
+// The two gesture tests below prove that through `fabric.fireEvent`
+
+// The dispatch surface never throws, as an unknown route name is a documented no-op
+// So there is no throwing Negative group, and the second group covers boundary and no-op cases
 describe('Drawer (real compiled index.svelte)', () => {
   describe('Positive - renders and reacts to the exposed navigator handle', () => {
-    // why: renderDrawer's drawerChildOrder for the default 'front' type is
-    // [content, overlay, panel] (render-drawer.ts) - the compiled template must paint them in
-    // that exact order, since Fabric stacks later siblings on top and 'front' relies on the panel
-    // painting over the dimming overlay.
+    // `drawerChildOrder` for the default 'front' type is [content, overlay, panel]
+    // The template must paint them in that order, as the panel has to cover the dimming overlay
     it('paints the shared renderDrawer slots in front order', async () => {
       await mountDrawer();
 
-      // front: content, overlay, panel - preceded by the collapsed registry host that absorbs the
-      // whitespace between the two `<Drawer.Screen>` markers.
-      //
-      // The root line reads `#surface` rather than `RCTView`, and the change is a CORRECTION.
-      // The app root is the surface node; it is created as an `RCTView` and then set to the
-      // surface component, so `componentOf` says `#surface` and Fabric commits it as `RootView`.
-      // The stand-in tree kept the creation name — a third answer, and the only one nothing
-      // downstream agrees with. Everything below the root is unchanged.
+      // The slots follow the collapsed registry host, which absorbs the whitespace between markers
+      // The root reads `#surface`, as it is created as an `RCTView` and then set to the surface
+      // component, which Fabric commits as `RootView`
       expect(outline(appRoot())).toEqual([
         '#surface',
         '  RCTView',
@@ -258,10 +238,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       expect(findLiveByTestId(appRoot(), 'drawer-panel-content')).toBeDefined();
     });
 
-    // why: an app-authored `drawerContent` snippet needs the live route count, open state,
-    // resolved descriptors and the navigator handle to paint a menu (IDrawerContentSlotProps) -
-    // if any of the four were stale or missing the menu could not label its own items or call
-    // openDrawer/closeDrawer from a custom control.
+    // A `drawerContent` snippet needs the route count, open state, descriptors and handle
+    // Without any of the four the menu could not label its items or call `openDrawer`
     it('hands the drawerContent snippet the router state, descriptors and handle', async () => {
       await mountDrawer();
       // routes:isOpen:descriptorCount:typeof openDrawer
@@ -271,9 +249,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       ).toBe('2:false:2:function');
     });
 
-    // why: openDrawer/closeDrawer are the exported imperative handle (IDrawerNavigatorHandle) a
-    // caller uses from outside the gesture system (a menu button, a header icon) - the slot state
-    // must reflect them synchronously with the reducer, not just the gesture path.
+    // `openDrawer` and `closeDrawer` are the handle a menu button or header icon calls
+    // The slot state must follow them in step with the reducer, not only the gesture path
     it('reflects openDrawer/closeDrawer in the overlay and the snippet state', async () => {
       const handle = await mountDrawer();
       handle.openDrawer();
@@ -293,9 +270,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       ).toBe('2:false:2:function');
     });
 
-    // why: like Tab (and unlike Stack), a Drawer only ever mounts the FOCUSED route's screen -
-    // mounting every route up front would run every screen's lifecycle/effects even while hidden
-    // behind the panel, wasting work and risking cross-screen side effects.
+    // Like Tab and unlike Stack, a Drawer mounts only the focused route
+    // Mounting every route would run the effects of hidden screens
     it('mounts only the focused route and swaps it on jumpTo', async () => {
       const handle = await mountDrawer();
       expect(findLiveByTestId(appRoot(), 'inbox')).toBeDefined();
@@ -308,9 +284,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       expect(findLiveByTestId(appRoot(), 'settings')).toBeDefined();
     });
 
-    // why: useIsFocused()/useFocusEffect() consumers rely on a focus event firing for the
-    // initially-mounted route (not just on later transitions) and on the previous route blurring
-    // before the next one focuses, so exactly one screen ever reads itself as focused at a time.
+    // `useIsFocused` and `useFocusEffect` need a focus event for the initial route too
+    // The previous route blurs before the next focuses, so one screen is focused at a time
     it('synthesizes focus on mount and moves it with the focused route', async () => {
       const handle = await mountDrawer();
       await tick();
@@ -327,15 +302,12 @@ describe('Drawer (real compiled index.svelte)', () => {
       ).toBe('settings:true');
     });
 
-    // why: drawerChildOrder's 'permanent' branch is the one type that is NOT absolutely
-    // positioned (an ordinary flex sidebar), so sibling order IS screen position, and
-    // isDrawerOverlayVisible excludes 'permanent' - a permanent drawer has nothing to dim because
-    // it never covers the content.
+    // The 'permanent' type is not absolutely positioned, as it is a flex sidebar
+    // So sibling order is screen position, and it has no overlay, as it never covers the content
     it('drops the overlay and reverses the slot order for a permanent drawer', async () => {
       await mountDrawer('permanent', 'drawerType="permanent"');
 
-      // permanent + left: panel, content, and no overlay at all. `#surface` at the root, for the
-      // reason spelled out on the front-order outline above.
+      // permanent + left gives panel, content and no overlay, with `#surface` at the root
       expect(outline(appRoot())).toEqual([
         '#surface',
         '  RCTView',
@@ -349,20 +321,17 @@ describe('Drawer (real compiled index.svelte)', () => {
       ]);
     });
 
-    // why: createInitialDrawerRouterState resolves `initialRouteName` to that route's index -
-    // a caller must be able to open a drawer directly onto a non-default screen (e.g. deep-link
-    // straight into Settings) without an extra jumpTo round-trip after mount.
+    // `initialRouteName` resolves to that route index, so a deep link can open straight on Settings
+    // No `jumpTo` after mount is needed
     it('honours initialRouteName', async () => {
       await mountDrawer('initial-route', 'initialRouteName="settings"');
       expect(findLiveByTestId(appRoot(), 'settings')).toBeDefined();
       expect(findLiveByTestId(appRoot(), 'inbox')).toBeUndefined();
     });
 
-    // why: structural regression guard for svelte-adapter-dom-shim skill §16b - the templates
-    // are formatted normally, so Svelte emits a ' ' text node between sibling tags and only the
-    // shim's parent check keeps it out of Fabric. One that got through would be a real
-    // RCTRawText engine node, visibly shifting the outline assertions above. Re-checked with the
-    // drawer open, because the panel slot only mounts then.
+    // Formatted templates make Svelte emit a ' ' text node between sibling tags
+    // The renderer blanks it, as a real `RCTRawText` would shift the outline assertions above
+    // It is re-checked with the drawer open, as the panel slot mounts only then
     it('commits no raw text outside a text container', async () => {
       const handle = await mountDrawer('hygiene');
       expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
@@ -373,10 +342,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
     });
 
-    // why: seedState's `routes.length === 0` branch (dlog-documented) must produce a mounted,
-    // non-crashing drawer with an empty route list rather than throwing while <Drawer.Screen>
-    // markers are still registering - an app that conditionally renders screens must not blow up
-    // during the frame where none have registered yet.
+    // With no route registered yet, the drawer must mount with an empty list and not throw
+    // An app that renders screens conditionally has a frame where none are registered
     it('mounts with zero registered screens without throwing', async () => {
       const handle = await mountDrawer('empty', '', false);
       expect(handle.jumpTo).toBeTypeOf('function');
@@ -386,10 +353,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       ).toBe('0:false:0:function');
     });
 
-    // why: a valid edge-swipe is the primary way a user opens a drawer on a real device - proves
-    // PanResponder.create's onStartShouldSetPanResponder/onPanResponderMove/onPanResponderRelease
-    // config, wired into rootProps, actually reaches shouldClaimDrawerSwipe/resolveSwipeIntent and
-    // dispatches openDrawer, not just the imperative handle.
+    // An edge swipe is the main way to open a drawer on a device
+    // It proves the `PanResponder` config in `rootProps` reaches the swipe resolver and opens it
     it('a valid edge-swipe opens the drawer', async () => {
       await mountDrawer();
       expect(overlayNode()?.props?.pointerEvents).toBe('none');
@@ -403,9 +368,7 @@ describe('Drawer (real compiled index.svelte)', () => {
   });
 
   describe('Boundary - invalid navigation input is absorbed safely, not thrown', () => {
-    // why: toggleDrawer is the third handle method (besides open/close) a caller can wire to a
-    // single button - it must flip isOpen in both directions off the same state, not just latch
-    // open once.
+    // `toggleDrawer` serves a single button, so it must flip `isOpen` both ways and not latch open
     it('toggles isOpen back and forth via the handle', async () => {
       const handle = await mountDrawer();
       handle.toggleDrawer();
@@ -425,9 +388,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       ).toBe('2:false:2:function');
     });
 
-    // why: drawerRouterReducer's jumpTo branch returns the SAME state when the name isn't found
-    // (`index === -1`) - a typo'd or stale route name must be a safe no-op, not a crash and not a
-    // silent focus change to an arbitrary route.
+    // `drawerRouterReducer` returns the same state when the name is unknown
+    // A typo or stale name must be a no-op, not a crash or a focus change
     it('ignores jumpTo to an unregistered route name', async () => {
       const handle = await mountDrawer();
       handle.jumpTo('does-not-exist');
@@ -437,11 +399,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       expect(findLiveByTestId(appRoot(), 'settings')).toBeUndefined();
     });
 
-    // Regression: jumpTo() used to animate off a pre-dispatch `wasOpen` snapshot alone, so an
-    // unmatched name - a reducer no-op that leaves isOpen true - still slid the panel shut. State
-    // and animation then disagreed with nothing to recover them: the overlay stayed tappable over
-    // an invisible panel. Asserts on the timing call itself, since the router state (correct all
-    // along) never showed the bug.
+    // An unmatched name is a reducer no-op, so the panel must not slide shut
+    // It asserts on the `timing` call, as the router state is right even when the animation is not
     it('leaves the panel open when jumpTo names an unregistered route', async () => {
       const handle = await mountDrawer();
       handle.openDrawer();
@@ -456,9 +415,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       timingSpy.mockRestore();
     });
 
-    // why: createInitialDrawerRouterState falls back to index 0 when `initialRouteName` names a
-    // screen that was never registered - the drawer must still mount onto a real screen instead
-    // of ending up with no focused route at all.
+    // An unregistered `initialRouteName` falls back to index 0
+    // The drawer must still mount on a real screen, not with no focused route
     it('falls back to the first route when initialRouteName is not registered', async () => {
       await mountDrawer(
         'initial-route-unknown',
@@ -468,9 +426,8 @@ describe('Drawer (real compiled index.svelte)', () => {
       expect(findLiveByTestId(appRoot(), 'settings')).toBeUndefined();
     });
 
-    // why: shouldClaimDrawerSwipe's first gate is `options.swipeEnabled ?? true` - an app that
-    // wraps the drawer's content in its own horizontal ScrollView/Swiper needs a real way to
-    // suppress the edge-swipe entirely so the two gestures don't fight over the same touch.
+    // `swipeEnabled` is the first gate of the swipe claim
+    // An app with its own horizontal scroller in the content needs it to avoid a touch fight
     it('swipeEnabled: false suppresses the gesture entirely', async () => {
       await mountDrawer('no-swipe', 'swipeEnabled={false}');
       swipe(OPEN_SWIPE);

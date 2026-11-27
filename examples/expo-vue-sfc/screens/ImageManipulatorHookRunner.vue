@@ -17,13 +17,13 @@ const context = useImageManipulator(() => props.source);
     <ActionButton
       testID="image-manipulator-hook-button"
       title="useImageManipulator context"
-      :onPress="() => run(context.value)"
+      :onPress="() => run(context)"
       :color="color"
     />
     <ActionButton
       testID="image-manipulator-reset-button"
       title="context.reset()"
-      :onPress="() => context.value.reset()"
+      :onPress="() => context.reset()"
       :color="color"
     />
   </view>

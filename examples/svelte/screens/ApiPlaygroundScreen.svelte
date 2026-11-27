@@ -1,14 +1,10 @@
 <script lang="ts">
-  // API Playground: live demos of Svelte 5's own idiomatic API surface (runes, template syntax,
-  // bindings, snippets, stores, context, lifecycle) running under Symbiote's custom renderer — the
-  // exact, already-triaged checklist is .docs/framework-api-surface/svelte.md. Sections below
-  // mirror that document's `##` categories in order; each section component's own header comment
-  // records exactly which rows it covers and why any row is skipped.
-  //
-  // Whitespace in this markup is free, unlike when the screen was written. The shim maps a
-  // whitespace-only text node under a parent that takes no raw text to an anchor, so a gap
-  // between siblings never reaches Fabric as an RCTRawText (svelte-adapter-dom-shim §16b), and
-  // svelte.config.js's collapseTextWhitespace() folds a sentence wrapped across source lines.
+  // API Playground: live demos of Svelte 5's own API surface (runes, template syntax, bindings,
+  // snippets, stores, context, lifecycle) running under Symbiote's custom renderer
+  // Sections follow the `##` categories of `.docs/framework-api-surface/svelte.md` in order
+
+  // Whitespace in this markup is free: the renderer drops a whitespace-only text node under a
+  // parent that takes no raw text, and `collapseTextWhitespace()` folds a wrapped sentence
   import { ROUTE_NAME } from '../routes';
   import { LINE_COLOR, ROUTE_LINE_INFO } from '../navigation-lines';
   import RunesDemo from '../components/api-playground/RunesDemo.svelte';

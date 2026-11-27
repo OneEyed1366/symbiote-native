@@ -1,9 +1,5 @@
-// Mount a Svelte app onto a Fabric surface. The native host hands us a rootTag; we create a
-// surface for it, install the DOM shim, and let stock compiled Svelte output drive it while
-// believing it is talking to the real DOM.
-
-// Single root per process (svelte-adapter-dom-shim skill §10), so
-// patchGlobals()/restoreGlobals() need no ref-counting.
+// Mounts a Svelte app onto a Fabric surface through `svelte/renderer`
+// The native host hands over a `rootTag`, and the surface made for it is the mount target
 
 import {
   mount as svelteMount,
@@ -18,22 +14,24 @@ import {
   type IRootTag,
   type SymbioteSurface,
 } from '@symbiote-native/engine';
-import { patchGlobals, restoreGlobals } from './dom-shim';
-import { createRootShimElement } from './root-element';
-import { ROOT_TAG_KEY } from './runes/use-root-tag';
+import { liveSurfaces } from './active-surface';
+import { createRootElement } from './root-element';
+import symbioteRenderer from './symbiote-renderer';
+import { ROOT_TAG_KEY, SURFACE_KEY } from './runes/use-root-tag';
 
 type IMountedApp = {
   readonly svelteApp: ReturnType<typeof svelteMount>;
+  readonly surface: SymbioteSurface;
 };
 
-// One Svelte app per surface — same re-mount-starts-clean shape as every other adapter's
-// render.ts (Fast Refresh / focus-lifecycle restarts a surface and reuses the rootTag).
+// One app per surface, as a restart reuses the `rootTag` and has to start clean
 const apps = new Map<IRootTag, IMountedApp>();
 
 function teardown(rootTag: IRootTag): void {
   const entry = apps.get(rootTag);
   if (entry === undefined) return;
   svelteUnmount(entry.svelteApp);
+  liveSurfaces.delete(entry.surface);
   apps.delete(rootTag);
   disposeRoot(rootTag);
 }
@@ -53,22 +51,24 @@ export function mount(
 ): SymbioteSurface {
   teardown(rootTag);
 
-  // Safe to install unconditionally - patchGlobals() is itself idempotent if a surface is
-  // already live.
-  patchGlobals();
-
   const surface = createSurface(rootTag);
-  const target = createRootShimElement(surface);
+  liveSurfaces.add(surface);
+  const target = createRootElement(surface);
 
   let svelteApp: ReturnType<typeof svelteMount>;
   try {
     svelteApp = svelteMount(RootComponent, {
+      renderer: symbioteRenderer,
       target,
       props: props ?? {},
-      context: new Map([[ROOT_TAG_KEY, rootTag]]),
+      context: new Map<symbol, unknown>([
+        [ROOT_TAG_KEY, rootTag],
+        [SURFACE_KEY, surface],
+      ]),
       transformError: tapBoundaryError,
     });
   } catch (error) {
+    liveSurfaces.delete(surface);
     // Svelte has no mount-level hook for an uncaught error, so the seam is the synchronous throw
     // Reported and rethrown, `mount()` keeps failing loudly for a caller's own try/catch
     // Later errors land in svelte's microtask flush, past this catch
@@ -78,25 +78,19 @@ export function mount(
     throw error;
   }
 
-  apps.set(rootTag, { svelteApp });
+  apps.set(rootTag, { svelteApp, surface });
 
   return surface;
 }
 
-// Tear down a surface by rootTag: the public pair of `mount`, and the JS half of the
-// bridgeless `RN$stopSurface` contract (see installStopSurfaceGlobal below).
+// The public pair of `mount`, and the JS half of the bridgeless `RN$stopSurface` contract
 export function unmount(rootTag: IRootTag): void {
   dlog(`svelte unmount root=${rootTag}`);
   teardown(rootTag);
-  // No other surface can still need the shim (single root per process, see module header).
-  restoreGlobals();
 }
 
-// `global.RN$stopSurface` is the JSI hook C++ AppRegistryBinding::stopSurface calls to stop a
-// Fabric surface. RN installs it from its own renderer; symbiote REPLACES that renderer, so
-// without this the binding throws "Global was not installed" on every surface stop (Fast
-// Refresh, focus/lifecycle) and the screen goes blank. Same contract as every other adapter:
-// an app uses one adapter, so exactly one installer runs.
+// `global.RN$stopSurface` is what `AppRegistryBinding::stopSurface` calls to stop a surface
+// RN installs it from its own renderer, which is replaced here, so every stop would throw
 declare global {
   var RN$stopSurface: ((surfaceId: number) => void) | undefined;
 }

@@ -1,29 +1,9 @@
-// An app-authored bare tag, compiled by the REAL Svelte compiler, mounted, and read off the
-// committed Fabric tree.
-//
-// `bare-tag-parity.test.ts` works on the `p={{…}}` bag and `dom-shim/bare-tag-props.test.ts` drives
-// `ShimElement` by hand. Neither answers the question an app actually asks: does ordinary
-// per-attribute markup — `<view testID="x" style={s} class="card" onPress={fn}>` — survive Svelte's
-// own codegen.
-//
-// It does not take one path. Measured against svelte@5.56.8 with the shipping options
-// (`{fragments:'tree', css:'external', generate:'client'}`), an attribute reaches the shim through
-// four helpers, and WHICH one is decided by the tag NAME — because `view`, `text`, `image` and
-// `switch` are real SVG element names and svelte's analyser puts them in the SVG namespace, while
-// `pressable` and `modal` stay in html and the hyphenated tags are custom elements:
-//
-//                       view/text/image/switch    pressable, modal      text-input, …
-//   static string       template -> setAttribute, name LOWERCASED       set_custom_element_data
-//   dynamic value       set_attribute             set_attribute         set_custom_element_data
-//                       name KEPT, value raw      name LOWERCASED       -> String(value)
-//   class={…}           set_class, is_html 0      set_class, is_html 1  set_class, is_html 1
-//                       -> setAttribute           -> dom.className      -> dom.className
-//   style={…}           set_style -> cssText (stringified) + a private Symbol (the real value)
-//   on<Name>={fn}       $.event('<Name>') -> addEventListener
-//
-// All four the shim answers now. The compiler-settled lowercased NAMES and stringified VALUES are
-// both recovered from below: a name via `dom-shim/canonical-prop-names.ts`, a value via
-// `get_setters` finding a real prototype setter — pinned by the last two `it`s below.
+// Bare tag authored in an app, compiled by the real Svelte compiler and read off the Fabric tree
+// Per-attribute markup like `<view testID="x" style={s} class="card" onPress={fn}>` must survive
+// Svelte's own codegen, which `bare-tag-parity.test.ts` (the `p` bag) does not cover
+
+// Codegen may lowercase an attribute name or stringify a value before the renderer sees it
+// `canonical-prop-names.ts` restores names, and the last two `it`s below pin the values
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
@@ -116,8 +96,8 @@ async function mountSource(source: string, rootTag: number): Promise<void> {
     compile(source, { ...COMPILE_OPTIONS, filename: 'Authored.svelte' }).js
       .code,
   );
-  // Node caches a dynamic import by resolved path, so each arm needs a fresh query string or it
-  // silently re-runs the previous arm's module (svelte-adapter-dom-shim §15).
+  // Node caches a dynamic import by resolved path, so each arm needs a fresh query string
+  // or it silently re-runs the previous arm's module
   const { default: Probe } = (await import(
     `file://${PROBE_OUT}?arm=${rootTag}`
   )) as { default: Component };
@@ -143,19 +123,15 @@ describe('an app-authored bare tag', () => {
 
     const props = committedProps('dyn');
     expect(props.accessibilityLabel).toBe('hi');
-    // The DOM would coerce this to "3". `set_attribute` hands a non-string straight through for a
-    // name with no prototype setter, and the shim must not coerce it either.
+    // The DOM would coerce this to "3", and the renderer must not
     expect(props.numberOfLines).toBe(3);
 
     unmount(9_820);
     await settle();
   });
 
-  // why: `from_tree` builds each template ONCE, writes its static attributes onto that master and
-  // then clones per instance. A clone that copies only the inert attribute Map commits nothing —
-  // and every attribute an app spells as a literal string is a static attribute. Finding the node
-  // at all is half the assertion: the label itself is a static `id` that had to be replayed AND
-  // folded to `nativeID`.
+  // `from_tree` builds each template once and clones it per instance, so a clone must replay
+  // every static attribute, and the label itself is a static `id` folded to `nativeID`
   it('replays the static attributes the template baked in', async () => {
     await mountSource(
       '<view id="static" accessible="true" pointerEvents="box-none"></view>',
@@ -164,10 +140,8 @@ describe('an app-authored bare tag', () => {
 
     const props = committedProps('static');
     expect(props.accessible).toBe('true');
-    // The compiler lowercased this name before the shim saw it; `canonical-prop-names.ts` is what
-    // puts it back. Source and expectation were both `pointerevents` while that was unfixable —
-    // an author cannot spell it in a way that survives, so the lowercase spelling is not a
-    // separate case to preserve, it is the ONLY thing the shim ever receives.
+    // The compiler lowercases this name before the renderer sees it, so `canonical-prop-names.ts`
+    // restores it: an author cannot spell it in a way that survives
     expect(props.pointerEvents).toBe('box-none');
     expect(props, 'the fold consumed the raw key').not.toHaveProperty('id');
 
@@ -175,13 +149,9 @@ describe('an app-authored bare tag', () => {
     await settle();
   });
 
-  // why: `set_class` takes TWO exits and NEITHER the tag nor the author picks which. It is the
-  // element's compiled NAMESPACE: anything under a `<view>` root inherits SVG and is passed
-  // `is_html: 0` -> `setAttribute('class', …)`, which was already routed; the same two tags written
-  // as siblings of a fragment are html, get `is_html: 1`, and are assigned to `dom.className` —
-  // a plain JS property without a setter, so nothing routes and nothing is red. Hence the two
-  // shapes below rather than two tag names: a fix for either exit alone leaves half of a real
-  // app's markup silently unstyled.
+  // `set_class` takes two exits, chosen by the element's compiled namespace and not by the author
+  // The test covers both shapes, as a fix for one exit alone leaves half of an app's markup
+  // silently unstyled
   it('routes a dynamic class through the style registry, on both class exits', async () => {
     registerRules([
       {
@@ -222,9 +192,8 @@ describe('an app-authored bare tag', () => {
     await settle();
   });
 
-  // why: `set_style` STRINGIFIES — `to_style(value)` is `String(value)`, so an RN style object
-  // reaches `dom.style.cssText` as "[object Object]" and the only surviving copy is the private
-  // Symbol it caches one line later. See `dom-shim/style-cache.ts`.
+  // `set_style` stringifies, so an RN style object reaches the attribute as "[object Object]"
+  // The only surviving copy is the one Svelte caches on the node, see `style-cache.ts`
   it('routes a style OBJECT, which cssText cannot carry', async () => {
     await mountSource(
       [
@@ -246,10 +215,8 @@ describe('an app-authored bare tag', () => {
     await settle();
   });
 
-  // why: two independent failures in one line of markup. `$.event()` ends its teardown check with
-  // a BARE `dom instanceof HTMLMediaElement`, which throws ReferenceError on an undeclared global
-  // and took the whole mount with it; and it passes the authored name minus `on`, so `onPress`
-  // arrives as `Press` — a listener the engine dispatches nothing to.
+  // `$.event()` passes the authored name minus `on`, so `onPress` arrives as `Press`
+  // The renderer must map it to the engine event name, or nothing is dispatched to the listener
   it('routes an on<Name> handler under the engine event name', async () => {
     await mountSource(
       [
@@ -276,11 +243,9 @@ describe('an app-authored bare tag', () => {
     await settle();
   });
 
-  // why: the compiler lowercases an attribute NAME in two of the three spellings, and which two
-  // depends on the tag — so a fix verified on `view` alone certifies nothing about `pressable`.
-  // `accessibilityLabel` is the oracle rather than `testID` because it is a name Fabric declares
-  // and the shim does not otherwise touch: a lowercased key reaches the payload, changes nothing
-  // on device, and is red nowhere.
+  // The compiler lowercases an attribute name for some tag families, so a fix verified on `view`
+  // alone certifies nothing about `pressable`
+  // `accessibilityLabel` is the oracle: a lowercased key reaches the payload and is red nowhere
   it('restores the attribute casing the compiler dropped, on every tag family', async () => {
     await mountSource(
       [
@@ -335,10 +300,8 @@ describe('an app-authored bare tag', () => {
     await settle();
   });
 
-  // why: a hyphenated tag is a CUSTOM ELEMENT to the compiler, so every prop goes through
-  // `set_custom_element_data` — which keeps the name and destroys the value instead. A scalar is
-  // handed on as `String(value)` and an object is assigned to a plain JS property nothing reads,
-  // unless `get_setters` finds a real prototype setter for that exact name.
+  // A hyphenated tag is a custom element to the compiler, which hands every prop on as
+  // `String(value)` or assigns it to a plain property, so scalars and objects must survive
   it('keeps a scalar a scalar and commits an object, on a custom-element tag', async () => {
     await mountSource(
       [

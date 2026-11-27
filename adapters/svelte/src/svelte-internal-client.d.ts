@@ -1,13 +1,11 @@
 // `svelte/internal/client` ships no type declarations of its own — its package.json export map
 // has a `default` entry and nothing else, and svelte's `types/index.d.ts` does not cover it. This
-// adapter is already, by design, coupled to Svelte's private internals (the whole DOM shim is —
-// svelte-adapter-dom-shim skill §0), so the declaration is hand-maintained here, narrowed to the
-// functions actually imported. Re-check it on every `svelte` bump, alongside §8's checklist.
+// adapter is coupled to Svelte's private internals by design, so the declaration is hand-maintained
+// here and narrowed to the functions actually imported. Re-check it on every `svelte` bump
 //
-// Two callers. `runes/attachments.ts` takes `attach`. `modules/animated/create-animated-component.ts`
-// takes the rest: it is a component body written by hand rather than compiled from a `.svelte`
-// file (see its header for why), so it calls the same primitives the compiler emits for the
-// equivalent source — verified against real `svelte/compiler` output, not guessed.
+// Two callers. `runes/attachments.ts` takes `attach`
+// `modules/animated/create-animated-component.ts` takes the rest, as it is a hand-written body
+// calling the primitives the compiler emits for the equivalent source, checked against its output
 declare module 'svelte/internal/client' {
   // internal/client/dom/elements/attachments.js. `getFn` is re-read inside a managed effect, and
   // the returned attachment is invoked inside a branch effect so a reactive read in its body
@@ -42,13 +40,11 @@ declare module 'svelte/internal/client' {
     getSnippet: () => import('svelte').Snippet | undefined,
   ): void;
 
-  // internal/client/reactivity/props.js. The `{...spread}` target: a Proxy merging its sources,
-  // each function source re-read per property access so the child stays reactive. The generic
-  // return type is what lets a caller hand it to a base whose prop type is only known there,
-  // without an `as` cast — the object really is assembled at runtime.
+  // internal/client/reactivity/props.js, the `{...spread}` target: a Proxy merging its sources
+  // The generic return type lets a caller hand it to a base with a known prop type, no `as` cast
   export function spread_props<TProps>(...sources: unknown[]): TProps;
 
-  // internal/client/dom/elements/style.js. Called only by `dom-shim/style-cache.ts`, against a
+  // internal/client/dom/elements/style.js. Called only by `style-cache.ts`, against a
   // probe object, to learn the private Symbol it caches its argument under. The real call sites
   // are the ones the compiler emits.
   export function set_style(dom: unknown, value: unknown): void;

@@ -1,80 +1,72 @@
-// Real-execution proof (against the real dom-shim + the real engine tree, no Svelte compile
-// needed since this module never touches Svelte's own codegen) that mountDescriptorChildren
-// creates each shim node ONCE and reuses it by position on update — no removeChild+recreate,
-// no new native-view identity, matching descriptor-to-svelte.ts's whole cost model.
+// `mountDescriptorChildren` creates each engine node once and reuses it by position on update
+// Run against the real engine tree, no Svelte compile, as the module never touches Svelte's codegen
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   createLiveTree,
   installRecordingFabric,
 } from '@symbiote-native/test-utils';
-import { createSurface, disposeRoot } from '@symbiote-native/engine';
 import type { IDescriptorChild } from '@symbiote-native/components';
-import { createRootShimElement } from './root-element';
 import {
   createDescriptorChildrenSync,
   mountDescriptorChildren,
 } from './descriptor-to-svelte';
-
-const ROOT_TAG = 91_301;
-const tick = (): Promise<void> =>
-  Promise.resolve().then(() => Promise.resolve());
+import { createRendererHarness } from './renderer-harness';
 
 const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
+const harness = createRendererHarness(91_301);
 
 beforeEach(() => {
   fabric.reset();
+  harness.open();
 });
 
 afterEach(() => {
-  disposeRoot(ROOT_TAG);
+  harness.close();
 });
+
+const view = (children: IDescriptorChild[] = []): IDescriptorChild => ({
+  type: 'view',
+  props: {},
+  children,
+});
+
+// The committed wrapper the harness root puts under the app root
+function wrapperChildren(): ReturnType<typeof live.nodeOf>['children'] {
+  return live.nodeOf(live.appRoot()).children[0]?.children ?? [];
+}
 
 describe('mountDescriptorChildren', () => {
   describe('Positive', () => {
+    // A Descriptor tree from `core/components` must reach a real committed Fabric node
     it('creates the child tree once and commits it under the live parent', async () => {
-      // why: the baseline this whole bridge exists to provide — a Descriptor tree from
-      // core/components' render-*.ts must reach a real committed Fabric node, matching
-      // React's descriptorToReact / Vue's descriptorToVue (skill §19).
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
-
-      const children: IDescriptorChild[] = [
+      mountDescriptorChildren(harness.liveRoot(), [
         {
           type: 'activity-indicator-spinner',
           props: { animating: true },
           children: [],
         },
-      ];
-      mountDescriptorChildren(root, children);
-      await tick();
+      ]);
+      await harness.settle();
 
-      const view = live.nodeOf(live.appRoot()).children[0];
-      expect(view?.children[0]?.viewName).toBe('ActivityIndicatorView');
-      expect(view?.children[0]?.payload.animating).toBe(true);
+      const spinner = wrapperChildren()[0];
+      expect(spinner?.viewName).toBe('ActivityIndicatorView');
+      expect(spinner?.payload.animating).toBe(true);
     });
 
-    it('reuses the same native node identity across an update — no recreate', async () => {
-      // why: the entire reason this bridge is shape-stable instead of a rebuild-every-call
-      // walker (skill §19) — a fresh native view per update would break any imperative
-      // command / native-owned state (focus, dispatchViewCommand) tied to the old identity.
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
-
-      const mounted = mountDescriptorChildren(root, [
+    // A fresh native view per update would break focus and `dispatchViewCommand` on the old one
+    it('reuses the same native node identity across an update, no recreate', async () => {
+      const mounted = mountDescriptorChildren(harness.liveRoot(), [
         {
           type: 'activity-indicator-spinner',
           props: { animating: true, color: 'red' },
           children: [],
         },
       ]);
-      await tick();
-      // Node IDENTITY, not a creation count: a recreate that happened to net out to the same
-      // number of nodes would still pass a count, and the thing that breaks a native command is
-      // the identity moving.
-      const spinnerBefore = live.nodeOf(live.appRoot()).children[0]?.children[0]
-        ?.handle;
+      await harness.settle();
+      // Identity, not a count: a recreate that nets out to the same number would still pass a count
+      const spinnerBefore = wrapperChildren()[0]?.handle;
       expect(spinnerBefore).toBeDefined();
 
       mounted.update([
@@ -84,29 +76,24 @@ describe('mountDescriptorChildren', () => {
           children: [],
         },
       ]);
-      await tick();
+      await harness.settle();
 
-      // Only the changed prop should have moved; the node itself is the one that was there.
-      const child = live.nodeOf(live.appRoot()).children[0]?.children[0];
+      const child = wrapperChildren()[0];
       expect(child?.handle).toBe(spinnerBefore);
       expect(child?.payload.animating).toBe(false);
       expect(child?.payload.color).toBe('red');
     });
 
+    // A Descriptor can nest, so the per-position cache has to walk down and not only diff the root
     it('syncs a nested multi-level tree by position', async () => {
-      // why: a render-*.ts Descriptor can nest (e.g. ImageBackground's View-wrapping-Image) —
-      // the per-position cache has to walk down, not just diff the root's own immediate props.
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
-
-      const mounted = mountDescriptorChildren(root, [
+      const mounted = mountDescriptorChildren(harness.liveRoot(), [
         {
           type: 'view',
           props: { style: { flex: 1 } },
           children: [{ type: 'text', props: {}, children: ['hello'] }],
         },
       ]);
-      await tick();
+      await harness.settle();
 
       mounted.update([
         {
@@ -115,9 +102,9 @@ describe('mountDescriptorChildren', () => {
           children: [{ type: 'text', props: {}, children: ['world'] }],
         },
       ]);
-      await tick();
+      await harness.settle();
 
-      const wrapper = live.nodeOf(live.appRoot()).children[0]?.children[0];
+      const wrapper = wrapperChildren()[0];
       expect(wrapper?.payload.flex).toBe(2);
       const text = wrapper?.children[0];
       expect(text?.viewName).toBe('RCTText');
@@ -125,86 +112,42 @@ describe('mountDescriptorChildren', () => {
       expect(text?.children[0]?.payload.text).toBe('world');
     });
 
+    // A top-level bare string takes the root-level cache entry, not the recursive one
     it('mounts and updates a bare string child directly under the parent', async () => {
-      // why: buildChild/syncChild's `typeof child === 'string'` branch has only ever been
-      // exercised nested inside an element (the "nested multi-level tree" case above) — a
-      // Descriptor's OWN top-level children array can hold a bare string too (e.g. Text's
-      // render fn), and that is a structurally different call path (root-level cache entry,
-      // not a recursive one).
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
-
-      const mounted = mountDescriptorChildren(root, ['hello']);
-      await tick();
-      expect(
-        live.nodeOf(live.appRoot()).children[0]?.children[0]?.payload.text,
-      ).toBe('hello');
+      const mounted = mountDescriptorChildren(harness.liveRoot(), ['hello']);
+      await harness.settle();
+      expect(wrapperChildren()[0]?.payload.text).toBe('hello');
 
       mounted.update(['world']);
-      await tick();
-      expect(
-        live.nodeOf(live.appRoot()).children[0]?.children[0]?.payload.text,
-      ).toBe('world');
+      await harness.settle();
+      expect(wrapperChildren()[0]?.payload.text).toBe('world');
     });
   });
 
-  // Every throw here enforces the SAME product rule (skill §19): a render-*.ts Descriptor is
-  // assumed shape-stable across renders, and this bridge's whole no-rebuild cost model depends
-  // on that. A shape change is therefore always a real bug in the CALLER, never a case to
-  // silently paper over — so the contract is "throw loudly", not "best-effort reconcile".
+  // A shape change is a bug in the caller, so the contract is to throw and not to reconcile
   describe('Negative', () => {
     it('throws when the root child count changes', async () => {
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
+      const mounted = mountDescriptorChildren(harness.liveRoot(), [view()]);
+      await harness.settle();
 
-      const mounted = mountDescriptorChildren(root, [
-        { type: 'view', props: {}, children: [] },
-      ]);
-      await tick();
-
-      expect(() =>
-        mounted.update([
-          { type: 'view', props: {}, children: [] },
-          { type: 'view', props: {}, children: [] },
-        ]),
-      ).toThrow(/shape changed/);
+      expect(() => mounted.update([view(), view()])).toThrow(/shape changed/);
     });
 
     it('throws when a nested child count changes', async () => {
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
-
-      const mounted = mountDescriptorChildren(root, [
-        {
-          type: 'view',
-          props: {},
-          children: [{ type: 'text', props: {}, children: [] }],
-        },
+      const text: IDescriptorChild = { type: 'text', props: {}, children: [] };
+      const mounted = mountDescriptorChildren(harness.liveRoot(), [
+        view([text]),
       ]);
-      await tick();
+      await harness.settle();
 
-      expect(() =>
-        mounted.update([
-          {
-            type: 'view',
-            props: {},
-            children: [
-              { type: 'text', props: {}, children: [] },
-              { type: 'text', props: {}, children: [] },
-            ],
-          },
-        ]),
-      ).toThrow(/shape changed/);
+      expect(() => mounted.update([view([text, text])])).toThrow(
+        /shape changed/,
+      );
     });
 
     it('throws when an element child is replaced by a text child at the same position', async () => {
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
-
-      const mounted = mountDescriptorChildren(root, [
-        { type: 'view', props: {}, children: [] },
-      ]);
-      await tick();
+      const mounted = mountDescriptorChildren(harness.liveRoot(), [view()]);
+      await harness.settle();
 
       expect(() => mounted.update(['not a view anymore'])).toThrow(
         /shape changed/,
@@ -212,25 +155,15 @@ describe('mountDescriptorChildren', () => {
     });
 
     it('throws when a text child is replaced by an element child at the same position', async () => {
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
+      const mounted = mountDescriptorChildren(harness.liveRoot(), ['hello']);
+      await harness.settle();
 
-      const mounted = mountDescriptorChildren(root, ['hello']);
-      await tick();
-
-      expect(() =>
-        mounted.update([{ type: 'view', props: {}, children: [] }]),
-      ).toThrow(/shape changed/);
+      expect(() => mounted.update([view()])).toThrow(/shape changed/);
     });
 
     it('throws when the element tag name changes at the same position', async () => {
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
-
-      const mounted = mountDescriptorChildren(root, [
-        { type: 'view', props: {}, children: [] },
-      ]);
-      await tick();
+      const mounted = mountDescriptorChildren(harness.liveRoot(), [view()]);
+      await harness.settle();
 
       expect(() =>
         mounted.update([{ type: 'text', props: {}, children: [] }]),
@@ -241,48 +174,35 @@ describe('mountDescriptorChildren', () => {
 
 describe('createDescriptorChildrenSync', () => {
   describe('Positive', () => {
-    it('is a no-op before the host shim is live, then mounts once it is', async () => {
-      // why: the wiring's own usage contract — `$effect(() => syncChildren(hostShim,
-      // descriptor.children))` can fire before `bind:this` populates hostShim, and must not
-      // throw or mount anything in that window.
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
+    // An `$effect` can fire before the host node is captured, and must neither throw nor mount
+    it('is a no-op before the host node is live, then mounts once it is', async () => {
+      const root = harness.liveRoot();
       const syncChildren = createDescriptorChildrenSync();
 
-      // Called with `hostShim === null` first (matches an $effect firing before bind:this
-      // populates it) — must not throw and must not mount anything.
-      syncChildren(null, [{ type: 'view', props: {}, children: [] }]);
-      await tick();
-      expect(
-        live.nodeOf(live.appRoot()).children[0]?.children.length ?? 0,
-      ).toBe(0);
+      syncChildren(null, [view()]);
+      await harness.settle();
+      expect(wrapperChildren()).toHaveLength(0);
 
       syncChildren(root, [
         { type: 'view', props: { collapsable: false }, children: [] },
       ]);
-      await tick();
-      const child = live.nodeOf(live.appRoot()).children[0]?.children[0];
+      await harness.settle();
+      const child = wrapperChildren()[0];
       expect(child?.viewName).toBe('RCTView');
       expect(child?.payload.collapsable).toBe(false);
     });
 
-    it("is a harmless no-op loop for an always-empty children array (Switch/TextInput's case)", async () => {
-      // why: Switch/TextInput route every prop through their own root `p` bag and have no
-      // Descriptor children at all — they still call this wiring uniformly (skill §19: "one
-      // uniform shape for every category-1 component"), so an empty array must cost nothing
-      // and mount nothing across repeated calls, not just on the first one.
-      const surface = createSurface(ROOT_TAG);
-      const root = createRootShimElement(surface);
+    // Switch and TextInput carry every prop in their own bag, yet call this wiring uniformly
+    it('is a harmless no-op loop for an always-empty children array', async () => {
+      const root = harness.liveRoot();
       const syncChildren = createDescriptorChildrenSync();
 
       syncChildren(root, []);
-      await tick();
+      await harness.settle();
       syncChildren(root, []);
-      await tick();
+      await harness.settle();
 
-      expect(
-        live.nodeOf(live.appRoot()).children[0]?.children.length ?? 0,
-      ).toBe(0);
+      expect(wrapperChildren()).toHaveLength(0);
     });
   });
 });

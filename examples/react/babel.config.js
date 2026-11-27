@@ -1,8 +1,6 @@
-// Inline `process.env.DEBUG` at bundle time so the @symbiote diagnostic logs can
-// be toggled from the shell without a dependency:
+// Inlines `process.env.DEBUG` at bundle time, so diagnostic logs toggle from the shell
 //   DEBUG=1 npx react-native start --reset-cache
-// The value is read from Metro's own environment when this config is evaluated
-// and baked into every transformed module (the app entry and the shared source).
+// Metro reads the environment when this config is evaluated, then bakes it into every module
 const debugFlag = process.env.DEBUG === '1' ? '1' : '0';
 
 function inlineDebugFlag({ types: t }) {
@@ -18,14 +16,19 @@ function inlineDebugFlag({ types: t }) {
   };
 }
 
+// Bundle Mode keeps worklets out of `eval`, which on Hermes V1 costs about 0.5 MB per function
+// It needs `bundleModeMetroConfig` in metro.config.js as well
+const workletsPluginOptions = { bundleMode: true };
+
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   // The worklets plugin has to stay last in this list
-  plugins: [inlineDebugFlag, 'react-native-worklets/plugin'],
-  // @react-native/babel-preset hardcodes its own @babel/plugin-transform-typescript call with no
-  // allowDeclareFields, so `declare context: ContextType<...>` (the official React docs' own class-
-  // component context typing idiom, used by ContextProviderDemo.tsx) throws at build time. Running our
-  // own TS transform first, with the flag on, strips the declare field before the preset's copy sees it.
+  plugins: [
+    inlineDebugFlag,
+    ['react-native-worklets/plugin', workletsPluginOptions],
+  ],
+  // The preset's TS transform lacks `allowDeclareFields`, so a `declare` field breaks the build
+  // Our copy runs first with the flag on and strips it, as `declare context` needs in the demo
   overrides: [
     {
       test: /\.tsx?$/,

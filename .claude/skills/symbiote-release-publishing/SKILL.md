@@ -88,9 +88,9 @@ to match its actual output 1:1 (verified by running it, not assumed).
 | `@symbiote-native/android`    | no build at all — ships tracked native `android/` source as-is                                                                                                                                          | pure native module, no JS/TS to compile                                                                                                   |
 
 **Do not cross the two mechanisms.** Conditional `exports` on a plain package
-would make Metro resolve `build/` even in-repo (conditions are evaluated
-identically locally and externally) and silently break the zero-build dev
-loop the other 4+3 packages rely on. `publishConfig` is inert until
+would make Metro resolve `build/` even in-repo, since conditions are evaluated the same way
+locally and externally. That silently breaks the zero-build dev loop the other 4+3 packages
+rely on. `publishConfig` is inert until
 `pnpm pack`/`pnpm publish`, which is exactly why it's the right tool for
 everything that doesn't need AOT.
 
@@ -98,14 +98,15 @@ everything that doesn't need AOT.
 
 `build/`, `build-ngc/`, and `dist/` are all gitignored (`.gitignore`). `npm`/
 `pnpm pack` falls back to `.gitignore` for what to exclude from a tarball when
-no `files` field is present — meaning without an explicit `"files"` array,
+no `files` field is present. So without an explicit `"files"` array,
 the just-built `build/` output would be **silently stripped from the
 package you publish**, shipping an empty/broken tarball. Every publishable
 package.json in this repo has an explicit `"files"` array for this reason:
-`["build"]` for the plain packages, `["src", "build"]` / `["src", "build",
-"build-ngc"]` for the Angular-conditional ones (their `default` export
-condition still points at `src/*.ts`, so `src/` must ship too), `["android"]`
-for the native-only package.
+
+- `["build"]` for the plain packages;
+- `["src", "build"]` or `["src", "build", "build-ngc"]` for the Angular-conditional ones. Their
+  `default` export condition still points at `src/*.ts`, so `src/` must ship too;
+- `["android"]` for the native-only package.
 
 ## Gotcha (fixed 2026-07): the hidden-folder `.gitignore` rule ate `.github/` itself
 
@@ -286,8 +287,8 @@ adapter code sat under 22.09's 1.2.0 / 3.0.1.
 `c17d33f1` added `setAssetSourceResolver` to `engine` and wired a call to it from
 `components/bootstrap.ts` in one commit, but carried a changeset for neither package. Next day a
 separate PR gave `components` its own changeset (3.1.0 to 3.1.1, calling the new export) with
-still no changeset for `engine`. `engine`'s version never moved past the already-published 1.3.0,
-so `changeset publish` saw nothing to do for it: same silent "already published" skip as the
+still no changeset for `engine`. `engine`'s version never moved past the already-published 1.3.0.
+So `changeset publish` saw nothing to do for it: same silent "already published" skip as the
 version-collision case above, but the trigger is a missing changeset, not a dropped merge. Real
 consumers installed `components@3.1.1` plus `engine@1.3.0`, and every `bootstrapHost()` call threw
 `TypeError: undefined is not a function` (`setAssetSourceResolver` resolved to `undefined`).
@@ -299,6 +300,19 @@ Diagnose it by comparing `git show <release-commit>:pkg/src/index.ts` (has the e
 **Rule: a commit that adds an export in package A and a call to it in package B needs a changeset
 for BOTH A and B**, not just the caller. A changeset only on the caller lets the producer's code
 sit unpublished indefinitely with no CI failure to flag it.
+
+## An upgrade step in a changeset is proven against the OLD template (measured 2026-11-26)
+
+A changeset told upgrading Svelte apps to add `svelte-custom-renderer` to Metro's
+`unstable_conditionNames`. The step was false. It came from docs prose, not from a resolver.
+
+- The old CLI template already had `['browser']`. In `svelte` 5.59.1 `browser` alone and both
+  conditions pick the same files: 32 `exports` and `imports` entries, 0 differ.
+- Check such a step with `node --conditions=a --conditions=b` and `import.meta.resolve`, against
+  the config the old `packages/cli/templates` wrote.
+- Pass each flag by itself. zsh does not split `$cond` into words, so two flags in one variable
+  become one unknown condition, and Node falls back to `default`.
+- New apps get settings from the CLI template. A manual step for them is a template bug.
 
 ## A MINOR on a 0.x `engine` is a MAJOR for the whole repo (measured 2026-09-21)
 
@@ -354,12 +368,11 @@ GitHub-OIDC trusted publishing for every publishable package in one loop —
 run once per package after its first manual authenticated publish, needs an
 interactive OTP/browser confirm so it can't run from CI. It hardcodes
 `--file .github/workflows/release.yml`: npm's OIDC trust is scoped to that
-exact workflow FILE (not job), covering the `release`/`cut-release` jobs
-(the only jobs in this workflow that touch the real npm registry —
-`publish-canary` below goes through pkg.pr.new instead and needs no npm auth
-at all) — a NEW workflow file would need its own `trust:publishers`-style
-re-registration first, or every publish from it 404s (npm returns 404, not
-403, for an identity with no trust config).
+exact workflow FILE, not to a job. It covers the `release`/`cut-release` jobs,
+the only ones here that touch the real npm registry. `publish-canary` below goes
+through pkg.pr.new and needs no npm auth at all. A NEW workflow file would need its
+own `trust:publishers`-style re-registration first, or every publish from it 404s.
+npm returns 404, not 403, for an identity with no trust config.
 
 ## Gotcha (found 2026-08-06 during the 18-package first-publish run): `pnpm publish` never completes npm's browser 2FA flow — pack with pnpm, upload with npm
 
@@ -525,11 +538,10 @@ GitHub App installed on this repo (github.com/apps/pkg-pr-new).
 2. **No package selection — publishes every publishable package, every
    time.** `scripts/select-canary-dirs.mjs` resolves ALL
    `publishablePackageEntries()` to directories, no filtering. Unlike a real
-   npm publish, pkg.pr.new never mutates shared registry state (no dist-tag
-   to move, no `updateInternalDependencies` cascade to reason about), so
-   there's no staleness/cascade risk a selection would need to guard
-   against — publishing everything is simply the cheapest, always-accurate
-   option.
+   npm publish, pkg.pr.new never mutates shared registry state: no dist-tag
+   to move, no `updateInternalDependencies` cascade to reason about. So a
+   selection has no staleness or cascade risk to guard against, and publishing
+   everything is the cheapest, always accurate option.
 
 3. **Publish step.**
    ```bash
@@ -644,7 +656,7 @@ inside the tarball against the same path on disk — 314 files, one differed, an
 a comment, which is exactly why nobody would notice it in a diff of the code.
 
 A comment is harmless; the same mechanism ships stale CODE just as quietly. The repo already has
-the fix — `prepublish-build` starts with `clean:build` (`scripts/clean-build-outputs.mjs`) — so the
+the fix: `prepublish-build` starts with `clean:build` (`scripts/clean-build-outputs.mjs`). So the
 rule is simply: **`pnpm run prepublish-build` before packing anything you intend to install or
 publish, never a bare `pnpm pack` on a working tree you have been iterating in.** After that the
 same hash comparison came back 0/312.

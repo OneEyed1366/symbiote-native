@@ -8,10 +8,11 @@ import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 Native Fabric events come back to the engine. Each adapter then exposes them in
 that framework's idiom: React callback props, Vue typed emits (plus `v-model`
 on controlled components), Angular real `@Output()` `EventEmitter`s, and
-Svelte and Solid plain callback props — the DOM-shim adapter and the Solid
-renderer both pass the same event object straight through, with no
-framework-specific wrapper or emit translation — with one permanent
-exception, the scroll-family events, which stay callback inputs (see the
+Svelte and Solid plain callback props.
+
+The Svelte and Solid custom renderers both pass the same event object straight
+through, with no framework-specific wrapper or emit translation. One permanent
+exception stays: the scroll-family events, which stay callback inputs (see the
 caveat below).
 
 ## Same event, different framework shape
@@ -77,10 +78,10 @@ The payload is the same concept. The public API is framework-shaped.
   The scroll-family events (`onScroll`, `onScrollBeginDrag`, `onScrollEndDrag`,
   `onMomentumScrollBegin`, `onMomentumScrollEnd`) are the one **permanent**
   exception to Angular's `@Output()` migration, on `ScrollView` and the list
-  components. They stay plain callback `@Input()`s — `[onScroll]="handler"` —
-  because RN's scroll callbacks can carry either a plain function or the return
+  components. They stay plain callback `@Input()`s, as in `[onScroll]="handler"`.
+  RN's scroll callbacks can carry either a plain function or the return
   value of `Animated.event(...)`, a native-driver marker for native-driven
-  scroll animations, and `@Output()` can only bind a template listener
+  scroll animations. `@Output()` can only bind a template listener
   expression, not an arbitrary value. See the [Angular API
   reference](/docs/api/angular/) for the exact split.
 </Aside>

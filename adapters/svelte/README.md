@@ -2,14 +2,15 @@
 
 The **Svelte adapter** for [SymbioteNative](../../README.md) — render real native iOS/Android views
 from Svelte 5, on the _same_ untouched core as React, Vue, Solid, and Angular, with React Native's own
-renderer never in the path. Svelte ships no official host-renderer API yet (`createRenderer` is
-still an unmerged PR upstream), so instead of hooking a framework-blessed extension point this
-adapter patches `globalThis`'s DOM classes: stock compiled Svelte client output believes it is
-talking to a real DOM, and every one of those calls routes into `@symbiote-native/engine`'s same
-four-call mutation API underneath, which does the clone-on-write commit into Fabric.
+renderer never in the path. The adapter drives Svelte's own custom renderer API
+(`svelte/renderer`, `createRenderer`), so the components are compiled with
+`experimental.customRenderer` and every node operation routes into `@symbiote-native/engine`'s
+same four-call mutation API, which does the clone-on-write commit into Fabric.
 
-Svelte is the **sharpest test yet** that the core is genuinely framework-agnostic — unlike Vue's
-`createRenderer` or Angular's `Renderer2`, there was no host-renderer seam to hook here at all.
+> **Experimental.** The custom renderer API is experimental in Svelte itself and needs
+> `svelte >= 5.59.1`. It rejects `bind:`, `on:`, `transition:`, `animate:`, `{@html}` and
+> `<svelte:window|document|body|head>` at compile time: use `{@attach}`, `onX={...}` props and the
+> runtime modules instead.
 
 <div align="center">
 
@@ -45,15 +46,16 @@ both pieces of Metro wiring below; there is no wiring script for an existing app
 - `metro.config.js` — point `babelTransformerPath` at
   `@symbiote-native/svelte/metro-svelte-transformer` (compiles `.svelte` on the way into the
   bundle) and disable `inlineRequires` (see [the gotcha
-  below](#a-svelte-specific-gotcha--inlinerequires-vs-the-svelte-runtime)).
+  below](#a-svelte-specific-gotcha--inlinerequires-vs-the-svelte-runtime)). Add
+  `resolver.unstable_conditionNames: ['svelte-custom-renderer', 'browser']`, so Svelte's runtime
+  resolves to its custom-renderer build.
 - `svelte.config.js` — registers the `forbidWebOnlyConstructs()`, `scopedStyles()`, and
   `collapseTextWhitespace()` preprocessors, so `svelte-check` and the editor catch the same things
-  Metro's transformer already guards against at build time (the third one matters beyond
-  diagnostics: without it, a sentence wrapped across source lines for readability ships a literal
-  newline into the native text content — Svelte doesn't collapse it the way a browser or Vue's
-  compiler would). Also sets `compilerOptions: { fragments: 'tree', css: 'external' }` and a
-  `warningFilter` that silences `element_invalid_self_closing_tag` for `<pressable />`-style
-  self-closing primitives.
+  Metro's transformer guards against at build time. The third one matters beyond diagnostics:
+  without it, a sentence wrapped across source lines ships a literal newline into the native text
+  content. Also sets `compilerOptions: { fragments: 'tree', css: 'external', experimental: {
+customRenderer: '@symbiote-native/svelte/renderer' } }` and a `warningFilter` that silences
+  `element_invalid_self_closing_tag` for `<pressable />`-style self-closing primitives.
 
 </details>
 
@@ -120,20 +122,18 @@ Angular reference canaries.
 
 Svelte reaches the same primitives, runtime modules, `Animated` on both drivers, gestures,
 accessibility, and the `VirtualizedList` family as React, Vue, Solid, and Angular, verified
-on-device on iOS and Android. That parity is **structural, not hand-copied**: the component logic (state
-machines + render functions) is written **once** in `@symbiote-native/components`, and Svelte
-supplies only its lifecycle — runes (`$state` / `$derived` / `$effect`) driving hand-authored
-`.svelte` markup that mirrors each `render-*.ts` directly, rather than a generic descriptor bridge
-the way React and Vue use one.
+on-device on iOS and Android. That parity is **structural, not hand-copied**. The component logic
+(state machines + render functions) is written **once** in `@symbiote-native/components`. Svelte
+supplies only its lifecycle: runes (`$state` / `$derived` / `$effect`) driving hand-authored
+`.svelte` markup that mirrors each `render-*.ts`, not a generic descriptor bridge like React and Vue.
 
-The one deliberate gap, same as every other non-React adapter — **third-party React component
-packages** (`@react-native-community/slider` used directly) run only under the React adapter:
-their body calls React hooks off the React dispatcher, which is null under Svelte.
+The one deliberate gap, same as every other non-React adapter: **third-party React component
+packages** (`@react-native-community/slider` used directly) run only under the React adapter.
+Their body calls React hooks off the React dispatcher, which is null under Svelte.
 `@symbiote-native/slider` (this repo's own wrapper) _does_ ship a real Svelte build
 (`@symbiote-native/slider/svelte`) through the same `createNode`-by-ViewConfig path Svelte uses
-for its own primitives — that wrapper is what makes this one third-party native view usable from
-Svelte at all; any _other_ React-only component package stays React-adapter-only until it gets the
-same treatment.
+for its own primitives. Any _other_ React-only component package stays React-adapter-only until it
+gets the same treatment.
 
 ---
 
@@ -144,16 +144,23 @@ client runtime (`svelte/internal/client/**`) is a graph of small files wired thr
 singleton reactivity state (the current-effect/signal graph); under `inlineRequires` that graph
 re-enters itself while mounting and blows the JS stack — `Maximum call stack size exceeded` inside
 `metroRequire`, reproduced on a real device/simulator, not just in theory.
-[`examples/svelte`](../../examples/svelte)'s `metro.config.js` disables it explicitly
-(`experimentalImportSupport: false, inlineRequires: false`); any new Svelte app needs the same
-override, since RN's default Metro config doesn't know to do this on its own.
+Any new Svelte app needs an override, since RN's default Metro config doesn't know to do this on
+its own. Without Worklets Bundle Mode, `inlineRequires: false` for the whole app is enough.
 
-A smaller one: Svelte's compiler only trims LEADING/TRAILING whitespace inside a fragment —
-whitespace strictly _between_ two sibling non-text nodes collapses to a real text node and is
-kept. That's invisible on the web, but a stray text node between siblings under a non-`Text`
-parent is an invalid Fabric child on this DOM shim, so markup inside an `{#each}`/`{#if}` chain
-over host primitives has to avoid it — this repo carries a device-verified regression test
-guarding it.
+With Worklets Bundle Mode that global switch breaks the app at start. A worklet runtime evaluates
+the same bundle, and eager requires load React Native modules there. The app then fails with
+`Accessing __fbBatchedBridgeConfig is not allowed on Worklet Runtimes`.
+
+Keep inline requires on for the files of `react-native-worklets`, and off for everything else.
+Metro takes this as `inlineRequires: { blockList }`, which names the files that stay eager. Also
+set `experimentalImportSupport: false`. [`examples/svelte`](../../examples/svelte)'s
+`metro.config.js` does this.
+
+A smaller one: Svelte's compiler only trims LEADING/TRAILING whitespace inside a fragment.
+Whitespace strictly _between_ two sibling non-text nodes collapses to a real text node and is
+kept. That is invisible on the web, but a stray text node between siblings under a non-`Text`
+parent is an invalid Fabric child. Markup inside an `{#each}`/`{#if}` chain over host primitives
+has to avoid it, and this repo carries a device-verified regression test guarding it.
 
 ---
 

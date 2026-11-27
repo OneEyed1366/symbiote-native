@@ -13,4 +13,10 @@
   });
 </script>
 
-<view bind:this={element} class="ra-tile ra-tile-small" p={rest} />
+<view
+  {@attach (node: unknown) => {
+    element = node;
+  }}
+  class="ra-tile ra-tile-small"
+  p={rest}
+/>

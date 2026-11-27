@@ -1,14 +1,16 @@
 import { splitProps } from 'solid-js';
 import { descriptorToSolid } from '@symbiote-native/solid';
+import type { IViewProps } from '@symbiote-native/solid';
 import { createHostNodeHolder } from '@symbiote-native/components';
 import type { ISymbioteNode } from '@symbiote-native/engine';
 import { createLivePhotoViewHandle, renderLivePhotoView } from '../core';
 import type { ILivePhotoViewHandle, ILivePhotoViewProps } from '../core';
 
-export type ILivePhotoViewSolidProps = ILivePhotoViewProps & {
-  /** Gets the handle that starts and stops the playback */
-  ref?: (handle: ILivePhotoViewHandle) => void;
-};
+export type ILivePhotoViewSolidProps = ILivePhotoViewProps &
+  Pick<IViewProps, 'class'> & {
+    /** Gets the handle that starts and stops the playback */
+    ref?: (handle: ILivePhotoViewHandle) => void;
+  };
 
 /** Solid twin of `expo-live-photo`'s `LivePhotoView`, iOS only */
 export function LivePhotoView(

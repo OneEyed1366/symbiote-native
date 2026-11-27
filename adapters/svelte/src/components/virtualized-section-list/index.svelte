@@ -1,12 +1,7 @@
 <script lang="ts" module>
-  // VirtualizedSectionList: sections flattened into one virtualized stream over VirtualizedList.
-  // Each section contributes a header row, its item rows, then a footer row (RN counts 2 per
-  // section); the flattened tagged sequence feeds VirtualizedList as one list, so headers, items,
-  // and footers are all windowed by the same machinery. The flattening, entry keying,
-  // separator-item unwrap, and scrollToLocation mapping are shared verbatim from
-  // @symbiote-native/components; this file wires only Svelte's lifecycle (typed prop inputs +
-  // handle delegation + the per-entry render dispatch) — the Svelte twin of the React/Vue
-  // VirtualizedSectionList.
+  // VirtualizedSectionList: sections flattened into one virtualized stream over `VirtualizedList`
+  // Each section gives a header row, its item rows and a footer row, all windowed together
+  // Flattening, keying and `scrollToLocation` mapping come from `@symbiote-native/components`
   import type {
     IVirtualizedSectionListProps,
     IVirtualizedSectionListHandle,
@@ -36,22 +31,16 @@
   import VirtualizedList from '../virtualized-list/index.svelte';
   import SectionItemCell from './section-item-cell.svelte';
   import { pickAccessibilityProps } from '../virtualized-list/virtualized-list-props';
-  import type {
-    IVirtualizedListHandle,
-    IScrollViewHandle,
-  } from '../virtualized-list/virtualized-list-props';
-  import type {
-    IVirtualizedSectionListProps as IProps,
-    ISection,
-  } from './virtualized-section-list-props';
+  import type { IScrollViewHandle } from '@symbiote-native/components';
+  import type { IVirtualizedListHandle } from '../virtualized-list/virtualized-list-props';
+  import type { IVirtualizedSectionListProps as IProps } from './virtualized-section-list-props';
   import { pickAttachmentProps } from '../../runes/attachments';
 
   let props: IProps<ItemT> = $props();
 
   let inner = $state.raw<IVirtualizedListHandle | null>(null);
 
-  // Forwarded as a component-prop spread onto the inner VirtualizedList (a compiled Svelte
-  // component, not a symbiote-* host tag — see flat-list/index.svelte's identical comment).
+  // Spread onto the inner `VirtualizedList`, a compiled component and not a host tag
   const accessibilityProps = $derived(pickAccessibilityProps(props));
 
   type IEntry = ISectionEntry<ItemT, ISection<ItemT>>;
@@ -71,9 +60,8 @@
       Platform.OS,
     ),
   );
-  // Diagnostic: logs every INPUT this $derived reads, not just VirtualizedList's own result —
-  // `stickyHeaderIndices` can come back undefined on Android with the bare
-  // `stickySectionHeadersEnabled` shorthand, and only the inputs show what differs.
+  // Logs every input this `$derived` reads, as `stickyHeaderIndices` can come back undefined on
+  // Android with the bare `stickySectionHeadersEnabled` shorthand and only the inputs show why
   $effect(() => {
     dlog(
       `VirtualizedSectionList sticky-inputs enabled=${String(props.stickySectionHeadersEnabled)} ` +
@@ -98,9 +86,8 @@
     return sectionEntryKey(entry, props.keyExtractor);
   }
 
-  // Hand the callback `sections`, not the entries: RN's inner VirtualizedList gets
-  // `data={this.props.sections}` (VirtualizedSectionList.js:216) while ours streams the FLATTENED
-  // entries, so the same user code would otherwise see a different argument here than on RN
+  // The callback gets `sections`, not the entries, as in RN (`VirtualizedSectionList.js:216`)
+  // Ours streams the flattened entries, so user code would otherwise see another argument
   const entryItemLayout = $derived.by(() => {
     const getItemLayout = props.getItemLayout;
     if (getItemLayout === undefined) return undefined;
@@ -111,8 +98,7 @@
       getItemLayout(props.sections, index);
   });
 
-  // The separator snippet for a gap: the section one, or the item one where a section's own beats
-  // the list's
+  // The separator snippet for a gap: the section one, or the item one with a section's own first
   function separatorFor(gap: ISeparatorGap<ItemT, ISection<ItemT>>) {
     if (gap.props === undefined) return undefined;
     if (gap.kind === SEPARATOR_GAP_KIND.section) return props.sectionSeparator;
@@ -124,9 +110,8 @@
     return previous === undefined ? undefined : entryKeyExtractor(previous);
   }
 
-  // ---- imperative handle: scrollToLocation resolves (sectionIndex, itemIndex) to the flattened
-  // entry index and forwards to the inner VirtualizedList; everything else routes straight
-  // through, the Svelte twin of the shared IScrollRoutingHandle tail. ----
+  // Handle: `scrollToLocation` maps `sectionIndex` and `itemIndex` to the flattened entry index
+  // The rest routes straight to the inner list
   export function scrollToLocation(params: {
     sectionIndex: number;
     itemIndex: number;

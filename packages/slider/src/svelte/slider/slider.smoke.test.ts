@@ -1,14 +1,12 @@
-// Real-compiled-source smoke test for index.svelte, mirroring
-// packages/slider/src/vue/slider/slider.test.ts's shape (value prop, onValueChange, min/max,
-// step, track/thumb tint colors) plus the two bridge-mounting paths this component's own header
-// documents: the default-overlay path (renderSlider()'s Descriptor, tolerant of a 1-vs-2
-// child-count change as renderStepNumber toggles) and the custom-marker path (hand-authored
-// {#each} + a live `stepMarker` Snippet, with only the native RNCSlider leaf bridged). Compiles
-// the REAL index.svelte source through svelte/compiler (not a hand-written stand-in), the same
-// compile-then-dynamic-import mechanics adapters/svelte/src/components/switch/
-// switch.smoke.test.ts uses. The native RNCSlider carries no symbiote metadata — the engine
-// derives its events + tint processors from an injected codegen-shaped ViewConfig, the same
-// shape packages/slider/src/vue/slider/slider.test.ts injects.
+// Smoke test for the real `index.svelte`, compiled through `svelte/compiler` and dynamic-imported
+// It mirrors `packages/slider/src/vue/slider/slider.test.ts`: value, events, range and tints
+
+// It also covers the two mounting paths named in the component header
+// The default overlay comes from `renderSlider()` and tolerates a 1 or 2 child count
+// The custom marker is a hand-authored `{#each}` with a live `stepMarker` Snippet
+
+// The native `RNCSlider` carries no metadata, so the engine derives events and tint processors
+// from an injected codegen-shaped ViewConfig, the same one the Vue test injects
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -21,9 +19,8 @@ import {
   type ILiveNode,
 } from '@symbiote-native/test-utils';
 import { setNativeViewConfigSource } from '@symbiote-native/engine';
-// From the dedicated `native-view-bridge` subpath, NOT the package's main barrel: the main
-// barrel re-exports View/Text/…, real `.svelte` sources, which vitest's plain (svelte-plugin-
-// free) transform cannot parse — see index.svelte's header and native-view-bridge.ts's own.
+// From the `native-view-bridge` subpath, as the main barrel re-exports `.svelte` sources
+// Vitest has no Svelte plugin here, so its plain transform cannot parse them
 import { mount, unmount } from '@symbiote-native/svelte/native-view-bridge';
 
 if (globalThis.window === undefined)
@@ -34,18 +31,15 @@ if (globalThis.navigator === undefined) {
 
 const ROOT_TAG = 91_101;
 const SLIDER_VIEW = 'RNCSlider';
-// Co-located with the real source (not an isolated temp dir): the compiled Slider's own
-// `import { PLATFORM } from './slider-platform'` / `from '../../core'` resolve relative to
-// WHERE THE COMPILED FILE LIVES — same reason switch.smoke.test.ts documents.
+// Co-located with the source, as the compiled file's relative imports resolve from its own place
 const SLIDER_OUT = join(__dirname, '.smoke-compiled-slider.mjs');
 const MARKER_PARENT_OUT = join(__dirname, '.smoke-compiled-marker-parent.mjs');
 const BIND_PARENT_OUT = join(__dirname, '.smoke-compiled-bind-parent.mjs');
 
 const fakeColor = (value: unknown): string => `processed(${value})`;
 
-// The codegen-shaped config the engine derives from: both value rails (bubbling), the two
-// sliding rails + accessibility (direct), plain pass-through attributes, and the tint
-// processors — identical to what the Vue wrapper's own test injects.
+// The codegen-shaped config the engine derives from, the same as in the Vue test
+// It has both value rails (bubbling), the sliding and accessibility rails (direct) and the tints
 const RNC_SLIDER_VIEW_CONFIG = {
   bubblingEventTypes: {
     topChange: {
@@ -123,9 +117,8 @@ async function loadSlider(): Promise<Component> {
   return importDefault(SLIDER_OUT);
 }
 
-// A parent that supplies a live `stepMarker` Snippet — only a compiled .svelte template can
-// construct one ({#snippet}), so this exercises the custom-marker path end to end (the
-// hand-authored {#each} overlay + the single bridged native leaf, see index.svelte's header).
+// A parent that supplies a live `stepMarker` Snippet, which only a compiled template can build
+// It exercises the custom-marker path: the `{#each}` overlay plus the single bridged leaf
 async function loadMarkerParent(): Promise<Component> {
   await loadSlider();
   compileToFile(
@@ -142,10 +135,8 @@ async function loadMarkerParent(): Promise<Component> {
   return importDefault(MARKER_PARENT_OUT);
 }
 
-// A parent that owns `value` via `$state` and hands it to Slider through `bind:value`, reporting
-// every change through the `report` prop supplied by the test — only a compiled .svelte template
-// can construct the `bind:` directive itself, so this exercises the `$bindable()` sync end to
-// end (compiler-generated two-way binding, not a hand-rolled prop+callback pair).
+// A parent that owns `value` in `$state` and binds it to Slider with `bind:value`
+// Only a compiled template builds the `bind:` directive, so this covers the `$bindable()` sync
 async function loadBindParent(): Promise<Component> {
   await loadSlider();
   compileToFile(
@@ -182,17 +173,14 @@ afterEach(() => {
   rmSync(BIND_PARENT_OUT, { force: true });
 });
 
-// No Negative group: the .svelte component itself has no guard clause that rejects bad input —
-// an inverted lowerLimit/upperLimit only dlog()s a warning (isInvalidLimitConfig, core/
-// slider-state.ts), never throws, and every prop is optional. Every scenario below is Positive:
-// the component always renders something, the question is only WHICH bridge shape and WHICH
-// resolved prop values reach the native RNCSlider leaf.
+// No Negative group, as the component never rejects input and every prop is optional
+// An inverted limit pair only logs through `isInvalidLimitConfig`
+// Every case checks which bridge shape and which resolved props reach the native leaf
 describe('Slider (real compiled index.svelte)', () => {
   describe('Positive (default-overlay bridge, prop folding, event routing, bind:value)', () => {
     it('paints the raw RNCSlider leaf inside a centering wrapper View', async () => {
-      // why: WHY THE LEAF IS BRIDGED (this file's header) — 'RNCSlider' would parse as a Svelte
-      // component reference if written as a literal tag, so the descriptor-children bridge must
-      // be the thing that actually gets the native view onto the tree, under a real wrapper.
+      // A literal `RNCSlider` tag would parse as a component
+      // So the bridge is what puts the native leaf on the tree
       await mountSlider({
         value: 0.5,
         minimumValue: 0,
@@ -204,16 +192,15 @@ describe('Slider (real compiled index.svelte)', () => {
       expect(props.minimumValue).toBe(0);
       expect(props.maximumValue).toBe(1);
       expect(props.step).toBe(0.1);
-      // The native leaf lives under a view wrapper (RCTView), not at the root.
+      // The native leaf lives under a view wrapper, not at the root
       expect(
         live.findLive(live.appRoot(), n => n.viewName === 'RCTView'),
       ).toBeDefined();
     });
 
     it('defaults range + limits the way the core fold does', async () => {
-      // why: an app that supplies only `value` must still get the library's own unbounded-range
-      // defaults (constants.ts: min 0 / max 1 / step 0 / MIN_SAFE_INTEGER..MAX_SAFE_INTEGER limits),
-      // not undefined props reaching the native view.
+      // An app that supplies only `value` still gets the library's own range defaults
+      // They are min 0, max 1, step 0 and the safe-integer limits, never undefined props
       await mountSlider({ value: 0.3 });
       const props = sliderNode().payload;
       expect(props.minimumValue).toBe(0);
@@ -226,9 +213,8 @@ describe('Slider (real compiled index.svelte)', () => {
     });
 
     it('sanitizes a falsy/NaN value to undefined (library passedValue quirk)', async () => {
-      // why: sanitizeSliderValue's product rule — 0/NaN must reach the native view as undefined so
-      // it falls back to ITS OWN default initial value, rather than the native view receiving a
-      // literal 0/NaN write it would otherwise treat as a real position.
+      // `sanitizeSliderValue` sends 0 and NaN as undefined, so native keeps its own initial value
+      // A literal 0 write would be taken as a real position
       await mountSlider({ value: 0 });
       expect(sliderNode().payload.value).toBeUndefined();
       unmount(ROOT_TAG);
@@ -238,10 +224,8 @@ describe('Slider (real compiled index.svelte)', () => {
     });
 
     it('forwards tint props and runs them through the derived processor', async () => {
-      // why: the color props are declared with `{ process: fakeColor }` in RNCSlider's own
-      // ViewConfig (the same shape the engine derives at runtime) — a value reaching the native
-      // node unprocessed would mean the engine's ViewConfig-driven processor wiring is broken for
-      // this component, not just an untested prop.
+      // The color props carry `{ process: fakeColor }` in the ViewConfig
+      // An unprocessed value on the node means the processor wiring is broken
       await mountSlider({
         value: 0.2,
         minimumTrackTintColor: '#ff0000',
@@ -255,9 +239,8 @@ describe('Slider (real compiled index.svelte)', () => {
     });
 
     it('maps both native value rails onto onValueChange(value)', async () => {
-      // why: the library's ViewConfig declares the value change as BOTH topChange (-> onChange)
-      // and topRNCSliderValueChange (-> onRNCSliderValueChange) bubbling events (constants.ts) —
-      // missing either rail would silently drop value updates on whichever host platform emits it.
+      // The ViewConfig declares the value change as both `topChange` and `topRNCSliderValueChange`
+      // Missing either rail drops updates on the platform that emits it
       let changed: number | undefined;
       await mountSlider({
         value: 0.2,
@@ -273,9 +256,8 @@ describe('Slider (real compiled index.svelte)', () => {
     });
 
     it('maps the direct sliding events onto their callbacks', async () => {
-      // why: onSlidingStart/onSlidingComplete are a distinct contract from onValueChange (drag
-      // boundaries vs. every intermediate value) — an app debouncing expensive work to
-      // slide-complete only, for example, needs these routed independently.
+      // `onSlidingStart` and `onSlidingComplete` mark drag boundaries, unlike `onValueChange`
+      // An app that debounces work to slide-complete needs them routed independently
       let startedAt: number | undefined;
       let completedAt: number | undefined;
       await mountSlider({
@@ -295,25 +277,21 @@ describe('Slider (real compiled index.svelte)', () => {
     });
 
     it('resolves disabled from accessibilityState when no explicit boolean', async () => {
-      // why: resolveSliderDisabled's fallback rule — an app driving disabled purely through
-      // accessibilityState (no separate `disabled` prop) must still reach the native view disabled,
-      // matching the library wrapper's own resolution order.
+      // `resolveSliderDisabled` falls back to `accessibilityState`, as the library wrapper does
       await mountSlider({ value: 0.2, accessibilityState: { disabled: true } });
       expect(sliderNode().payload.disabled).toBe(true);
     });
 
     it('does NOT leak the JS onValueChange callback to the native node as a prop', async () => {
-      // why: a function value reaching the native side would either crash Fabric prop
-      // serialization or silently no-op — the callback belongs only in `passthrough`'s routed
-      // event keys, never as a plain native attribute.
+      // A function reaching the native side would crash prop serialization or silently no-op
+      // The callback belongs in the routed event keys, never as a plain attribute
       await mountSlider({ value: 0.2, onValueChange: () => undefined });
       expect(typeof sliderNode().payload.onValueChange).not.toBe('function');
     });
 
     it('renders the default step indicator when renderStepNumber is set (2-child bridge shape)', async () => {
-      // why: shouldRenderStepsIndicator's product rule — opting into step numbers must add the
-      // StepsIndicator overlay as a SECOND child of the wrapper, while the native leaf itself stays
-      // exactly where it was.
+      // Opting into step numbers adds the StepsIndicator overlay as a second child of the wrapper
+      // The native leaf stays where it was
       await mountSlider({
         value: 0.5,
         minimumValue: 0,
@@ -326,14 +304,13 @@ describe('Slider (real compiled index.svelte)', () => {
         n => n.props.testID === 'StepsIndicator-Container',
       );
       expect(container, 'a StepsIndicator container is painted').toBeDefined();
-      // Still exactly one native leaf underneath the same wrapper.
+      // Still exactly one native leaf under the same wrapper
       expect(sliderNode().payload.value).toBe(0.5);
     });
 
     it('tolerates the bridged child count changing between mounts (no-steps -> steps)', async () => {
-      // why: renderSlider()'s Descriptor shape genuinely varies (1 child vs. 2) as
-      // renderStepNumber toggles — the bridge's own sync must rebuild cleanly on a child-count
-      // change instead of assuming the fixed shape every OTHER component in this adapter has.
+      // The `renderSlider()` shape varies between 1 and 2 children as `renderStepNumber` toggles
+      // So the sync must rebuild on a child-count change
       await mountSlider({
         value: 0.5,
         minimumValue: 0,
@@ -365,17 +342,14 @@ describe('Slider (real compiled index.svelte)', () => {
     });
 
     it('renders a custom stepMarker overlay and still bridges the native leaf', async () => {
-      // why: the custom-marker path is hand-authored live template content (a Snippet no
-      // Descriptor can carry), not the Descriptor bridge — this proves the overlay markers AND the
-      // single native leaf coexist correctly rather than the overlay accidentally displacing or
-      // duplicating the bridged leaf.
+      // The custom-marker path is live template content, as a Snippet no Descriptor can carry
+      // The overlay markers and the single native leaf must coexist, neither displacing the other
       const MarkerParent = await loadMarkerParent();
       mount(ROOT_TAG, MarkerParent);
       await tick();
       await tick();
 
-      // computeStepOptions(0, 1, 0.25, resolution) with an explicit step yields 5 points
-      // (0, 0.25, 0.5, 0.75, 1) — one marker per point.
+      // `computeStepOptions` with step 0.25 over 0..1 gives 5 points, one marker per point
       const markers = fabric.findAll(
         n =>
           typeof n.props.testID === 'string' &&
@@ -385,16 +359,11 @@ describe('Slider (real compiled index.svelte)', () => {
 
       const node = sliderNode();
       expect(node.props.value).toBe(0.5);
-      // The overlay sits under the SAME wrapper as the native leaf, never as a sibling of a
-      // stray whitespace text node (svelte-adapter-dom-shim skill §16) — confirmed by the exact
-      // marker count above matching computeStepOptions() with none dropped/duplicated.
     });
 
     it('syncs a bind:value binding on the same report path as onValueChange', async () => {
-      // why: `$bindable()` is ADDITIVE sugar over the existing value/onValueChange contract
-      // (index.svelte's own comment) — a caller using bind:value must see the SAME
-      // handleValueChange-driven updates onValueChange gets, not a separate per-frame resync loop
-      // that could drift from what the native view actually reported.
+      // `$bindable()` is sugar over the `value` and `onValueChange` contract
+      // A `bind:value` caller sees the same updates `onValueChange` gets, with no separate resync
       const reported: number[] = [];
       const BindParent = await loadBindParent();
       mount(ROOT_TAG, BindParent, {
@@ -407,10 +376,8 @@ describe('Slider (real compiled index.svelte)', () => {
       expect(reported.at(-1)).toBe(0.2);
       expect(sliderNode().payload.value).toBe(0.2);
 
-      // Uncontrolled during the drag itself — bind:value only reflects what the native view
-      // actually reports, on the SAME handleValueChange path onValueChange already fires from
-      // (index.svelte's `value = next` right beside `onValueChange?.(next)`), never a per-frame
-      // resync driven by anything else.
+      // The slider is uncontrolled during a drag, so `bind:value` reflects only what native reports
+      // It rides the `handleValueChange` path, right beside `onValueChange`
       fabric.fireEvent(sliderNode().instanceHandle, 'topChange', {
         value: 0.7,
       });

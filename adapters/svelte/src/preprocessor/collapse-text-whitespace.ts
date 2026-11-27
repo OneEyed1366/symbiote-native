@@ -1,61 +1,30 @@
-// svelte-adapter-dom-shim skill §16: Svelte trims only the leading/trailing whitespace of a
-// fragment's own children - never whitespace INSIDE a single Text node, and never a
-// whitespace-only Text node BETWEEN two siblings. Vue's compiler (and every browser) collapse both.
+// Svelte trims only the edges of a fragment, so a Text node keeps its inner newlines and indent
+// Vue's compiler and every browser collapse them, here they would ship into native text
 
-// A Text node authored as `Hello world, this is a\n  long sentence.` compiles verbatim, so the
-// newline and indent ship into native text as a forced line break plus stray leading spaces.
-//
-// Two hazards:
-//   1. Wrapped sentence - a Text node with real content plus an embedded whitespace run
-//      (usually a line-wrap for readability). Fixed by collapsing every whitespace run to a
-//      single space, matching HTML/Vue.
-//   2. Stray sibling gap - a Text node that is entirely whitespace. Compiles to a real
-//      `$.text(' ')` -> ShimText -> RCTRawText engine node: invalid outside a Text-accepting
-//      parent, and a stray paint even inside one. Fixed by deleting the node outright, since
-//      collapsing alone leaves it there as a single space.
-//
-// Telling an accidental gap from an intentional inline space (`<Text>{a} {b}</Text>`) needs a
-// signal, since both are whitespace-only nodes: did the original contain a newline? A same-line
-// space is something the author typed on purpose; a run spanning multiple source lines has, in
-// every case this codebase has produced, come from writing each sibling on its own line. So only
-// a whitespace-only node with a newline gets deleted; a same-line run of 2+ spaces collapses to
-// one and stays, matching HTML's own collapse of an intentional double space.
-//
-// Hazard 2 is no longer THIS file's guarantee. A whitespace-only run between two siblings on
-// ONE line (`<View><A/>  <B/></View>`) is indistinguishable here from an intentional space -
-// the missing fact is whether the parent renders raw text, which source alone cannot say.
-// `dom-shim/text.ts` knows it: by the time a text node goes live its parent's engine node is
-// bound, so it drops whitespace-only text under any non-text parent. That is exact, and it
-// holds even for a consumer who never registers this preprocessor.
-//
-// So deleting the cross-line gap here is now an OPTIMIZATION - the node is never built at all -
-// plus source hygiene for svelte-check. Hazard 1 (a wrapped sentence INSIDE one text node) does
-// still rely on this file: it needs collapsing rather than dropping, and only source can tell an
-// authored newline from one a runtime value carries. `scripts/audit-svelte-stray-whitespace.mjs`
-// still walks compiled output independently of both.
-//
-// Registered in svelte.config.js's `preprocess`, same as forbid-web-only-constructs.ts and
-// scoped-styles.ts, so it covers both svelte-check/the language server and Metro's build.
-//
-// Line numbers are not preserved past an edited node, unlike scoped-styles.ts's blankOut trick:
-// blankOut hides removed characters behind an equal count of `\n` because that code is gone from
-// the output entirely; here the newlines being removed are the bug, so re-inserting them
-// anywhere would bring it back. A diagnostic below an edited node may point a few lines off - no
-// source map, matching the other two preprocessors, and the one place that choice costs
-// something.
+// A whitespace run inside real content collapses to one space, a same-line space stays as typed
+// A whitespace-only node is deleted only when the original spanned a newline
+
+// A gap between siblings on one line is handled at runtime, where the parent is known
+// `blankFormattingWhitespace` in `symbiote-renderer.ts` blanks it under any parent but `<Text>`
+// So deleting the gap here is an optimization, while a wrapped sentence still needs this file
+
+// Registered in `svelte.config.js` like scoped-styles.ts, for svelte-check and Metro
+// Line numbers drift past an edited node, as the removed newlines are the bug and there is no map
 
 import { parse } from 'svelte/compiler';
 
-interface IEdit {
+const TEXT_NODE_TYPE = 'Text';
+
+type IEdit = {
   readonly start: number;
   readonly end: number;
   readonly text: string;
-}
+};
 
-interface IMarkupInput {
+type IMarkupInput = {
   readonly content: string;
   readonly filename?: string;
-}
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -84,9 +53,7 @@ function fragmentNodes(ast: unknown): unknown[] {
   return Array.isArray(fragment.nodes) ? fragment.nodes : [];
 }
 
-// Same walk shape as scoped-styles.ts's collectClassEdits: a Text node can sit inside an
-// {#if}/{#each} branch, a snippet body, or an element's children, so this descends through every
-// child value rather than one known key.
+// A Text node can sit in a branch, a snippet body or children, so the walk takes every child value
 function nestedNodes(node: Record<string, unknown>): unknown[] {
   const nested: unknown[] = [];
   for (const value of Object.values(node)) {
@@ -96,27 +63,28 @@ function nestedNodes(node: Record<string, unknown>): unknown[] {
   return nested;
 }
 
-// Narrower than the shim's WHITESPACE_ONLY, on purpose - do NOT "unify" them. This class drives
-// COLLAPSING runs inside real text content, where `&nbsp;` / `&emsp;` are a deliberate character
-// an author typed, not formatting; folding them into a plain space would change what renders.
-// The shim can be wider because it only ever DROPS, and only under a parent that cannot paint
-// text at all. Same reason Svelte's own regex_not_whitespace excludes nbsp.
+// Narrower than the renderer's `isWhitespaceOnly` on purpose, do NOT unify them
+// This one collapses runs inside real text, where `&nbsp;` is a character the author typed
 const WHITESPACE_RUN = /[ \t\r\n]+/g;
+
+function editOfTextNode(node: Record<string, unknown>): IEdit | undefined {
+  const start = numberAt(node, 'start');
+  const end = numberAt(node, 'end');
+  const data = stringAt(node, 'data');
+  if (start === undefined || end === undefined || data === undefined)
+    return undefined;
+  return textEdit(start, end, data);
+}
 
 function collectEdits(nodes: unknown[], edits: IEdit[]): void {
   for (const node of nodes) {
     if (!isRecord(node)) continue;
-    if (node.type === 'Text') {
-      const start = numberAt(node, 'start');
-      const end = numberAt(node, 'end');
-      const data = stringAt(node, 'data');
-      if (start !== undefined && end !== undefined && data !== undefined) {
-        const edit = textEdit(start, end, data);
-        if (edit !== undefined) edits.push(edit);
-      }
+    if (node.type !== TEXT_NODE_TYPE) {
+      collectEdits(nestedNodes(node), edits);
       continue;
     }
-    collectEdits(nestedNodes(node), edits);
+    const edit = editOfTextNode(node);
+    if (edit !== undefined) edits.push(edit);
   }
 }
 
@@ -125,8 +93,7 @@ function textEdit(start: number, end: number, data: string): IEdit | undefined {
   WHITESPACE_RUN.lastIndex = 0;
   const collapsed = data.replace(WHITESPACE_RUN, ' ');
   if (collapsed.trim() === '') {
-    // Whitespace-only node: delete it only if the original spanned a line break, else leave it
-    // as the single collapsed space.
+    // Whitespace-only node: delete it only if the original spanned a line break
     return data.includes('\n')
       ? { start, end, text: '' }
       : { start, end, text: collapsed };
@@ -135,7 +102,7 @@ function textEdit(start: number, end: number, data: string): IEdit | undefined {
   return { start, end, text: collapsed };
 }
 
-// Applied back-to-front so an earlier edit's offsets stay valid, same as scoped-styles.ts.
+// Applied back-to-front so an earlier edit's offsets stay valid, same as scoped-styles.ts
 function applyEdits(content: string, edits: IEdit[]): string {
   return [...edits]
     .sort((left, right) => right.start - left.start)

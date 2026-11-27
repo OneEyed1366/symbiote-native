@@ -3,6 +3,7 @@ import { CUSTOM_ELEMENTS_SCHEMA, Component } from '@angular/core';
 import { createLiveTree } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/angular';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from 'react-native-reanimated/src/common';
 import { WorkletEventHandler } from 'react-native-reanimated/src/WorkletEventHandler';
 import { installWrapperHost } from '../../test-support/wrapper-host';
 import { renderComposable } from '../../test-support/render-angular-composable';
@@ -128,6 +129,34 @@ describe('Animated.ScrollView with a scrollViewOffset', () => {
     await mountScrollView({});
 
     expect(registered).toHaveLength(0);
+  });
+});
+
+describe('useScrollOffset on the ref of an Animated.ScrollView', () => {
+  it('listens to the view, and reports no ref that is still to get one', async () => {
+    // The offset is asked for in the parent, before the scroll view that takes the ref exists
+    @Component({
+      selector: 'offset-host',
+      standalone: true,
+      imports: [AnimatedScrollView],
+      schemas: [CUSTOM_ELEMENTS_SCHEMA],
+      template: `<AnimatedScrollView [animatedRef]="scroller" />`,
+    })
+    class OffsetHost {
+      readonly scroller = hooks.useAnimatedRef();
+      constructor() {
+        hooks.useScrollOffset(this.scroller);
+      }
+    }
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    mount(ROOT_TAG, OffsetHost);
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+
+    expect(registered).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 

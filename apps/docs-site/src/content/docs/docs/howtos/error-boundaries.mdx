@@ -7,10 +7,10 @@ import { Aside } from '@astrojs/starlight/components';
 
 Svelte 5 and Solid both ship a real error-boundary primitive -
 `<svelte:boundary>` and solid-js's `<ErrorBoundary>`, re-exported verbatim
-from the Solid adapter barrel. React and Vue don't: React's class-component
-`componentDidCatch` boundary is not exposed as a documented pattern in the
-[React API](/docs/api/react/), and Vue's nearest tool, `onErrorCaptured`, is a
-different shape — a hook you write yourself, not a template construct with
+from the Solid adapter barrel. React and Vue don't ship one here.
+React's class-component `componentDidCatch` boundary is not a documented pattern
+in the [React API](/docs/api/react/). Vue's nearest tool, `onErrorCaptured`, is a
+different shape. It is a hook you write yourself, not a template construct with
 its own fallback UI. If you need the same fallback-UI behavior on those
 adapters today, you're on your own.
 
@@ -59,14 +59,14 @@ but silently doesn't work:
 
 `{@const}` compiles to `$.derived(...)`, and a derived value nothing reads is
 never evaluated — the capture silently never runs. Route it through a prop
-bag expression instead, since `set_custom_element_data` always evaluates its
-argument:
+bag expression instead, since the template effect that sets an attribute always
+evaluates its expression:
 
 ```svelte
 {#snippet failed(error, reset)}
-  <symbiote-view p={control.failedBag(reset)}>
-    <symbiote-text p={{}}>{error.message}</symbiote-text>
-  </symbiote-view>
+  <view p={control.failedBag(reset)}>
+    <text>{error.message}</text>
+  </view>
 {/snippet}
 ```
 
@@ -169,10 +169,9 @@ difficulty.
 `<ErrorBoundary>` against the engine's fake Fabric and asserts, not just
 compiles:
 
-- a boundary-caught error stays off the native redbox reporter - writing a
-  boundary is the app saying "I'm handling this," so a full-screen redbox
-  over the fallback it just painted would contradict that, matching React's
-  and Vue's adapters;
+- a boundary-caught error stays off the native redbox reporter, as in the React
+  and Vue adapters. Writing a boundary is the app saying "I'm handling this,"
+  and a full-screen redbox over the painted fallback would contradict that;
 - the fallback commits as the real child in place of the thrown subtree.
 
 Verified via vitest against the fake Fabric tree, not yet exercised on a

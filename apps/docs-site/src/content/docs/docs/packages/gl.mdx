@@ -131,8 +131,8 @@ context, take a snapshot to see it), `destroyContextAsync`, `takeSnapshotAsync` 
 | Angular | `@ViewChild(GLView)`, the functions are methods                           |
 
 The handle has `exglCtxId`, `createCameraTextureAsync(camera)` (a native tag or a host node),
-`destroyObjectAsync` and `takeSnapshotAsync`. The context of a view is forgotten when the view
-unmounts.
+`destroyObjectAsync` and `takeSnapshotAsync`. In Svelte, `getContextId()` replaces `exglCtxId`.
+The context of a view is forgotten when the view unmounts.
 
 ## Notes
 

@@ -33,10 +33,8 @@
   import VirtualizedList from '../virtualized-list/index.svelte';
   import { itemComponentOf } from '../virtualized-list/list-props';
   import { pickAccessibilityProps } from '../virtualized-list/virtualized-list-props';
-  import type {
-    IVirtualizedListHandle,
-    IScrollViewHandle,
-  } from '../virtualized-list/virtualized-list-props';
+  import type { IScrollViewHandle } from '@symbiote-native/components';
+  import type { IVirtualizedListHandle } from '../virtualized-list/virtualized-list-props';
   import type { IFlatListProps as IProps } from './flat-list-props';
   import { pickAttachmentProps } from '../../runes/attachments';
 
@@ -47,9 +45,8 @@
     removeClippedSubviewsOrDefault(props.removeClippedSubviews, Platform.OS),
   );
 
-  // $state.raw: the inner VirtualizedList component instance (its exports), held by identity —
-  // same concern as every other handle in this adapter (Switch's hostShim, VirtualizedList's own
-  // scrollHandle over its ShimElement).
+  // `$state.raw`: holds the inner `VirtualizedList` instance (its exports) by identity
+  // Same as the other handles here, such as VirtualizedList's `scrollHandle`
   let inner = $state.raw<IVirtualizedListHandle | null>(null);
 
   const numColumns = $derived(
@@ -123,13 +120,10 @@
     })),
   );
 
-  // Forwarded onto the inner VirtualizedList as a component-prop spread (not a raw attribute
-  // spread on a symbiote-* host tag — that stays banned, svelte-adapter-dom-shim skill §3g(c) —
-  // this lands on another compiled Svelte COMPONENT, an ordinary prop merge). Picked field-by-
-  // field by pickAccessibilityProps, same helper VirtualizedList's own host bag uses.
+  // Spread onto the inner `VirtualizedList` component, an ordinary prop merge (a raw spread on a
+  // `symbiote-*` host tag stays banned); picked by the helper VirtualizedList's own host bag uses
   const accessibilityProps = $derived(pickAccessibilityProps(props));
 
-  // ---- imperative handle: delegate straight through to the inner VirtualizedList instance. ----
   export function scrollToOffset(params: {
     offset: number;
     animated?: boolean;

@@ -8,6 +8,12 @@ name: Checks
 on:
   workflow_call:
 
+# A pull request touching up to NARROW_LIMIT projects runs Lint and Test for those only
+# Anything wider runs the whole suite, which is faster than many per-package vitest starts
+env:
+  NARROW_LIMIT: 15
+  BASE: origin/${{ github.base_ref }}
+
 # THE CANCELLATION LIVES HERE, not in ci.yml: a caller's `concurrency` never reaches the jobs of a
 # workflow it calls, and ci.yml holds no job of its own — only the `uses:` that lands here. Its
 # block has therefore governed nothing since 2026-07-06, when the jobs moved into this file, and
@@ -24,12 +30,9 @@ concurrency:
   cancel-in-progress: ${{ github.workflow == 'CI' }}
 
 jobs:
-  # This exact tree may already have been verified — a push to master re-runs every check on a
-  # merge/squash/rebase commit whose CONTENT was already checked on the PR it came from, just under
-  # a different SHA (all three merge strategies mint a new commit). Keying a cache on the TREE
-  # object (`git rev-parse HEAD^{tree}`) survives that: it is identical whenever the file contents
-  # are, whatever the commit SHA says, and any real change misses the cache and runs everything —
-  # so a hit can only ever skip work that is provably redundant, never real verification.
+  # A merge commit mints a new SHA for content the PR already verified, so the cache keys on the
+  # TREE (`git rev-parse HEAD^{tree}`), identical whenever the contents are
+  # Any real change misses it, so a hit only skips provably redundant work
   gate:
     name: Gate
     runs-on: ubuntu-latest
@@ -111,7 +114,7 @@ jobs:
       # node builtins only.
       - id: arms
         run: |
-          list=$(node -e "import('./scripts/check-packed-consumer-bundles.mjs').then(m => console.log(JSON.stringify(Object.keys(m.FRAMEWORK_EXAMPLES))))")
+          list=$(node -e "import('./scripts/check-packed-consumer-bundles.mjs').then(m => console.log(JSON.stringify(Object.keys(m.MATRIX_EXAMPLES))))")
           echo "list=$list" >> "$GITHUB_OUTPUT"
 
   # Fails a PR whose changed packages outnumber its changesets - see symbiote-release-publishing
@@ -143,8 +146,13 @@ jobs:
     needs: gate
     if: needs.gate.outputs.cache-hit != 'true'
     runs-on: ubuntu-latest
+    outputs:
+      narrowed: ${{ steps.scope.outputs.narrowed }}
     steps:
+      # Full history: `nx affected` diffs against the base branch
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -178,7 +186,20 @@ jobs:
       # log). The day somebody allowlists one, it stops running here and nothing says so.
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - run: pnpm run lint
+      - id: scope
+        run: |
+          narrowed=false
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            count=$(pnpm exec nx show projects --affected --base="$BASE" --json | jq length)
+            if [ "$count" -le "$NARROW_LIMIT" ]; then narrowed=true; fi
+          fi
+          echo "narrowed=$narrowed" >> "$GITHUB_OUTPUT"
+
+      - if: steps.scope.outputs.narrowed == 'true'
+        run: pnpm exec nx affected -t lint --base="$BASE"
+
+      - if: steps.scope.outputs.narrowed != 'true'
+        run: pnpm run lint
 
   # THE BUILD RUNS HERE AND NOWHERE ELSE IN THIS FILE. `prepublish-build` is a superset of
   # `typecheck` — it starts with `clean:build && tsc --build` and then adds the three emit fixups and
@@ -218,18 +239,9 @@ jobs:
 
       - run: pnpm run prepublish-build
 
-      # `tsconfig.tsbuildinfo` is deliberately NOT in here. Its only consumer downstream is
-      # `adapters/svelte`'s `prepack`, which runs its own `tsc --build`; shipping a build-info file
-      # whose recorded mtimes no longer match the freshly-checked-out sources is how you get tsc to
-      # declare everything up to date and emit NOTHING into a build/ that then looks populated
-      # because the artifact filled it. `scripts/clean-build-outputs.mjs` documents that failure in
-      # its own words. Without the file that prepack simply redoes its work, which is slower and
-      # cannot be wrong.
-      #
-      # `core/*/build-ngc` matches nothing today (no core package is an Angular library) and is
-      # listed anyway — `if-no-files-found` fires only when EVERY pattern is empty, so an unmatched
-      # one costs nothing, while an omitted one silently drops the day a core package gains AOT
-      # output. Same deny-list-over-allow-list reasoning as the gate's tree hash above.
+      # `tsconfig.tsbuildinfo` stays out: stale mtimes make tsc emit nothing into a filled build/
+      # `core/*/build-ngc` matches nothing today, but `if-no-files-found` fires only when EVERY
+      # pattern is empty, so an omitted one would silently drop a future core AOT output
       - uses: actions/upload-artifact@v4
         with:
           name: build-output
@@ -248,8 +260,12 @@ jobs:
     needs: gate
     if: needs.gate.outputs.cache-hit != 'true'
     runs-on: ubuntu-latest
+    outputs:
+      narrowed: ${{ steps.scope.outputs.narrowed }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
 
@@ -262,7 +278,24 @@ jobs:
       # output at all and passed.
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - run: pnpm run test
+      - id: scope
+        run: |
+          narrowed=false
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            count=$(pnpm exec nx show projects --affected --base="$BASE" --json | jq length)
+            if [ "$count" -le "$NARROW_LIMIT" ]; then narrowed=true; fi
+          fi
+          echo "narrowed=$narrowed" >> "$GITHUB_OUTPUT"
+
+      # `tests/` and the node tests belong to no project, so they run whatever is affected
+      - if: steps.scope.outputs.narrowed == 'true'
+        run: |
+          pnpm exec nx affected -t test --base="$BASE"
+          pnpm exec vitest run tests/
+          pnpm run test:node
+
+      - if: steps.scope.outputs.narrowed != 'true'
+        run: pnpm run test
 
   # THE ONE JOB THAT COMMITS INTO THE ENGINE THAT SHIPS. `pnpm test` drives a fake
   # `nativeFabricUIManager`; this one builds ReactCommon for the host and evaluates every
@@ -289,11 +322,8 @@ jobs:
       # A cold build compiles some sixty ReactCommon modules; nothing else in this file is cold for
       # minutes, which is what makes the cache worth having.
       CMAKE_CXX_COMPILER_LAUNCHER: ccache
-      # NOT `runner.temp`, which is what `bundle-isolation` below uses — that context does not exist
-      # at JOB level (github / needs / strategy / matrix / vars / inputs only), and naming it here
-      # does not fail the job, it rejects the whole WORKFLOW FILE: run 35568194451 reported "this run
-      # likely failed because of a workflow file issue" with zero jobs and no annotation to read.
-      # `bundle-isolation` gets away with it because both of its uses are on STEPS.
+      # Not `runner.temp`: that context is missing at JOB level, and naming it rejects the whole
+      # workflow file with zero jobs and no annotation (run 35568194451)
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 2G
       # WHY THE TWO ARMS DID NOT SHARE A SINGLE OBJECT ON THE FIRST RUN. This build is Debug (asserts
@@ -405,24 +435,9 @@ jobs:
       # does not — drop the artifact and this flag together, or the tarballs ship empty.
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
-      # The build arrives instead of being repeated. Every tarball's publishConfig points at build/
-      # (and build-ngc/ for Angular), so it has to be on disk before anything packs — it just does
-      # not have to be MADE here, six times, from the same commit. No `path:`, so it extracts at the
-      # workspace root, which is where the upload's own paths are relative to: v4 stores entries
-      # under the least common ancestor of everything it matched, and matches land in all three of
-      # `core/`, `adapters/` and `packages/`, so that ancestor is the repo root. If output ever
-      # survived in only ONE of the three, the ancestor would shift down and every entry would
-      # arrive one level too high.
-      #
-      # Two packages rebuild themselves during `pnpm pack` regardless, through their own `prepack`:
-      # `adapters/angular` (`ng:build`, which wipes its build/ first) and `adapters/svelte`. That is
-      # their own guard and it is left alone — the artifact carries 59 output directories across 34
-      # packages, so it saves the other 32.
-      #
-      # This arm then packs the direct @symbiote-native dependencies of its own standalone canary
-      # example, installs them into a disposable npm consumer, type-checks/AOT-builds the app, and
-      # creates iOS + Android Metro production bundles. One arm per example, not per adapter —
-      # vue-sfc and vue-tsx both consume @symbiote-native/vue.
+      # Packs need build/ and build-ngc/ on disk, so the artifact arrives instead of six rebuilds
+      # No `path:`: entries are relative to the repo root, the common ancestor of all three groups
+      # `adapters/angular` and `adapters/svelte` still rebuild in their own `prepack`
       - uses: actions/download-artifact@v4
         with:
           name: build-output
@@ -466,8 +481,10 @@ jobs:
       needs.gate.outputs.cache-hit != 'true' &&
       needs['changeset-status'].result == 'success' &&
       needs.lint.result == 'success' &&
+      needs.lint.outputs.narrowed != 'true' &&
       needs.typecheck.result == 'success' &&
       needs.test.result == 'success' &&
+      needs.test.outputs.narrowed != 'true' &&
       needs.itest.result == 'success' &&
       (needs['bundle-isolation'].result == 'success' ||
       needs['bundle-isolation'].result == 'skipped')
@@ -480,10 +497,8 @@ jobs:
           path: .checks-passed
           key: checks-passed-${{ needs.gate.outputs.tree }}
 
-  # The bundle matrix's own record, keyed on the narrowed hash. Deliberately NOT folded into
-  # `mark-passed`: that one says "this whole tree is verified" and must not be written when the
-  # arms were skipped, while this one says "this bundle-relevant content is verified" and is the
-  # only thing a later prose-only commit can inherit. One key per claim.
+  # Own record keyed on the narrowed hash, not folded into `mark-passed`: that one claims the
+  # whole tree and must not be written when the arms were skipped
   mark-bundle-passed:
     name: Mark bundle tree as passed
     needs: [gate, bundle-isolation]

@@ -176,15 +176,21 @@ export function insertBefore(
 // Removal only NOMINATES a behavior for teardown and the commit sweep decides, т.к. a framework may
 // spell a move as remove-then-reinsert and the machine must survive it
 export function removeChild(
-  requestedParent: ISymbioteNode,
+  askedParent: ISymbioteNode,
   child: ISymbioteNode,
 ): void {
   // A wrap claim leaving: the owner takes its own place back and stays in the tree, nominated for
   // teardown like any other removed node т.к. the wrapper IS leaving
-  if (unwrapsOwner(requestedParent, child)) {
+  if (unwrapsOwner(askedParent, child)) {
     if (owesTeardown()) markDetachCandidate(child);
     return;
   }
+  // An adapter that asks the host for a wrapped owner's parent is told the wrapper, which holds it
+  // Removing the owner from there leaves the wrapper in the tree, so the owner's real place is used
+  const requestedParent =
+    askedParent === child.wrapper
+      ? (holderOf(askedParent) ?? askedParent)
+      : askedParent;
   // A slot that IS the child being removed stops being one. Without the clear, `hostFor` below
   // redirects the removal into the node being removed and the next child nests inside the orphan
   if (requestedParent.childHost === child)
@@ -192,7 +198,8 @@ export function removeChild(
   const parent = hostFor(requestedParent, child);
   // `hasAttachedBehaviors`, not `hasHostBehaviors`: the latter is on from module load in every app
   // just from registering Pressable as a type
-  if (owesTeardown()) markDetachCandidate(child);
+  // The wrapper is nominated: a wrapped owner still has it as a parent and would not read as gone
+  if (owesTeardown()) markDetachCandidate(placedNode(child));
   // BOTH, and the owner is the one that matters: a composed primitive's behavior lives on the node
   // the adapter named, while `hostFor` redirects the mutation into its internal slot
   armCommitHookForChildChange(requestedParent);

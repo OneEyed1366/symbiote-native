@@ -37,17 +37,23 @@ import {
 const ROUTE = ROUTE_NAME.AppleAuthentication;
 const IS_IOS = Platform.select({ ios: true, default: false });
 
+// A parameter narrows away the `null`, two `credential()` calls in the JSX do not
+function describeFullName(fullName: IAppleAuthenticationCredential['fullName']) {
+  if (fullName === null) return 'null';
+  return formatFullName(fullName, 'medium');
+}
+
 function CredentialCard(props: { credential: IAppleAuthenticationCredential | null }) {
   return (
     <Show
       when={props.credential}
       fallback={<ResultRow testID="apple-credential-empty" label="Credential" value="none yet" />}
     >
-      {credential => (
+      {(credential: () => IAppleAuthenticationCredential) => (
         <view testID="apple-credential">
           <ResultRow testID="apple-user" label="user (stable id)" value={credential().user} />
           <ResultRow testID="apple-email" label="email (first sign-in only)" value={credential().email ?? 'null'} />
-          <ResultRow testID="apple-name" label="fullName (first sign-in only)" value={credential().fullName === null ? 'null' : formatFullName(credential().fullName, 'medium')} />
+          <ResultRow testID="apple-name" label="fullName (first sign-in only)" value={describeFullName(credential().fullName)} />
           <ResultRow testID="apple-real-user" label="realUserStatus" value={REAL_USER_LABEL[credential().realUserStatus]} />
           <ResultRow testID="apple-identity-token" label="identityToken (send to your server)" value={preview(credential().identityToken)} />
           <ResultRow testID="apple-auth-code" label="authorizationCode" value={preview(credential().authorizationCode)} />
@@ -198,7 +204,6 @@ function ButtonGallery(props: { color: string }) {
 }
 
 export function AppleAuthenticationScreen() {
-  const color = lineColorOf(ROUTE);
   const [credential, setCredential] = createSignal<IAppleAuthenticationCredential | null>(null);
   const [isAvailable, setIsAvailable] = createSignal('checking…');
   onMount(async () => {
@@ -208,6 +213,7 @@ export function AppleAuthenticationScreen() {
       setIsAvailable('error');
     }
   });
+  const color = lineColorOf(ROUTE);
   return (
     <ScreenShell
       route={ROUTE}

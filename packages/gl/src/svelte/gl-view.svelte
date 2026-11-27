@@ -2,9 +2,10 @@
   import DescriptorHost from '@symbiote-native/svelte/descriptor-host';
   import { useNativeViewController } from '@symbiote-native/svelte/runes/use-native-view-controller';
   import { createGLView } from '../core';
+  import type { IViewProps } from '@symbiote-native/svelte';
   import type { IGLViewProps } from '../core';
 
-  const props: IGLViewProps = $props();
+  const props: IGLViewProps & Pick<IViewProps, 'class'> = $props();
   const view = useNativeViewController(createGLView, () => ({ ...props }));
 
   // The functions of the view are instance members, `bind:this` reaches them

@@ -4,9 +4,9 @@ The SolidJS canary for SymbioteNative: compiled Solid JSX driving real native iO
 through `@symbiote-native/engine`, with React's renderer nowhere in the path.
 
 `App.tsx` composes the native stack navigator (`@symbiote-native/navigation/solid`) over the demo
-screens: Menu is the initial route, Canary the every-primitive surface, plus the animated, list,
-hooks, tabs, drawer, deep-linking, header-options and API-playground stops. See the adapter's own
-[README](../../adapters/solid/README.md) for current status.
+screens. Menu is the initial route and Canary is the every-primitive surface. The other stops are
+animated, list, hooks, tabs, drawer, deep-linking, header-options and API playground.
+See the adapter's own [README](../../adapters/solid/README.md) for current status.
 
 > This canary predates `@symbiote-native/cli` and is for in-repo development. To start a new app,
 > use `npx @symbiote-native/cli new --framework solid` instead.
@@ -28,6 +28,11 @@ npm run android
 matches what a real npm consumer gets — always install from inside this directory, never with
 `pnpm` from the repo root. `npm run dev` is Metro with `--reset-cache`; editing `metro.config.js`
 or `babel.config.js` needs it, editing a `.tsx` file does not.
+
+After any reinstall of `node_modules`, run `npm run dev` once and load the app before a Release build.
+Worklets Bundle Mode writes files into `react-native-worklets/.worklets`, and Metro's cache outlives
+them. The build then fails with `ENOENT` on `.worklets/<id>.js`
+([reanimated#11313](https://github.com/software-mansion/react-native-reanimated/issues/11313)).
 
 ## What is wired, and the one piece of boilerplate
 

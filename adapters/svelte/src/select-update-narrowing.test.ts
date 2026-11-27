@@ -1,10 +1,6 @@
-// Where a benchmark Select does and does not cost this adapter: Svelte narrows at the
-// component-prop boundary, so this adapter is touched ONCE per select. The residue is Svelte's
-// own invalidation of per-row prop expressions, not this shim's `foldHostBag`/diff cycle.
-//
-// The row shape is copied from examples/svelte/components/BenchmarkRow.svelte and
-// BenchmarkScreen's `isSelected={row.id === selectedId}`; the counters are threaded through the
-// compiled sources so they measure the real compiled output rather than a hand-built stand-in.
+// A select touches the adapter once: Svelte narrows at the component-prop boundary
+// The residue is Svelte's own re-run of the per-row prop expressions, not the bag diff
+// The counters sit in the compiled sources, the row copies the example's `BenchmarkRow`
 import { afterAll, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { rmSync, writeFileSync } from 'node:fs';
@@ -16,6 +12,7 @@ import {
 } from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
+import symbioteRenderer from './symbiote-renderer';
 
 if (globalThis.window === undefined)
   Object.assign(globalThis, { window: globalThis });
@@ -26,6 +23,9 @@ const fabric = installRecordingFabric();
 const live = createLiveTree(fabric);
 const ROW_OUT = join(__dirname, '.smoke-compiled-select-row.mjs');
 const APP_OUT = join(__dirname, '.smoke-compiled-select-app.mjs');
+const ROOT_TAG = 9_400;
+const ROW_COUNT = 1_000;
+const SELECTED_ROW = 500;
 
 const COMPILE_OPTIONS = {
   generate: 'client',
@@ -70,89 +70,93 @@ const APP_SOURCE = [
   '{/each}',
 ].join('\n');
 
+function compileToFile(source: string, filename: string, out: string): void {
+  writeFileSync(out, compile(source, { ...COMPILE_OPTIONS, filename }).js.code);
+}
+
+async function loadApp(): Promise<Component> {
+  compileToFile(ROW_SOURCE, 'Row.svelte', ROW_OUT);
+  compileToFile(APP_SOURCE, 'App.svelte', APP_OUT);
+  const mod: unknown = await import(`file://${APP_OUT}?arm=1`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod))
+    throw new Error('App.svelte produced no default export');
+  const component: unknown = mod.default;
+  if (typeof component !== 'function')
+    throw new Error('App.svelte default export is not a component');
+  return component;
+}
+
+function readCounter(name: string): number {
+  const value: unknown = Reflect.get(globalThis, name);
+  return typeof value === 'number' ? value : 0;
+}
+
+function resetCounter(name: string): void {
+  Reflect.set(globalThis, name, 0);
+}
+
+function selectRow(id: number): void {
+  const select: unknown = Reflect.get(globalThis, '__selectRow');
+  if (typeof select !== 'function') throw new Error('the probe has no select');
+  select(id);
+}
+
+// The class reaches Fabric folded into `nativeID`, so the read is the payload's and not the bag's
+function nativeIdOf(testID: string): unknown {
+  const hit = live.findLive(
+    live.appRoot(),
+    node => node.payload.testID === testID,
+  );
+  return hit?.payload.nativeID;
+}
+
+// Counts the bag writes on the renderer object itself, so the shipped code stays untouched
+function countBagWrites(): { read: () => number; restore: () => void } {
+  const realSetAttribute = symbioteRenderer.setAttribute;
+  let calls = 0;
+  symbioteRenderer.setAttribute = (element, key, value) => {
+    if (key === 'p') calls += 1;
+    realSetAttribute(element, key, value);
+  };
+  return {
+    read: () => calls,
+    restore: () => {
+      symbioteRenderer.setAttribute = realSetAttribute;
+    },
+  };
+}
+
 describe('a select-shaped update on a 1 000-row list', () => {
   it('counts how much of pass 1 runs per row', async () => {
-    writeFileSync(
-      ROW_OUT,
-      compile(ROW_SOURCE, { ...COMPILE_OPTIONS, filename: 'Row.svelte' }).js
-        .code,
-    );
-    writeFileSync(
-      APP_OUT,
-      compile(APP_SOURCE, { ...COMPILE_OPTIONS, filename: 'App.svelte' }).js
-        .code,
+    const App = await loadApp();
+    const bagWrites = countBagWrites();
+    const rows = Array.from({ length: ROW_COUNT }, (_unused, id) => ({ id }));
+    mount(ROOT_TAG, App, { rows, initial: -1 });
+    await settle();
+    expect(nativeIdOf(`row-${SELECTED_ROW}`), 'row starts unselected').toBe(
+      'unsel',
     );
 
-    // Count `set p` by instrumenting the prototype rather than the class body, so the shipped
-    // code is untouched and the count is of the REAL setter.
-    const { ShimElement } = await import('./dom-shim');
-    const descriptor = Object.getOwnPropertyDescriptor(
-      ShimElement.prototype,
-      'p',
-    );
-    if (descriptor?.set === undefined) throw new Error('no p setter to count');
-    const realSet = descriptor.set;
-    let setPCalls = 0;
-    Object.defineProperty(ShimElement.prototype, 'p', {
-      ...descriptor,
-      set(value: unknown) {
-        setPCalls += 1;
-        realSet.call(this, value);
-      },
-    });
-
-    const rows = Array.from({ length: 1_000 }, (_unused, index) => ({
-      id: index,
-    }));
-    const { default: App } = (await import(`file://${APP_OUT}?arm=1`)) as {
-      default: Component;
-    };
-    mount(9_400, App, { rows, initial: -1 });
+    const writesAtMount = bagWrites.read();
+    resetCounter('__rowBagEvals');
+    resetCounter('__isSelEvals');
+    selectRow(SELECTED_ROW);
     await settle();
 
-    // The class reaches Fabric folded into `nativeID`, so the read is the payload's, not the bag's.
-    const classOf = (testID: string): unknown => {
-      const hit = live.findLive(
-        live.appRoot(),
-        node => node.payload.testID === testID,
-      );
-      if (hit === undefined) return undefined;
-      return hit.payload.nativeID ?? 'NO-NATIVE-ID';
-    };
-    const before = JSON.stringify(classOf('row-500'));
-    const select = (globalThis as { __selectRow?: (id: number) => void })
-      .__selectRow;
-    const hasSelect = typeof select === 'function';
-    setPCalls = 0;
-    const g = globalThis as {
-      __rowBagEvals?: number;
-      __isSelEvals?: number;
-    };
-    g.__rowBagEvals = 0;
-    g.__isSelEvals = 0;
-    select?.(500);
-    await settle();
+    const bagEvalsOnSelect = readCounter('__rowBagEvals');
+    const propEvalsOnSelect = readCounter('__isSelEvals');
+    const writesOnSelect = bagWrites.read() - writesAtMount;
+    const selectedAfter = nativeIdOf(`row-${SELECTED_ROW}`);
+    bagWrites.restore();
+    unmount(ROOT_TAG);
 
-    // Snapshot BEFORE arm 2 mounts, or its 1 000 mount-time evaluations land in these counters.
-    const bagEvalsOnSelect = g.__rowBagEvals ?? 0;
-    const isSelEvalsOnSelect = g.__isSelEvals ?? 0;
-    const after = JSON.stringify(classOf('row-500'));
-    Object.defineProperty(ShimElement.prototype, 'p', descriptor);
-    unmount(9_400);
-
-    expect(hasSelect, 'the probe could drive a selection').toBe(true);
-    expect(before, 'row 500 started unselected').toBe('"unsel"');
-    expect(after, 'and the selection reached Fabric').toBe('"sel"');
-
-    // THE FINDING. Svelte narrows 1 000 invalidations to ONE bag rebuild at the component-prop
-    // boundary, so a select costs this adapter one `set p`, not a thousand.
+    expect(selectedAfter, 'the selection reached Fabric').toBe('sel');
+    // Svelte narrows 1 000 invalidations to one bag rebuild at the component-prop boundary
     expect(bagEvalsOnSelect, 'exactly one row rebuilt its bag').toBe(1);
-    expect(setPCalls, 'and reached the shim exactly once').toBe(1);
-    // The other side of the same fact, and the reason the wall time is not free: the each-block's
-    // own prop expression re-runs for EVERY row, because all 1 000 read `selectedId`.
-    expect(
-      isSelEvalsOnSelect,
-      'while every row re-evaluated its own prop',
-    ).toBe(1_000);
+    expect(writesOnSelect, 'and reached the renderer exactly once').toBe(1);
+    // The wall time is not free: the each-block's prop expression re-runs for every row
+    expect(propEvalsOnSelect, 'while every row re-evaluated its own prop').toBe(
+      ROW_COUNT,
+    );
   });
 });

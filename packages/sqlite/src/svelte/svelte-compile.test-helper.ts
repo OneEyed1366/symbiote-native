@@ -1,13 +1,10 @@
-// The compile-and-load harness `SQLiteProvider.smoke.test.ts` uses. Copied verbatim (mechanism,
-// not content — nothing here is navigation-specific) from
-// packages/navigation/src/svelte/svelte-compile.test-helper.ts, which is not part of that
-// package's public exports (a co-located test helper), so it can't be imported across the
-// package boundary.
+// The compile-and-load harness `SQLiteProvider.smoke.test.ts` uses, copied verbatim from
+// `packages/navigation/src/svelte/svelte-compile.test-helper.ts`
+// It is a co-located helper outside the public exports, so it cannot be imported across packages
 //
-// There is no `.svelte`-aware bundler wired into this repo's vitest (svelte-adapter-dom-shim
-// skill §15, a deliberate choice), so a test that needs to RUN a component compiles the real
-// source with `svelte/compiler` itself and dynamic-`import()`s the output. Three rules fall out
-// of that, all of them learned the hard way in the navigation adapter's own smokes:
+// There is no `.svelte`-aware bundler in this repo's vitest, so a test that needs to RUN a
+// component compiles the real source with `svelte/compiler` and dynamic-`import()`s the output
+// Three rules fall out of that:
 //
 //  1. The compiled file must sit NEXT TO the real source, because its own relative imports
 //     resolve from wherever the compiled FILE lives, not from where the source did.

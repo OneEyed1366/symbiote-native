@@ -2,24 +2,21 @@
 // returns a framework-agnostic `Descriptor` tree; this materializes it as real engine nodes that
 // flow on through the universal renderer -> engine -> Fabric, exactly like compiled JSX would.
 //
-// IT TAKES AN ACCESSOR, not a Descriptor — and that is the whole design, not a convenience.
-// React's and Vue's bridges are plain recursive walkers that rebuild the element tree on every
-// render because those frameworks re-run a component's body and diff the result. Solid runs a
-// component body ONCE; there is no re-render and no diff. So a `descriptorToSolid(descriptor)`
-// taking a value would paint the mount-time props and then freeze — every later `value` change
-// invisible. Returning a fresh tree from an accessor instead is worse than frozen: Solid's
-// insertExpression would REPLACE the node, destroying the identity that dispatchViewCommand, the
-// commit mirror and native-owned state (a Switch's own grip, a TextInput's cursor) all key on.
+// It takes an accessor, not a Descriptor, and that is the whole design
+// React and Vue bridges rebuild the tree on every render, as those frameworks re-run a body
+// Solid runs a body once, so a bridge taking a value would paint the mount-time props and freeze
+
+// Returning a fresh tree from an accessor is worse than frozen: `insertExpression` would replace
+// the node, destroying the identity that `dispatchViewCommand`, the commit mirror and
+// native-owned state (a Switch's grip, a TextInput's cursor) all key on
+
+// So the tree is built once and every node's props go through the renderer's own `spread`
+// It is a render effect that diffs prop by prop and calls `setProperty` -> `routeProp` only for
+// changed ones, with the same node identity as compiled `<switch value={v()} />`
 //
-// So the tree is built ONCE and every node's props are wired through the renderer's own `spread`,
-// which is a render effect that diffs prop-by-prop against the previous values and calls
-// setProperty -> routeProp only for the ones that actually changed. Same mechanism, same node
-// identity, as compiled `<switch value={v()} />`.
-//
-// This relies on `render-*.ts` producing a SHAPE-STABLE Descriptor: same type, same child count,
-// text where text was — only prop VALUES vary between calls. That is already the contract the
-// Svelte bridge depends on (svelte-adapter-dom-shim skill §15/§19); a violation throws here rather
-// than silently painting a half-updated tree.
+// This relies on `render-*.ts` producing a shape-stable Descriptor: same type, same child count,
+// text where text was, only prop values vary between calls
+// The Svelte bridge relies on the same contract, a violation throws instead of a half-updated tree
 
 import { createMemo, createRenderEffect, type JSX } from 'solid-js';
 import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
@@ -41,9 +38,8 @@ import {
 // resolveAccessibilityProps — see that module's header.
 import { withStableKeys } from './utils/stable-keys';
 
-// The predicates belong to @symbiote-native/components, next to the Descriptor whose contract they
-// guard — this bridge and Svelte's had each grown a private copy, and the two had already drifted
-// to different coverage.
+// The predicates live in `@symbiote-native/components`, next to the contract they guard
+// This bridge and Svelte's each had a private copy, and the two had drifted apart in coverage
 const shape = createDescriptorShapeGuard('descriptorToSolid');
 
 function childAt(
@@ -99,9 +95,9 @@ function mountChildren(
     if (typeof initial === 'string') {
       const textNode = createTextNode(initial);
       insertNode(parent, textNode);
-      // The `previous` accumulator is why this is a render effect with a seed rather than a plain
-      // one: the first run must NOT re-write text createTextNode already carries, and a later run
-      // must skip a recomputed-but-unchanged string instead of paying a commit for it.
+      // The `previous` seed makes this a render effect rather than a plain one
+      // The first run must not rewrite the text `createTextNode` carries, and an unchanged
+      // recomputed string must not cost a commit
       createRenderEffect<string>(previous => {
         const value = shape.asText(child());
         if (value !== previous) replaceText(textNode, value);

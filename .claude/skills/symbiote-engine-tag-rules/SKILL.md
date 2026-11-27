@@ -21,10 +21,12 @@ cost per commit   a JSI round trip  none
 ```
 
 **Status: zero `payloadFold` in production.** `IHostBehavior.foldPayload` is declared by nothing that
-ships. The seam stays anyway, for two reasons recorded on the field itself: it is the JS ARM of every
-measurement in `tag-rule-cost.itest.ts` (delete it and the per-node figures that justified every port
-can never be taken again), and it is the declared extension point for a third-party primitive, which
-has no option to write a C++ rule.
+ships. The seam stays anyway, for two reasons recorded on the field itself.
+
+- It is the JS ARM of every measurement in `tag-rule-cost.itest.ts`. Delete it and the per-node
+  figures that justified every port can never be taken again.
+- It is the declared extension point for a third-party primitive, which has no option to write a
+  C++ rule.
 
 ## What may cross
 
@@ -34,8 +36,8 @@ framework or component instance. That may cross. What a browser keeps in the pag
 
 **Stays in JS, by the model and not by omission:**
 
-- **gesture and press machines** — they run at gesture rate and call back into app code
-- **the controlled-input handshake** — the event-count acknowledgement, autofocus
+- **gesture and press machines** - they run at gesture rate and call back into app code
+- **the controlled-input handshake** - the event-count acknowledgement, autofocus
 - **anything only the bundler knows** — `resolveAssetSource` turns `require('./logo.png')` into a
   `{uri,width,height,scale}` by asking METRO'S asset registry, a JS table built at bundle time.
   That belongs to the bundler. It moved EARLIER instead of across: `routeProp` resolves the three
@@ -55,7 +57,7 @@ is meant.
 
 **"JS holds it" is not the same claim as "only JS can compute it."** The first is a wiring question
 and wiring is cheap; the second is the real boundary. Every "cannot be ported" note is worth
-re-reading against that distinction — three of them dissolved under it.
+re-reading against that distinction, three of them dissolved under it.
 
 ## The seams
 
@@ -79,7 +81,7 @@ every seam that existed happened to read upward. Upstream builds that wrapper FR
 in a table frame that has always followed its cells.
 
 What a rule may NOT read: **live JS state** (a value a framework computes per render, a closure, a
-per-frame animated value). That is the browser's own line — a UA rule sees the tree, not the
+per-frame animated value). That is the browser's own line: a UA rule sees the tree, not the
 application's closures.
 
 `IFirstChild` is FIRST child rather than a list, deliberately: the only shape that needs it is a
@@ -95,17 +97,17 @@ prop at all because the behavior OWNS the name and diverts it into a JS stash.
 
 The browser settles it: `addEventListener` is the UA's own API, so a browser knows which of its
 elements carry a click handler while the handler's body stays the page's. One bit crosses per flip;
-the closure never leaves JS. **A flip is a mount-time event** — the engine already refuses to notify
+the closure never leaves JS. **A flip is a mount-time event** - the engine already refuses to notify
 on listener IDENTITY, since a framework hands a fresh closure nearly every render.
 
-It is a **mask, not a bool**, and not for a size reason: `focusable` asks about `onPress` alone while
-`_hasPressHandler` asks about any of four — and "any of four" can go DOWN when one name departs,
-which C++ cannot recompute, because each op is about ONE name.
+It is a **mask, not a bool**, and not for a size reason. `focusable` asks about `onPress` alone while
+`_hasPressHandler` asks about any of four. "Any of four" can go DOWN when one name departs, which
+C++ cannot recompute, because each op is about ONE name.
 
 ### The dirty-marking obligation
 
 A rule runs when **its own** node is dirty. So a rule reading another node re-derives only if a write
-to that other node marks this one — otherwise the derived node freezes at its first frame while the
+to that other node marks this one, otherwise the derived node freezes at its first frame while the
 thing it reads visibly changes around it.
 
 - `slotDerived` on the behavior names which owner props dirty the slot
@@ -113,10 +115,10 @@ thing it reads visibly changes around it.
   label; `markPropsDirty` bubbles UP and nothing would reach it otherwise)
 - `routeProp`'s `node.wrapper` branch carries it for a wrapper reading its child
 - `SLOT_DERIVED_ALL` is the honest spelling for a `cloneElement` owner, which never derived from a
-  NAMED set — it re-clones on every render, whatever changed. Naming the keys was an optimisation
+  NAMED set, it re-clones on every render, whatever changed. Naming the keys was an optimisation
   whose upkeep was a mirror.
 
-The seam did not introduce the requirement — the JS fold had it too. Nothing said so out loud until
+The seam did not introduce the requirement, the JS fold had it too. Nothing said so out loud until
 it was asserted. **Verify it by breaking it**: comment out the mark and the re-derive case must go
 red.
 
@@ -145,7 +147,7 @@ and literally nothing. They land within 1.4 us of each other. The column orders 
 
 Two consequences: **a trivial fold over a large bag is the worst value available**, and **deleting a
 fold that does nothing is worth as much as porting one that does a lot**. `input-accessory-view`'s
-fold took the bag apart and reassembled it unchanged — deleted, not moved, and it had cost 10.7 us
+fold took the bag apart and reassembled it unchanged: deleted, not moved, and it had cost 10.7 us
 per node to have had.
 
 Read the native column as a measurement and the JS column as a floor: a JS fold allocates, so its
@@ -160,17 +162,18 @@ reading back costs eight times sending, because `jsi::dynamicFromValue` does `ge
 per key `getValueAtIndex` + `getString` + a `std::string` allocation + `getProperty`.
 
 **A patch-shaped return was tried and pulled back.** A fold expresses a REMOVAL by not putting the
-key back, so replacing is load-bearing and merging a "superset" restores every stripped key — and
-`jsi::dynamicFromValue` maps JS `null` and `undefined` onto the same `folly::dynamic` nullptr, so no
-value distinguishes "drop this" from "reset to the platform default", which is a real instruction
-Fabric reads. There is no safe subset to convert first. Pinned in
+key back, so replacing is load-bearing and merging a "superset" restores every stripped key.
+Nor can a value carry the removal: `jsi::dynamicFromValue` maps JS `null` and `undefined` onto the
+same `folly::dynamic` nullptr, so nothing distinguishes "drop this" from "reset to the platform
+default". Fabric reads the second as a real instruction. There is no safe subset to convert first.
+Pinned in
 `core/engine/src/__tests__/payload-fold-merge.test.ts`.
 
 ## Traps
 
-**Trap A — a tag rule runs BEFORE the JS fold.** A JS fold reading a key the rule STRIPS reads it
+**Trap A: a tag rule runs BEFORE the JS fold.** A JS fold reading a key the rule STRIPS reads it
 gone. `foldPressableProps` erases `disabled`; two touchables read it out of the bag and would have
-resolved every disabled control as focusable — a focus-order bug visible on a TV remote and in no
+resolved every disabled control as focusable: a focus-order bug visible on a TV remote and in no
 test that reads props. **Anything a JS fold needs after a rule has stripped it must come from
 `propsOf(node)`, not from the bag.** One copy of the expression was corrected and the other was not,
 which is how it shipped.
@@ -184,7 +187,7 @@ stub behavior registered or it measures nothing — and `expectSamePayload` refu
 disagreeing arms is what catches it, not a suspiciously good number.
 
 **A DERIVED node needs its own registration to get a tag across**, even an empty one:
-`registerHostBehavior('activity-indicator-spinner', {attach(){}, detach(){}})`. That is not a trick —
+`registerHostBehavior('activity-indicator-spinner', {attach(){}, detach(){}})`. That is not a trick,
 a registration is how this codebase declares a tag HAS platform semantics, which is exactly the
 claim. Emitting a tag from `createElement` for every node stays rejected: an app's own
 `<div>`-equivalent would pay an intern and an op to name something the host has no rule for.
@@ -223,7 +226,7 @@ component name and tested under the iOS name passes on the host and never runs o
 whole TextInput rule set (controlled `value`, `submitBehavior`, aliases) was dead on Android that way.
 
 **A rule C++ cannot compute exactly stays in JS.** Button's Android title is RN's
-`title.toUpperCase()` — full Unicode; the host has no ICU. It runs at the slot redirect
+`title.toUpperCase()`: full Unicode; the host has no ICU. It runs at the slot redirect
 (`IHostBehavior.slotValueFor`), not as an ASCII approximation in C++.
 
 **A colour int is SIGNED on Android, unsigned on iOS** (RN `processColor.js`: `| 0x0`). Java
@@ -238,7 +241,7 @@ so the seam processes them (a string paints nothing; `opaque-color-payload.itest
 Boolean`), iOS tolerates it. A bare attribute arrives as `""` in two places, both fixed 2026-09-23:
 Vue (casts only a DECLARED Boolean prop; `createBareBooleanNodeTransform` in
 `metro-vue-transformer.cjs`) and Svelte on a hyphen-less tag (`<view accessible>` goes through the
-template as `accessible=""`; the DOM shim maps it via the derived `BOOLEAN_PROP_NAMES`). JSX, Svelte
+template as `accessible=""`; `element-props.ts` maps it via the derived `BOOLEAN_PROP_NAMES`). JSX, Svelte
 components and hyphenated tags pass `true`. Angular static attributes are always strings: use
 `[prop]="true"`.
 
@@ -250,14 +253,14 @@ components and hyphenated tags pass `true`. Angular static attributes are always
 second copy of itself is asserted against nothing.
 
 **The JS harness cannot see a rule-ORDERING bug.** It builds payloads through the TypeScript
-`fabric-props.ts`, which carries no tag rules — so a fold reading a key an engine rule removes
+`fabric-props.ts`, which carries no tag rules, so a fold reading a key an engine rule removes
 resolves correctly there and nowhere else. The property that makes that harness correct is the same
 property that blinds it. The shipping `focusable` bug had a vitest case asserting exactly it, and
 passing.
 
 **A case whose subject is a fold moves as a GROUP with its positive twins.** Twice this migration had
-to delete a case that was still GREEN: an absence assertion on a harness that can no longer produce
-the key ("OMITS colour entirely", "does not seed text defaults onto a View") passes forever and means
+to delete a case that was still GREEN.
+An absence assertion on a harness that can no longer produce the key ("OMITS colour entirely", "does not seed text defaults onto a View") passes forever and means
 nothing. A control only controls beside the thing it controls.
 
 **Do not locate a node by the thing under test.** Thirty-six cases went red on one cause: each
@@ -266,9 +269,12 @@ output. The recording host has retained `tagName` all along for exactly this; lo
 POSITION, which the tag guarantees anyway.
 
 **What the adapter half becomes** when the platform half leaves is almost always one of two claims:
-*does this adapter commit the node under the component the rule is keyed on*, and *does an authored
-value reach the engine unchanged* — including the `false` that a `!== false` default exists for,
-which is the value a renderer is most likely to swallow. For aria, assert the AUTHORED hyphenated key
+
+- *does this adapter commit the node under the component the rule is keyed on*
+- *does an authored value reach the engine unchanged*, including the `false` that a `!== false`
+  default exists for, which is the value a renderer is most likely to swallow
+
+For aria, assert the AUTHORED hyphenated key
 arrives: the rule reads `aria-label` literally, and Svelte's compiler really does lowercase static
 attribute names.
 
@@ -277,7 +283,7 @@ composite field by field) and **cannot see a key whose value is `undefined`**.
 
 ## Mirrors
 
-**A second implementation is not automatically a mirror — ask what each one REACHES.** The obvious
+**A second implementation is not automatically a mirror: ask what each one REACHES.** The obvious
 cleanup was wrong twice:
 
 - `foldHostBag`'s alias half LOOKED like a leftover once `id -> nativeID` had a C++ rule. It was not:
@@ -288,7 +294,7 @@ cleanup was wrong twice:
   `packages/slider/src/core/slider-state.ts` must disable the slider's gesture MACHINE from
   `aria-disabled`, in JS, before any commit. **A component whose machine branches on the folded value
   cannot wait for the payload.** A page may ask a browser for an element's computed accessible state;
-  asking is not reimplementing. So the mirror is made LOUD instead —
+  asking is not reimplementing. So the mirror is made LOUD instead:
   `aria-fold-parity.itest.ts` computes the JS fold and commits the same bag through the C++ rule over
   seventeen bags, one per branch, and compares every key. It is the only place the comparison is
   possible, because that harness holds both in one process. It treats `undefined` and a `folly`
@@ -297,7 +303,7 @@ cleanup was wrong twice:
 
 Conversely, what IS a mirror goes: `backgroundProps` in `core/components` duplicated the
 `#ifdef ANDROID` tail of `foldCloneOntoChild`, api-level gate included, with no runtime caller.
-`canUseNativeForeground` sitting beside it stays — it is a QUESTION an app asks the platform (RN's
+`canUseNativeForeground` sitting beside it stays: it is a QUESTION an app asks the platform (RN's
 own public API), not a rule that decides a payload. Two functions in one file, one a mirror and one
 not.
 
@@ -312,7 +318,7 @@ went with the copy the day `IFirstChild` landed.
 that way. A hook that exists to work around a missing seam should be deleted when the seam lands, not
 left to misdirect the next reader. And a **write-only field is worse than a slow one**:
 `node.hasAriaAlias` cost an `isAriaAliasKey(key)` on every one of 13 000 prop writes per create and,
-once the fold left, was read by nothing — it type-checks, tests green, and reads as load-bearing.
+once the fold left, was read by nothing: it type-checks, tests green, and reads as load-bearing.
 
 ## What porting keeps finding
 
@@ -324,10 +330,10 @@ Reading the vendor to port a rule is, empirically, the cheapest bug-finding this
 - neither touchable stripped the six props its feedback machine consumes, two of them FUNCTIONS,
   forwarded to a native view declaring none of them
 - `Switch` announced as a plain view (no default `accessibilityRole`), stretched on iOS (missing the
-  `alignSelf: flex-start` compose), and on Android painted from nothing and could not be disabled —
+  `alignSelf: flex-start` compose), and on Android painted from nothing and could not be disabled,
   we sent the iOS prop names on both platforms
 - `collapsableChildren` honoured `snapToAlignment` on **both** platforms where RN gates that leg to
-  Android — every snapping iOS ScrollView telling Yoga not to flatten its children. **A test pinned
+  Android: every snapping iOS ScrollView telling Yoga not to flatten its children. **A test pinned
   it as correct**, written from our code rather than from upstream: an assertion copied from the
   implementation cannot disagree with it.
 - `decelerationRate` reached Fabric as the string `'fast'` on every Android ScrollView carrying a

@@ -1,75 +1,62 @@
-// `{@attach fn}` support for this adapter's components.
-//
-// WHY IT IS THE ONLY ROUTE. Svelte's compiler rejects `use:` / `transition:` / `class:` /
-// `style:` on a COMPONENT ("This type of directive is not valid on components"), and app code
-// here never authors a host element (skill §7), so a directive is unreachable by construction.
-// Attachments are the exception: `{@attach fn}` compiles on a component, and `fromAction` from
-// `svelte/attachments` converts any third-party action into one. That makes this the single seam
-// through which a Svelte author reaches the committed native node, the twin of Vue's
-// user-defined custom directive (which works untouched in adapters/vue).
-//
-// THE MECHANISM. `{@attach fn}` compiles to a prop whose key is a SYMBOL created by
-// `createAttachmentKey()`, i.e. `Symbol(ATTACHMENT_KEY)`; Svelte's own spread path identifies one
-// by `symbol.description === ATTACHMENT_KEY` (internal/client/dom/elements/attributes.js). Both
-// `rest_props` and `spread_props` expose symbol keys through their `ownKeys` traps, so
-// `Object.getOwnPropertySymbols()` over `$props()` — or over the `...rest` object — finds them.
-//
-// WHY IT DELEGATES TO SVELTE'S OWN `attach()` RATHER THAN CALLING THE FUNCTION DIRECTLY. A
-// DYNAMIC attachment expression does not compile to a changing prop VALUE; the compiler emits a
-// STABLE wrapper and moves the reactivity inside it:
-//
-//   {@attach which === 'first' ? first : second}
-//   ->  [$.attachment()]: ($$node) => ($.get(which) === 'first' ? first : second)($$node)
-//
-// So identity-diffing the prop can never see the swap — the read that changes lives in the
-// attachment BODY. `attach(node, getFn)` (internal/client/dom/elements/attachments.js) is exactly
-// the machinery that handles this: a managed effect around `getFn()` for the identity case, and a
-// branch effect around `fn(node)` so a reactive read inside the body re-runs it with the previous
-// teardown fired first. Reimplementing it would be reimplementing it wrong.
-//
-// WHY A PLAIN `.ts` HERE AND NOT A `.svelte.ts` RUNE. The `$effect` stays at the component call
-// site; this file holds no rune syntax. `.svelte.ts` files are compiled by `compileModule` in
-// Metro (metro-svelte-transformer.cjs) but NOT by vitest, which has no Svelte plugin — so a rune
-// file imported by every component would break every smoke test in this package. Same split, and
-// the same call shape, as `createDescriptorChildrenSync`.
-import { attach } from 'svelte/internal/client';
-import { createAttachmentKey } from 'svelte/attachments';
-import type { ShimElement } from '../dom-shim';
+// `{@attach fn}` is the only directive Svelte compiles on a component, so it is the one route
+// for app code to the native node (`use:` and the rest are rejected there)
 
-// Read off a real key rather than hardcoded: `ATTACHMENT_KEY` lives in svelte/src/constants.js
-// and is not part of the public export surface, so a rename there would otherwise silently
-// disable every attachment. The literal is the fallback for a Svelte build that stops giving the
-// key a description at all.
+// An attachment arrives as a prop keyed by a symbol from `createAttachmentKey()`
+// `Object.getOwnPropertySymbols()` over `$props()` or `...rest` finds it
+
+// A dynamic `{@attach expr}` compiles to a stable wrapper with the reactivity inside it
+// Diffing the prop misses a swap, so we delegate to Svelte's `attach()`, which re-runs the body
+
+// Plain `.ts`, not a `.svelte.ts` rune file, because vitest has no Svelte plugin to compile it
+import { attach } from 'svelte/internal/client';
+import { createAttachmentKey, type Attachment } from 'svelte/attachments';
+import { isSymbioteNode, type ISymbioteNode } from '@symbiote-native/engine';
+
+// Read off a real key because `ATTACHMENT_KEY` is not public, the literal is the fallback
 const ATTACHMENT_KEY_DESCRIPTION =
   createAttachmentKey().description ?? '@attach';
 
 type IAttachmentSync = (
-  host: ShimElement | null | undefined,
+  host: ISymbioteNode | null | undefined,
   props: object,
 ) => void;
 
-// Call once during component init, then drive it from an `$effect`:
-//
-//   const syncAttachments = createAttachmentsSync();
-//   $effect(() => { syncAttachments(hostShim, rest); });
-//
-// That effect depends ONLY on the host ref — the attachment values are read lazily inside
-// `attach`'s own effects, never in the caller's body — so it re-runs only when the host node
-// itself changes, and Svelte then destroys the previous run's child effects (firing every
-// teardown) before the new node is attached to.
+// Call once in component init, then run it from an `$effect` that depends only on the host ref
+// The attachment values are read lazily inside `attach`, so it re-runs only when the host changes
 export function createAttachmentsSync(): IAttachmentSync {
   return (host, props) => {
     if (host === null || host === undefined) return;
-    for (const key of attachmentKeys(props)) {
-      attach(host, () => Reflect.get(props, key));
-    }
+    forwardTo(host, props);
   };
 }
 
-// For a component that delegates to another Symbiote component by naming individual props
-// instead of spreading (the list family, whose wrappers forward ~30 named props, and anything
-// rebuilding its props through a plain string-keyed Record such as Animated's `reduceProps`).
-// Symbol keys do not survive either, so the wrapper re-spreads just the attachment ones.
+function forwardTo(host: ISymbioteNode, props: object): void {
+  for (const key of attachmentKeys(props)) {
+    attach(host, () => Reflect.get(props, key));
+  }
+}
+
+// For a wrapper that owns its host element: `{@attach forwardAttachments(() => props)}` on it
+// Needs no state, as the attachment itself runs once the element exists
+export function forwardAttachments(getProps: () => object): Attachment {
+  return node => {
+    if (isSymbioteNode(node)) forwardTo(node, getProps());
+  };
+}
+
+// Replacement for `bind:this` on an element, which does not compile under `customRenderer`
+export function captureHost(
+  assign: (host: ISymbioteNode | null) => void,
+): Attachment {
+  return node => {
+    if (!isSymbioteNode(node)) return;
+    assign(node);
+    return () => assign(null);
+  };
+}
+
+// For wrappers that forward props by name, so the symbol keys of attachments get lost
+// They re-spread just the attachment ones
 export function pickAttachmentProps(props: object): Record<symbol, unknown> {
   const forwarded: Record<symbol, unknown> = {};
   for (const key of attachmentKeys(props)) {

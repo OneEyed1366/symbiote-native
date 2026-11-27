@@ -10,9 +10,14 @@ const RN_BARREL = /^react-native$/;
 const REACT = /^react$/;
 const EXAMPLE_IMPORTER = /[/\\]examples[/\\]/;
 const PACKAGE_REACT = /^@symbiote-native\/reanimated\/react$/;
-const REANIMATED_IMPORTER = /[/\\](react-native-reanimated|packages[/\\]reanimated)[/\\]/;
+const REANIMATED_IMPORTER =
+  /[/\\](react-native-reanimated|packages[/\\]reanimated)[/\\]/;
 const RN_STUB = 'packages/reanimated/test-support/react-native.ts';
-const BRIDGE ='core/engine/cpp/tests/js/reanimated-layout-config-bridge.ts';
+const BRIDGE = 'core/engine/cpp/tests/js/reanimated-layout-config-bridge.ts';
+// Upstream hooks import the writer by this relative name, and the web one writes to a DOM element
+const UPDATE_PROPS = /^\.\.\/updateProps$/;
+const UPSTREAM_IMPORTER = /[/\\]react-native-reanimated[/\\]src[/\\]/;
+const UPDATE_WRITES = 'core/engine/cpp/tests/js/reanimated-update-writes.ts';
 
 function adapterReact(root) {
   const manifest = path.join(root, 'adapters/react/package.json');
@@ -44,17 +49,17 @@ export function reanimatedItestSeams(root) {
       build.onResolve({ filter: WORKLETS }, () =>
         workletsMock(path.join(root, 'packages/reanimated')),
       );
+      const resolveFor = (filter, importers, target) =>
+        build.onResolve({ filter }, ({ importer }) =>
+          importers.test(importer) ? target() : undefined,
+        );
+      const inRepo = file => () => ({ path: path.join(root, file) });
       // The `react-native` barrel pulls every native module, so Reanimated reads the stub it has
       // under vitest, while deep `react-native/...` imports stay the real ones
-      build.onResolve({ filter: RN_BARREL }, ({ importer }) =>
-        REANIMATED_IMPORTER.test(importer)
-          ? { path: path.join(root, RN_STUB) }
-          : undefined,
-      );
+      resolveFor(RN_BARREL, REANIMATED_IMPORTER, inRepo(RN_STUB));
       // An example app has an install of React of its own, and a second copy splits the hooks
-      build.onResolve({ filter: REACT }, ({ importer }) =>
-        EXAMPLE_IMPORTER.test(importer) ? adapterReact(root) : undefined,
-      );
+      resolveFor(REACT, EXAMPLE_IMPORTER, () => adapterReact(root));
+      resolveFor(UPDATE_PROPS, UPSTREAM_IMPORTER, inRepo(UPDATE_WRITES));
       build.onResolve({ filter: PACKAGE_REACT }, () => ({
         path: path.join(root, 'packages/reanimated/src/react/index.ts'),
       }));

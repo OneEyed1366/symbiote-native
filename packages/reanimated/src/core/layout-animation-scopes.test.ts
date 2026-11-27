@@ -4,6 +4,7 @@ import {
   createElement,
   createSurface,
   getNativeTag,
+  parentOf,
   removeChild,
   routeProp,
   type ISymbioteNode,
@@ -57,27 +58,25 @@ function surfaceWith(root: ISymbioteNode) {
   return surface;
 }
 
-function cancelled(): unknown[] {
+// The ids of every entering call native got, one that only clears a config included
+function entering(): unknown[] {
   return update.mock.calls
-    .filter(([, type, config]) => {
-      return type === LayoutAnimationType.ENTERING && config === undefined;
-    })
+    .filter(([, type]) => type === LayoutAnimationType.ENTERING)
     .map(([id]) => id);
 }
 
 describe('a scope that skips entering', () => {
-  it('cancels the entering animation of a node under it that was made in the same batch', () => {
+  it('gives native no entering animation for a node under it made in the same batch', () => {
     const child = viewWith({ entering: fade });
     const scope = viewWith({ layoutAnimationScope: { skipEntering: true } });
     appendChild(scope, child);
 
     surfaceWith(scope).commit();
 
-    const registered = update.mock.calls[0]?.[0];
-    expect(cancelled()).toEqual([registered]);
+    expect(entering()).toEqual([]);
   });
 
-  it('takes the native id off the node it cancelled', () => {
+  it('mounts the node it skipped without a native id', () => {
     const child = viewWith({ entering: fade });
     const scope = viewWith({ layoutAnimationScope: { skipEntering: true } });
     appendChild(scope, child);
@@ -96,7 +95,29 @@ describe('a scope that skips entering', () => {
 
     surfaceWith(scope).commit();
 
-    expect(cancelled()).toHaveLength(1);
+    expect(entering()).toEqual([]);
+  });
+
+  it('skips a node that was read in its surface before the scope got its props', () => {
+    const scope = viewWith();
+    const surface = surfaceWith(scope);
+    const child = viewWith({ entering: fade });
+    appendChild(scope, child);
+
+    // Angular asks for a parent in the middle of a render, ahead of the bindings of the scope
+    parentOf(child);
+    routeProp(scope, 'layoutAnimationScope', { skipEntering: true });
+    surface.commit();
+
+    expect(entering()).toEqual([]);
+  });
+
+  it('still animates a node that is placed only after the commit that followed its making', () => {
+    viewWith({ entering: fade });
+
+    surfaceWith(viewWith()).commit();
+
+    expect(entering()).toHaveLength(1);
   });
 
   it('lets a node that mounts later animate, once the scope has committed', () => {
@@ -108,7 +129,7 @@ describe('a scope that skips entering', () => {
     const surface = surfaceWith(viewWith());
     surface.commit();
 
-    expect(cancelled()).toEqual([]);
+    expect(entering()).toHaveLength(1);
   });
 });
 
@@ -122,7 +143,7 @@ describe('a scope that is given its props again', () => {
     appendChild(scope, later);
     surfaceWith(viewWith()).commit();
 
-    expect(cancelled()).toEqual([]);
+    expect(entering()).toHaveLength(1);
   });
 
   it('skips exiting by the props it has when it leaves, not the ones it was made with', () => {
@@ -152,7 +173,7 @@ describe('a scope that does not skip entering', () => {
 
     surfaceWith(scope).commit();
 
-    expect(cancelled()).toEqual([]);
+    expect(entering()).toHaveLength(1);
   });
 
   it('stays out of the committed payload', () => {

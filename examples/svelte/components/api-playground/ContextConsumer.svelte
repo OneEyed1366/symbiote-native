@@ -12,9 +12,8 @@
 <script lang="ts">
   import { getAllContexts, getContext, hasContext } from 'svelte';
 
-  // Context follows the RUNTIME render tree, not this file's lexical location — it reads whatever
-  // CompositionDemo.svelte's ancestor instance set, even though this component is defined in a
-  // different module (svelte-adapter-dom-shim skill, "Rendering declarative marker children").
+  // Context follows the runtime render tree, not the lexical location of this file
+  // It reads what the ancestor instance in `CompositionDemo.svelte` set
   const theme = getContext<IApiPlaygroundTheme>(API_PLAYGROUND_THEME_CONTEXT);
   const hasTheme = hasContext(API_PLAYGROUND_THEME_CONTEXT);
   const contextKeyCount = getAllContexts().size;

@@ -18,30 +18,30 @@ navigation-linking.ts  the deep-link config, shared by the root wiring and the D
 screens/               18 screens — CanaryScreen plus the 9 tour stops and their nested children
 components/            the canary's own demo components (Animated, NativeModules, Responder, …)
 metro.config.js        sourceExts += 'svelte' + css family, babelTransformerPath → the Svelte transformer
-svelte.config.js       fragments: 'tree' + css: 'external' — both mandatory, see below
+svelte.config.js       fragments: 'tree' + css: 'external' + the custom renderer, all mandatory, see below
 ```
 
-## The Svelte adapter is a DOM shim, and that shapes this app
+## The Svelte adapter is a custom renderer, and that shapes this app
 
-Svelte's official custom-renderer API ([sveltejs/svelte#18042](https://github.com/sveltejs/svelte/pull/18042))
-is still an unmerged PR, so `@symbiote-native/svelte` instead patches the `globalThis` DOM classes
-and lets stock compiled Svelte output run unchanged. Three consequences show up in this app:
+`@symbiote-native/svelte` drives Svelte's own custom renderer API (`svelte/renderer`), which is
+experimental and needs `svelte >= 5.59.1`. Four consequences show up in this app:
 
-- **`svelte.config.js` is not optional.** `fragments: 'tree'` makes the compiler emit `from_tree()`
-  (element-by-element `document.createElement`) instead of `from_html()` (an `innerHTML` assignment
-  on a `<template>`), so the shim needs no HTML parser. `css: 'external'` keeps Svelte from
-  injecting `<style>` into a `document.head` that does not meaningfully exist.
-- **Markup whitespace is free — write it normally.** It was not always: whitespace between two
-  sibling nodes compiles to a real text node, which used to become an `RCTRawText`, illegal under
-  a non-`Text` parent on device, so this app was packed edge-to-edge. That is fixed structurally —
-  the shim maps a whitespace-only text node under a parent that takes no raw text to an anchor
-  (`svelte-adapter-dom-shim` §16b) — and a sentence wrapped across source lines is folded back to
-  single spaces by `collapseTextWhitespace()` in `svelte.config.js` and in Metro's transformer.
-  `node scripts/audit-svelte-stray-whitespace.mjs` still gates the second half, checking the
+- **`svelte.config.js` is not optional.** `experimental.customRenderer` points the compiler at
+  `@symbiote-native/svelte/renderer`, and `fragments: 'tree'` makes it emit element-by-element
+  creation instead of an `innerHTML` template. `css: 'external'` keeps Svelte from injecting
+  `<style>` into a document that does not exist. Metro also needs
+  `resolver.unstable_conditionNames: ['svelte-custom-renderer', 'browser']`.
+- **Markup whitespace is free, so write it normally.** Whitespace between two sibling nodes
+  compiles to a text node, and the adapter drops one under a parent that takes no raw text.
+  A sentence wrapped across source lines is folded back to single spaces by
+  `collapseTextWhitespace()` in `svelte.config.js` and in Metro's transformer.
+  `node scripts/audit-svelte-stray-whitespace.mjs` gates that second half, checking the
   pipeline's OUTPUT rather than your source: `0 wrapped text nodes`.
-- **Styling goes through plain CSS classes** (`App.css` + `@symbiote-native/css-parser`), not
-  in-component `<style>` blocks — Svelte's own scoped-style path is a documented, not-yet-built
-  seam on this adapter.
+- **The compiler rejects what needs a DOM.** `bind:` on an element, `on:`, `transition:`,
+  `animate:`, `{@html}` and `<svelte:window>`, `<svelte:document>`, `<svelte:body>`,
+  `<svelte:head>` fail at build time. Use `{@attach}` for a host node and `onX={...}` props for events.
+- **Styling goes through plain CSS classes** (`App.css` + `@symbiote-native/css-parser`).
+  A component's own `<style>` block works too and is scoped by default, through `scopedStyles()`.
 
 ## Screens are discovered by self-registration, not by scanning children
 

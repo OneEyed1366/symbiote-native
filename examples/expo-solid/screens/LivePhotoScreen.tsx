@@ -91,7 +91,7 @@ function Player(props: { source: ILivePhotoAsset | null; color: string }) {
           </view>
         }
       >
-        {source => (
+        {(source: () => ILivePhotoAsset) => (
           <LivePhotoView
             testID="live-photo-view"
             ref={setHandle}

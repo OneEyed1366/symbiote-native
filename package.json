@@ -69,6 +69,7 @@
     "globals": "catalog:",
     "husky": "catalog:",
     "lint-staged": "catalog:",
+    "nx": "catalog:",
     "pkg-pr-new": "catalog:",
     "prettier": "catalog:",
     "prettier-plugin-astro": "catalog:",

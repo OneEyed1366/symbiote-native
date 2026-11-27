@@ -23,6 +23,7 @@ import {
   createSurface,
   removeChild,
   routeProp,
+  setText,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
 
@@ -105,6 +106,38 @@ describe('the live tree reads what is on screen, not what was created', () => {
     expect(kids[0].props.testID).toBe('behind-the-anchor');
   });
 
+  // The commit walk skips an empty raw text, and Svelte leaves one per block as its anchor
+  it('leaves out an empty raw text and shows it once it has text', () => {
+    fabric.reset();
+    const surface = createSurface(ROOT_TAG);
+    const root = viewWith({ pointerEvents: 'box-none' });
+    const blank = createRawText('');
+    appendChild(root, blank);
+    appendChild(root, createRawText('shown'));
+    surface.appendChild(root);
+    surface.commit();
+
+    expect(live.texts(root)).toEqual(['shown']);
+    expect(live.nodeOf(root).children).toHaveLength(1);
+
+    setText(blank, 'late');
+    expect(live.nodeOf(root).children).toHaveLength(2);
+  });
+
+  // A test about the adapter's in-place text update asks for the node, not for what is painted
+  it('keeps an empty raw text when asked for the nodes themselves', () => {
+    fabric.reset();
+    const surface = createSurface(ROOT_TAG);
+    const root = viewWith({ pointerEvents: 'box-none' });
+    appendChild(root, createRawText(''));
+    surface.appendChild(root);
+    surface.commit();
+
+    const nodes = createLiveTree(fabric, { keepBlankText: true });
+    expect(nodes.nodeOf(root).children).toHaveLength(1);
+    expect(live.nodeOf(root).children).toHaveLength(0);
+  });
+
   // why: the two readings of a node are easy to confuse and the difference bites — `props` is the
   // author's bag (`style` is still an object), `payload` is what the engine hands the renderer
   // (style flattened, the RN processors run). A test asking about `padding` means the payload.
@@ -125,10 +158,7 @@ describe('the live tree reads what is on screen, not what was created', () => {
     expect(node?.payload.padding, 'flattened into the payload').toBe(7);
   });
 
-  // why: "what does the screen SAY" is the single most repeated question in the converted suite —
-  // six files had hand-rolled the same raw-text walk before it moved here. In TREE order, which is
-  // the half a `findAll` over the recording cannot give: the record is in CREATION order, and for
-  // a list that reorders its rows those two disagree without either being wrong.
+  // The texts come in tree order, as a `findAll` over the recording is in creation order
   it('collects every raw text in tree order', () => {
     fabric.reset();
     const surface = createSurface(ROOT_TAG);
@@ -145,12 +175,8 @@ describe('the live tree reads what is on screen, not what was created', () => {
     expect(live.texts(root)).toEqual(['first', 'second']);
   });
 
-  // why: the anchor-cost probes need the count `censusRetainedTree` used to give them, and that one
-  // is answered by the HOST — truthfully by the TypeScript applier and by nothing else. The native
-  // host returns zeroes on purpose (`native-tree-host.ts`: census is deliberately off the ABI), so
-  // a probe reading it on a device has always seen nothing. The counts those probes actually claim
-  // are the ENGINE's — how many nodes the adapter allocated and how many of them are anchors —
-  // and `isAnchor` is the engine's own answer to the second.
+  // The native host answers a census with zeroes (`native-tree-host.ts`), so the count is read
+  // off the engine's own child links
   it('counts the retained tree without asking a host', () => {
     fabric.reset();
     const surface = createSurface(ROOT_TAG);
@@ -170,13 +196,8 @@ describe('the live tree reads what is on screen, not what was created', () => {
     expect(census.anchors).toBe(1);
     expect(census.nonAnchors).toBe(3);
 
-    // Serialized, the anchor is gone again — `serialize` reads the same flattened tree `walkLive`
-    // does, which is what makes it comparable to the strings the stand-in's `serialize` produced
-    // off the COMMITTED tree (a committed tree cannot hold an anchor by construction).
-    //
-    // `view` rather than `RCTView` because `viewWith` builds the node with `createElement('view')`
-    // and nothing here renames it — the RN view name is what an ADAPTER asks for. The shape is the
-    // claim; the name is whatever the node was created under.
+    // Serialized, the anchor is gone: `serialize` reads the flattened tree, like `walkLive`
+    // The name is `view` as `viewWith` creates it, an adapter is what asks for `RCTView`
     expect(live.serialize(root)).toBe('view(viewview)');
 
     // Several roots at once, because a surface holds a LIST of top-level nodes and the files that

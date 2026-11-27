@@ -1,44 +1,17 @@
-// §7 of svelte-adapter-dom-shim: the constructs that compile cleanly and
-// then silently do nothing under the DOM shim. Everything else in the original §4 table is
-// already closed by "app code can't reach it" or "the TS/Svelte compiler already errors on it for
-// free" (see the skill for the full reachability table). This preprocessor is the guard for what
-// is left.
-//
-// Three families, one mechanism:
-//   <svelte:head|window|document|body>  — compiler-level special elements with no RN meaning.
-//   {@html expr}                        — compiles to $.html(), which either assigns to an
-//     `innerHTML` that ShimElement does not define (a silent no-op producing zero nodes) or
-//     reaches create_element('template'), a tag with no descriptorFor entry. There is no
-//     meaningful HTML to render into a native tree, so it fails LOUDLY here instead.
-//   browser-only IMPORTS from svelte's own subpackages — the same failure one level up. These
-//     read browser globals React Native does not define, so every value they hand back is
-//     permanently undefined/false with no error anywhere. Measured per subpackage (see §25):
-//     `svelte/reactivity/window` and `MediaQuery` are the ONLY browser-dependent members —
-//     `svelte/store`, `svelte/easing`, `svelte/motion`, `svelte/events`, `svelte/attachments`
-//     and the rest of `svelte/reactivity` (SvelteMap/Set/Date/URL, createSubscriber) are pure
-//     and must keep working, so this is a two-name list, not a subpackage ban.
-//
-// Registered in svelte.config.js's `preprocess`, NOT a standalone lint rule: `svelte-check`
-// and the Svelte VS Code/language-server extension run the SAME preprocessor pipeline, so this
-// one mechanism produces both an editor-time diagnostic and a build failure — no second
-// mechanism needed.
-//
-// Verified against the installed svelte@5.56.8: `parse(content, {modern: true})` on throwaway
-// markup confirmed `Root.fragment.nodes[].type` === 'SvelteHead' / 'SvelteWindow' /
-// 'SvelteDocument' / 'SvelteBody' / 'HtmlTag', and running this preprocessor's `markup()`
-// against forbidden vs. clean markup threw/passed as expected.
+// Guards the web-only constructs a native tree cannot hold
+// The compiler of `svelte/renderer` rejects most of them too, but this one names the fix
+// Registered in `preprocess`, so `svelte-check` and the editor run it too
 
 import { parse } from 'svelte/compiler';
 
-interface IForbidden {
+type IForbidden = {
   readonly label: string;
   readonly advice: string;
-}
+};
 
 const SPECIAL_ELEMENT_ADVICE =
-  'has no meaning under React Native and is silently inert under the Symbiote DOM shim ' +
-  '(svelte-adapter-dom-shim skill §4/§7). Use the matching runtime module instead ' +
-  '(Dimensions / AppState / StatusBar / …).';
+  'has no meaning under React Native, and the custom renderer has no document to hold it. ' +
+  'Use the matching runtime module instead (Dimensions / AppState / StatusBar / …).';
 
 const FORBIDDEN: ReadonlyMap<string, IForbidden> = new Map([
   ['SvelteHead', { label: '<svelte:head>', advice: SPECIAL_ELEMENT_ADVICE }],
@@ -56,17 +29,14 @@ const FORBIDDEN: ReadonlyMap<string, IForbidden> = new Map([
     {
       label: '{@html …}',
       advice:
-        'renders an HTML string, and a native view tree has no HTML to render it into — it ' +
-        'compiles and then paints nothing (svelte-adapter-dom-shim skill §4/§7). Build the ' +
-        'content out of <View>/<Text> from @symbiote-native/svelte instead; for rich text from ' +
-        'a remote source, parse it yourself and map each node onto those primitives.',
+        'renders an HTML string, and a native view tree has no HTML to render it into. Build ' +
+        'the content out of <View>/<Text> from @symbiote-native/svelte instead; for rich text ' +
+        'from a remote source, parse it yourself and map each node onto those primitives.',
     },
   ],
 ]);
 
-// The real AST shape isn't pinned here (see the VERIFY note above), so this reads it through
-// runtime guards on `unknown` rather than trusting an unverified type — narrower and safer
-// than casting past whatever `parse()`'s declared return type turns out to be.
+// The AST shape is not pinned, so it is read through runtime guards on `unknown`, not a cast
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -126,7 +96,7 @@ const FORBIDDEN_IMPORT: ReadonlyMap<
         'reads browser globals (window.innerWidth / scrollY / navigator.onLine …) that React ' +
         'Native never defines, so every value it hands back stays undefined with no error. ' +
         'Import innerWidth / innerHeight / outerWidth / outerHeight / devicePixelRatio from ' +
-        '@symbiote-native/svelte instead (svelte-adapter-dom-shim skill §25). There is no ' +
+        '@symbiote-native/svelte instead. There is no ' +
         'equivalent for scrollX/scrollY/screenLeft/screenTop — a native app has no window-level ' +
         'scroll offset and no position in a window manager; read scroll from a ScrollView.',
     },
@@ -139,7 +109,7 @@ const FORBIDDEN_IMPORT: ReadonlyMap<
         'is built on window.matchMedia, which React Native does not have, so every query ' +
         'answers false — indistinguishable from a legitimate no. Use orientation or ' +
         'createWidthQuery from @symbiote-native/svelte, or useColorScheme for ' +
-        'prefers-color-scheme (svelte-adapter-dom-shim skill §25). The rest of this module ' +
+        'prefers-color-scheme. The rest of this module ' +
         '(SvelteMap / SvelteSet / SvelteDate / SvelteURL / createSubscriber) is pure and fine.',
     },
   ],

@@ -1,20 +1,11 @@
-// What a <Text>'s children actually become on the way to Fabric. Two of the three claims here
-// guard a real iOS abort: a screen rendering `{list().length} tiles` died inside
-// BaseTextShadowNode::buildAttributedString.
-//
-// The trap is that RCTRawText's `text` is parsed natively as a std::string. Anything else fails the
-// conversion, and Fabric does not throw — convertRawProp logs and falls back to the DEFAULT, i.e.
-// the empty string. An empty fragment is then dropped by AttributedString::appendFragment while the
-// walk still records "last child was raw text", so the next sibling merges into `fragments.back()`
-// of an empty vector and the process aborts. Nothing about that is visible from JS.
-//
-// Solid is the adapter that can hand over a non-string: solid-js/universal's
-// normalizeIncomingArray() pushes `createTextNode(item)` with the JSX child value UNCONVERTED, and
-// on the DOM that is harmless because document.createTextNode coerces. Vue and React stringify
-// upstream, so neither ever noticed.
-//
-// No Negative group: the renderer has no throwing path for a text child. A raw string outside a
-// <Text> DOES throw, and that contract is owned by view.test.tsx.
+// What a <Text>'s children become on the way to Fabric
+// Two claims guard a real iOS abort: `{list().length} tiles` died in `buildAttributedString`
+
+// A raw text's `text` is parsed natively as a `std::string`, and any other type falls back to ''
+// `appendFragment` then drops the empty fragment, so the next sibling merges into an empty vector
+// Solid can hand over a non-string, as `normalizeIncomingArray()` skips the DOM's coercion
+
+// No Negative group: a raw string outside a <Text> does throw, owned by `view.test.tsx`
 
 import { createSignal } from 'solid-js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -28,19 +19,16 @@ const ROOT_TAG = 9_477;
 const RAW_TEXT = 'RCTRawText';
 
 const fabric = installRecordingFabric();
-const live = createLiveTree(fabric);
+// Asks for the nodes, as the claim is that the adapter empties a raw text in place
+const live = createLiveTree(fabric, { keepBlankText: true });
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
 beforeEach(() => fabric.reset());
 afterEach(() => unmount(ROOT_TAG));
 
-// Every raw text's `text`, UNFILTERED and UNCOERCED — the point of this file is what the value
-// actually IS, so neither `live.texts()` (which stringifies) nor a walker that kept only strings
-// (jsx-runtime.test.tsx's) can be used here: both would hide the bug.
-//
-// The LIVE tree rather than the recording: a created node's props are frozen at its first commit,
-// so an update asserted off the record would pass forever (symbiote-engine-core §8).
+// Every raw text's `text`, unfiltered and uncoerced, as `live.texts()` stringifies and hides it
+// The live tree rather than the recording, as a created node's props freeze at its first commit
 function committedText(): unknown[] {
   return live
     .findAllLive(live.appRoot(), node => node.viewName === RAW_TEXT)
@@ -48,8 +36,7 @@ function committedText(): unknown[] {
 }
 
 describe('text children reaching Fabric', () => {
-  // why: a count interpolated into a sentence is the most ordinary line of app code there is, and
-  // it is exactly what aborted the canary. The value must arrive as a string, not as a number.
+  // A count interpolated into a sentence is what aborted the canary, so it must arrive as a string
   it('commits a numeric expression as a string', async () => {
     const [tiles] = createSignal([1, 2, 3]);
     mount(ROOT_TAG, () => <text>{tiles().length} tiles</text>);
@@ -58,8 +45,7 @@ describe('text children reaching Fabric', () => {
     expect(committedText()).toEqual(['3', ' tiles']);
   });
 
-  // why: an expression emptying out is a normal reactive update. The node it leaves behind must not
-  // be committed as an empty raw text — that is the same abort, reached with pure strings.
+  // An expression emptying out is a normal update, and its node must not commit as empty text
   it('empties the raw text in place rather than replacing the node', async () => {
     const [name, setName] = createSignal('Ada');
     mount(ROOT_TAG, () => <text>{name()} — hello</text>);
@@ -69,16 +55,12 @@ describe('text children reaching Fabric', () => {
     setName('');
     await tick();
 
-    // The node is still HERE, carrying an empty string — the adapter updates text in place, and
-    // that is the whole of its job. Dropping an empty fragment is the COMMIT's rule
-    // (`AttributedString::appendFragment`), so "nothing is painted" is asserted where a commit
-    // happens: `core/engine/cpp/tests/js/solid-adapter.itest.tsx`, "stops committing a raw text
-    // whose expression empties out", and statically in `text-nesting.itest.ts`.
+    // The node stays, carrying an empty string, as the adapter updates text in place
+    // The commit drops it, asserted in `solid-adapter.itest.tsx` and `text-nesting.itest.ts`
     expect(committedText()).toEqual(['', ' — hello']);
   });
 
-  // why: the rule is "empty", never "blank". A space between two nested texts is what makes
-  // "a b" read as two words, so it has to survive everything above.
+  // The rule is empty, never blank: a space between two nested texts keeps "a b" two words
   it('keeps a whitespace-only literal between two nested texts', async () => {
     mount(ROOT_TAG, () => (
       <text>

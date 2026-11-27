@@ -11,6 +11,11 @@
       "why": "MediaQueryList implements the DOM removeEventListener and counts its listeners through it"
     },
     {
+      "path": "adapters/svelte/src/symbiote-renderer.ts",
+      "id": "ts-remove-listener",
+      "why": "the method name is fixed by the Renderer contract of svelte/renderer, this is a definition, not a call"
+    },
+    {
       "path": "core/css-parser/src/golden-corpus/fixtures/**",
       "id": "css-px",
       "why": "the fixtures feed the unit conversion under test, so px is the input"

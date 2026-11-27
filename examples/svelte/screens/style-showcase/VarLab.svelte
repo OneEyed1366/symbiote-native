@@ -40,7 +40,13 @@
   <text class="sc-panel-title">12 · Device lab: var(), setVariable</text>
   <text class="sc-tile-label">A :root TOKEN, THEN THE SURFACE'S OWN</text>
   <view class="lab-row">
-    <view bind:this={swatch} class="lab-var-swatch" testID="lab-var-swatch" />
+    <view
+      {@attach (node: unknown) => {
+        swatch = node;
+      }}
+      class="lab-var-swatch"
+      testID="lab-var-swatch"
+    />
     <text class="lab-readout" testID="lab-var-readout">
       {`${ACCENT_NAME}=${accent}`}
     </text>

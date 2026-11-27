@@ -1,20 +1,10 @@
-// Co-located Svelte-driven smoke test for <SQLiteProvider>/useSQLiteContext, mirroring
-// ../react/sqlite-context.test.tsx's scenario coverage and its mock-the-whole-module approach
-// (openDatabaseAsync timing fully controlled via deferred promises) — but driven through the
-// real Svelte compiler + a real Fabric slot, the mechanism every *.smoke.test.ts in
-// packages/navigation/src/svelte already uses (see ./svelte-compile.test-helper.ts's header),
-// per this task's brief to reuse it rather than invent a third harness shape for this package.
-//
+// Smoke test for `SQLiteProvider` and `useSQLiteContext` over the real Svelte compiler and a
+// real Fabric slot, mirroring `../react/sqlite-context.test.tsx` and its mocked module
+// The `openDatabaseAsync` timing is controlled through deferred promises
+
 // `@symbiote-native/svelte`, `@symbiote-native/engine` and `@symbiote-native/test-utils` are not
-// declared dependencies of this package — same reasoning as ../react/sqlite-context.test.tsx:
-// SQLiteProvider renders no host primitive of its own (Context, `{#if}`, or plain snippet
-// children), so pulling in the whole Fabric stack is only for the TEST's harness, not for the
-// component under test. Resolved here via manual node_modules symlinks mirroring exactly what
-// pnpm's own linker produces for a real dependency
-// (`packages/sqlite/node_modules/@symbiote-native/{svelte,engine,test-utils}` ->
-// `adapters/svelte` / `core/engine` / `core/test-utils`) — the same hand-added-symlink precedent
-// ../react/sqlite-context.test.tsx already set for `react-reconciler`, so `package.json` stays
-// untouched here too.
+// dependencies of this package: `SQLiteProvider` renders no host primitive of its own
+// They resolve through manual `node_modules` symlinks, like `react-reconciler` in the React twin
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -61,10 +51,9 @@ afterEach(() => {
   harness.cleanup();
 });
 
-//#region Live-tree lookup — fabric.find() returns a pre-clone node frozen at creation time
-// (svelte-adapter-dom-shim skill §15 / test-harness-false-greens.md #"fabric.find() returns a
-// PRE-CLONE node"), so every assertion here walks the LIVE tree instead, same as
-// packages/navigation/src/svelte/fabric-tree.test-helper.ts's findLiveByTestId.
+//#region Live-tree lookup, as `fabric.find()` returns a pre-clone node frozen at creation time
+// Every assertion walks the live tree instead, as `findLiveByTestId` in
+// `packages/navigation/src/svelte/fabric-tree.test-helper.ts` does
 
 function findLiveByTestId(root: ISymbioteNode, testID: string) {
   return findLive(root, node => node.props.testID === testID);
@@ -90,9 +79,8 @@ function deferred<T>(): IDeferred<T> {
   return { promise, resolve: box.resolve, reject: box.reject };
 }
 
-// A structural stand-in for the resolved database — the provider only ever calls closeAsync()
-// on it, and production code's own typing (SQLiteDatabase, from the UNMOCKED '../core' types)
-// never sees this shape, so nothing here needs a cast.
+// A structural stand-in for the resolved database, as the provider only calls `closeAsync()`
+// The typing of production code never sees this shape, so no cast is needed
 type IFakeDb = { closeAsync: typeof closeAsyncMock };
 function fakeDatabase(): IFakeDb {
   return { closeAsync: closeAsyncMock };

@@ -47,12 +47,19 @@ const slide = () => ({
 
 describe('the entering animation of a node', () => {
   it('is configured before the node commits, under the native id the node carries', () => {
+    const commitsBefore = host.fabric.commits;
+    let commitsAtSend: number | undefined;
+    update.mockImplementationOnce(() => {
+      commitsAtSend = host.fabric.commits;
+    });
     const { surface, node } = mounted(target =>
       routeProp(target, 'entering', fade),
     );
 
-    expect(update).toHaveBeenCalledTimes(1);
     surface.commit();
+
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(commitsAtSend).toBe(commitsBefore);
     const [id, type, config] = update.mock.calls[0] ?? [];
     expect(type).toBe(LayoutAnimationType.ENTERING);
     expect(config).toBe(fade);
@@ -71,8 +78,11 @@ describe('the entering animation of a node', () => {
   });
 
   it('gives each node an id of its own', () => {
-    mounted(target => routeProp(target, 'entering', fade));
-    mounted(target => routeProp(target, 'entering', fade));
+    const first = mounted(target => routeProp(target, 'entering', fade));
+    const second = mounted(target => routeProp(target, 'entering', fade));
+
+    first.surface.commit();
+    second.surface.commit();
 
     const ids = update.mock.calls.map(([id]) => id);
     expect(new Set(ids).size).toBe(2);
@@ -82,7 +92,7 @@ describe('the entering animation of a node', () => {
     const built = fade;
     const builder = { build: () => built };
 
-    mounted(target => routeProp(target, 'entering', builder));
+    mounted(target => routeProp(target, 'entering', builder)).surface.commit();
 
     expect(update.mock.calls[0]?.[2]).toBe(built);
   });

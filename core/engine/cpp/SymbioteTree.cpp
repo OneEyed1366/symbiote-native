@@ -254,6 +254,10 @@ struct Node : jsi::NativeState {
   // The cycle it makes is broken by the tree: a removed node and `~Node` of each child drop it
   std::optional<jsi::Object> attachedHandle;
 
+  // The pins of every descendant, taken over when this node left its parent
+  // Released with it, so a dead subtree goes in two collections and not one per level
+  std::vector<jsi::Object> descendantPins;
+
   // ── Commit state ───────────────────────────────────────────────────────────────────────────────
   std::shared_ptr<const react::ShadowNode> committed;
   // What the last commit actually sent, so the next payload can be a minimal diff.
@@ -393,6 +397,38 @@ void holdHandle(jsi::Runtime &runtime, Node &node) {
   if (node.attachedHandle.has_value() || !node.handle.has_value()) return;
   auto live = node.handle->lock(runtime);
   if (live.isObject()) node.attachedHandle.emplace(live.getObject(runtime));
+}
+
+// Descendants only, root excluded; a hole in a child vector is skipped, not compacted
+std::vector<Node *> descendantsOf(const Node &root) {
+  std::vector<Node *> found;
+  std::vector<const Node *> pending{&root};
+  while (!pending.empty()) {
+    const Node *node = pending.back();
+    pending.pop_back();
+    for (const NodePtr &child : node->children) {
+      if (child == nullptr) continue;
+      found.push_back(child.get());
+      pending.push_back(child.get());
+    }
+  }
+  return found;
+}
+
+// A removed subtree is garbage once JS lets go of its root, so its pins move onto the root
+void takeOverDescendantPins(Node &root) {
+  for (Node *node : descendantsOf(root)) {
+    if (!node->attachedHandle.has_value()) continue;
+    root.descendantPins.push_back(std::move(*node->attachedHandle));
+    node->attachedHandle.reset();
+  }
+}
+
+// The subtree was put back: every descendant pins its own placeholder again
+void returnDescendantPins(jsi::Runtime &runtime, Node &root) {
+  if (root.descendantPins.empty()) return;
+  for (Node *node : descendantsOf(root)) holdHandle(runtime, *node);
+  root.descendantPins.clear();
 }
 
 /**
@@ -1899,6 +1935,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         child->parent = parent.get();
         const auto holdStartedAt = ISteadyClock::now();
         holdHandle(runtime, *child);
+        returnDescendantPins(runtime, *child);
         walkCost_.holdHandleNs += nanosSince(holdStartedAt);
         // A HINT the detach path reads back, and appending past a hole is harmless: the hole keeps
         // its place until the next read compacts
@@ -1928,6 +1965,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
         }
         child->parent = parent.get();
         holdHandle(runtime, *child);
+        returnDescendantPins(runtime, *child);
         // An insert has to land at a POSITION and a hole is not one. Free when the parent is dense,
         // which after the branch above it is in the move-within-a-parent case.
         compactChildren(*parent);
@@ -1954,6 +1992,7 @@ jsi::Value Tree::applyOps(jsi::Runtime &runtime, const jsi::Value *arguments, si
           // Released HERE and not inside `detachFromParent`, which the attach ops also call to
           // spell a MOVE. Why that window would matter: the skill
           child->attachedHandle.reset();
+          takeOverDescendantPins(*child);
         }
         break;
       }

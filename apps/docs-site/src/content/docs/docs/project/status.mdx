@@ -28,12 +28,11 @@ and the shared core packages.
   an `Animated.event(...)` marker, which `@Output()` can't express. On the
   landing page's live framework switcher now; the Slider wrapper package also
   ships an Angular build (`@symbiote-native/slider/angular`).
-- Svelte — the third non-React adapter. A DOM shim over stock compiled Svelte
-  output drives the same engine, so components are stock Svelte markup —
-  no custom compiler output, no bespoke reconciler. Full component parity
-  with React/Vue/Angular, verified on-device on iOS and Android
-  (`examples/svelte`). On the landing page's live framework switcher now; the
-  Slider wrapper package also ships a Svelte build.
+- Svelte - the third non-React adapter. Svelte's experimental custom renderer
+  API (`svelte >= 5.59.1`) drives the same engine, so components are stock
+  Svelte markup with no bespoke compiler output. Full component parity with
+  React/Vue/Angular (`examples/svelte`). On the landing page's live framework
+  switcher now; the Slider wrapper package also ships a Svelte build.
 - Solid — the fourth non-React adapter. A Solid custom renderer built on
   `solid-js/universal`'s official `createRenderer` (Solid's own
   framework-agnostic seam for non-DOM targets) maps every compiled-JSX call

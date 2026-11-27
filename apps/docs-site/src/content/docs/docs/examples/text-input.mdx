@@ -89,11 +89,13 @@ controlled write handshake is shared; the public event name is framework-shaped.
     ```
 
     `[(value)]="name"` is Angular's banana-in-a-box two-way binding, sugar over
-    the same `[value]`/`(valueChange)` pair — write that explicit form instead
+    the same `[value]`/`(valueChange)` pair. Write the explicit form instead
     (`[value]="name" (valueChange)="setName($event)"`) if you also need the raw
-    native event, which arrives on the separate `(change)` output: an
-    `EventEmitter` only carries one value, so `(valueChange)` stays text-only to
-    keep `[(value)]` working, and `(change)` exists purely for the raw event.
+    native event.
+
+    The raw event arrives on the separate `(change)` output. An `EventEmitter`
+    only carries one value, so `(valueChange)` stays text-only to keep
+    `[(value)]` working, and `(change)` exists purely for the raw event.
 
   </TabItem>
   <TabItem label="Svelte">
@@ -117,12 +119,13 @@ controlled write handshake is shared; the public event name is framework-shaped.
     </style>
     ```
 
-    Svelte's own element `bind:value` is explicitly unsupported by this
-    adapter's DOM shim — there is no sugar over `value`/`onValueChange` here,
-    same as React. Unlike a plain `onPress`, `onValueChange` is safe to write
-    as an individual attribute directly: it is always called with a single
-    change-event object, so it never trips the crash an individual callback
-    prop can otherwise hit on a bare host tag.
+    Svelte's own element `bind:value` is rejected at compile time by the
+    custom renderer, so there is no sugar over `value`/`onValueChange` on the
+    bare tag, same as React.
+
+    Unlike a plain `onPress`, `onValueChange` is safe to write as an individual
+    attribute. It is always called with a single change-event object, so it
+    never trips the crash an individual callback prop can hit on a bare host tag.
 
   </TabItem>
   <TabItem label="Solid">
@@ -163,11 +166,12 @@ controlled write handshake is shared; the public event name is framework-shaped.
 | Native event      | _(same event object)_          | _(same emit, same event object)_   | `(change)="handler($event)"` (separate output)         | _(same event object)_                   | _(same event object)_            |
 
 All five now share one contract: `onValueChange` (or its per-adapter emit/output
-spelling) is called with a **single** change-event object, `event.text` carries
-the current text, and `event` itself is the native change event — there is no
-separate second argument anywhere. Angular is the one exception, since its
-`(valueChange)` output is deliberately text-only to keep `[(value)]` working,
-with `(change)` carrying the full event instead.
+spelling) is called with a **single** change-event object. `event.text` carries
+the current text, and `event` itself is the native change event, with no
+separate second argument anywhere.
+
+Angular is the one exception, since its `(valueChange)` output is deliberately
+text-only to keep `[(value)]` working, with `(change)` carrying the full event.
 
 `StyleSheet.create` works identically to a CSS class if you'd rather keep
 style objects inline — see the [Styling guide](/docs/learn/styling/).

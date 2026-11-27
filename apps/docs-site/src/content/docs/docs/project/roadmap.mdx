@@ -14,7 +14,7 @@ parity through shared layers.
 | React adapter      | On the live switcher | Reference canary for the engine and Fabric pipe.                                            |
 | Vue adapter        | On the live switcher | First non-React proof of the framework-agnostic seam.                                       |
 | Angular adapter    | On the live switcher | Second non-React proof: `Renderer2` seam, DOM-less bootstrap, full component parity.        |
-| Svelte adapter     | On the live switcher | Third non-React proof: a DOM shim over stock compiled Svelte output, full component parity. |
+| Svelte adapter     | On the live switcher | Third non-React proof: Svelte's custom renderer API, full component parity.                 |
 | Solid adapter      | On the live switcher | Fourth non-React proof: `solid-js/universal`'s `createRenderer`, full component parity.     |
 | Engine             | Rewritten in C++, tuning ongoing | Retained tree, clone-on-write commits, tag-keyed platform rules, and event normalization now live in `core/engine/cpp`, reached from JS through one buffered crossing per commit instead of one per mutation. |
 | Components         | In progress          | Shared state/view layers so adapters inherit parity.                                        |
@@ -52,13 +52,13 @@ Wrapper packages have followed: the Slider package now ships an Angular build
 alongside React and Vue.
 
 Svelte is the third non-React adapter, done the same long-term way: a thin
-layer over the shared engine. Here that is a DOM shim over stock compiled Svelte
-output, so components stay ordinary Svelte markup with no bespoke compiler
-output.
+layer over the shared engine. Here that is Svelte's own custom renderer API
+(`svelte/renderer`, experimental, `svelte >= 5.59.1`), so components stay ordinary
+Svelte markup with no bespoke compiler output.
 
-It reaches the same full component parity as React, Vue, and Angular, verified
-on-device on iOS and Android, and the Slider wrapper package ships a Svelte build
-too. It's on the landing page's live framework switcher.
+It reaches the same full component parity as React, Vue, and Angular, and the
+Slider wrapper package ships a Svelte build too. It's on the landing page's live
+framework switcher.
 
 Solid is the fourth non-React adapter, built the same long-term way: a thin
 layer over the shared engine, here a Solid custom renderer over

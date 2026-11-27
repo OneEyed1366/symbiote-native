@@ -1,6 +1,6 @@
-// Guards a RELEASE-ONLY bug class no behavioral test can see: Metro's inlineRequires (production
-// only) moves a require() down to a binding's first VALUE use, so a barrel's pure re-export of a
-// load-time-registering module never evaluates it at all — dev/vitest/tsc stay eager and green.
+// Guards a release-only bug class no behavioral test can see.
+// `inlineRequires` in Metro defers a `require()` to its binding's first value use, so a barrel's
+// pure re-export never evaluates a load-time-registering module, while dev and vitest stay green
 
 // So this checks the SHAPE, not the behavior: every such module must be reachable by a bare
 // `import './m';` or an ordinary value import, not only `export ... from`. The cheapest fix when
@@ -22,6 +22,16 @@ import ts from 'typescript';
 
 const REPO_ROOT = resolve(__dirname, '../../..');
 const SCANNED_ROOTS = ['core', 'adapters', 'packages'];
+const SKIPPED_DIRECTORIES = new Set(['node_modules', 'build', 'build-ngc']);
+
+// Tests write throwaway probes under a dot or double-underscore name and delete them
+function isSkippedEntry(name: string): boolean {
+  return (
+    SKIPPED_DIRECTORIES.has(name) ||
+    name.startsWith('.') ||
+    name.startsWith('__')
+  );
+}
 
 // A load-time registration is a top-level call to an imported `registerX` / `setX` function.
 // Both prefixes are used in this codebase (registerInterpolationFactory, registerPostCommit,
@@ -34,28 +44,27 @@ const REGISTRATION_CALLEE = /^(register|set)[A-Z]/;
 function collectSourceFiles(dir: string, out: string[]): void {
   for (const dirent of readdirSync(dir, { withFileTypes: true })) {
     const entry = dirent.name;
-    if (entry === 'node_modules' || entry === 'build' || entry === 'build-ngc')
-      continue;
+    if (isSkippedEntry(entry)) continue;
     const full = join(dir, entry);
     if (dirent.isDirectory()) {
       collectSourceFiles(full, out);
-    } else if (
-      full.endsWith('.ts') &&
-      !full.endsWith('.d.ts') &&
-      !full.includes('.test.') &&
-      // Excluded like a test: neither a bench nor an itest is ever in a Metro bundle, so
-      // inlineRequires' lazy-getter hazard can't reach either.
-      !full.includes('.bench.') &&
-      !full.includes('.itest.')
-    ) {
+    } else if (isBundledSource(full)) {
       out.push(full);
     }
   }
 }
 
-// A second race, unlike the withFileTypes one, can't be closed the same way — only named: the
-// walk lists a path and this reads it, with nothing making those atomic, so a `.ts` that vanishes
-// in between throws ENOENT with no assertion in the message.
+// A bench and an itest are excluded like a test: neither is ever in a Metro bundle
+function isBundledSource(file: string): boolean {
+  const isDeclaration = file.endsWith('.d.ts');
+  const isTestLike = ['.test.', '.bench.', '.itest.'].some(infix =>
+    file.includes(infix),
+  );
+  return file.endsWith('.ts') && !isDeclaration && !isTestLike;
+}
+
+// A second race cannot be closed like the `withFileTypes` one, only named
+// The walk lists a path and `parse` reads it later, so a `.ts` that vanishes throws a bare ENOENT
 
 // This does not CATCH the race, it labels it: swallowing the file would be worse, since a skipped
 // module is a finding that silently stops being reported. Rethrowing with the path means the next
@@ -113,7 +122,7 @@ function resolveWorkspaceSubpath(specifier: string): string | undefined {
   return undefined;
 }
 
-interface IModuleFacts {
+type IModuleFacts = {
   /** Top-level `registerX(...)` / `setX(...)` calls on an imported binding. */
   registrations: string[];
   /** Files this module pulls in with a BARE side-effect import (`import './m';`). */
@@ -122,78 +131,99 @@ interface IModuleFacts {
   valueImportedNames: string[];
   /** Names this module exports as values, i.e. what a consumer could name to wake it up. */
   exportedNames: string[];
+};
+
+const isExported = (node: ts.Node): boolean =>
+  ts.canHaveModifiers(node) &&
+  (ts.getModifiers(node) ?? []).some(
+    m => m.kind === ts.SyntaxKind.ExportKeyword,
+  );
+
+function noteImportedBindings(
+  clause: ts.ImportClause,
+  importedNames: Set<string>,
+  valueImportedNames: string[],
+): void {
+  // `import type ...` is erased at compile time and carries no runtime dependency.
+  if (clause.isTypeOnly === true) return;
+  if (clause.name !== undefined) valueImportedNames.push(clause.name.text);
+  const named = clause.namedBindings;
+  if (named === undefined || !ts.isNamedImports(named)) return;
+  for (const element of named.elements) {
+    if (element.isTypeOnly) continue;
+    importedNames.add(element.name.text);
+    valueImportedNames.push(element.name.text);
+  }
+}
+
+function noteImport(
+  file: string,
+  statement: ts.ImportDeclaration,
+  importedNames: Set<string>,
+  facts: IModuleFacts,
+): void {
+  if (!ts.isStringLiteral(statement.moduleSpecifier)) return;
+  const clause = statement.importClause;
+  if (clause !== undefined) {
+    noteImportedBindings(clause, importedNames, facts.valueImportedNames);
+    return;
+  }
+  // No import clause at all == `import './m';` — the one form inline-requires cannot defer,
+  // because there is no binding for it to chase to a use site.
+  const target = resolveSpecifier(file, statement.moduleSpecifier.text);
+  if (target !== undefined) facts.bareImports.push(target);
+}
+
+function noteExport(statement: ts.Statement, exportedNames: string[]): void {
+  if (!isExported(statement)) return;
+  if (ts.isVariableStatement(statement)) {
+    for (const declaration of statement.declarationList.declarations) {
+      if (ts.isIdentifier(declaration.name))
+        exportedNames.push(declaration.name.text);
+    }
+    return;
+  }
+  const isNamedDeclaration =
+    ts.isClassDeclaration(statement) || ts.isFunctionDeclaration(statement);
+  if (isNamedDeclaration && statement.name !== undefined) {
+    exportedNames.push(statement.name.text);
+  }
+}
+
+// A top-level expression statement calling an imported register*/set* function.
+function noteRegistration(
+  statement: ts.Statement,
+  importedNames: Set<string>,
+  registrations: string[],
+): void {
+  if (!ts.isExpressionStatement(statement)) return;
+  if (!ts.isCallExpression(statement.expression)) return;
+  const callee = statement.expression.expression;
+  if (!ts.isIdentifier(callee) || !REGISTRATION_CALLEE.test(callee.text)) {
+    return;
+  }
+  if (importedNames.has(callee.text)) registrations.push(callee.text);
 }
 
 function analyze(file: string): IModuleFacts {
   const source = parse(file);
   const importedNames = new Set<string>();
-  const bareImports: string[] = [];
-  const valueImportedNames: string[] = [];
-  const exportedNames: string[] = [];
-  const registrations: string[] = [];
-
-  const isExported = (node: ts.Node): boolean =>
-    ts.canHaveModifiers(node) &&
-    (ts.getModifiers(node) ?? []).some(
-      m => m.kind === ts.SyntaxKind.ExportKeyword,
-    );
+  const facts: IModuleFacts = {
+    registrations: [],
+    bareImports: [],
+    valueImportedNames: [],
+    exportedNames: [],
+  };
 
   for (const statement of source.statements) {
-    if (
-      ts.isImportDeclaration(statement) &&
-      ts.isStringLiteral(statement.moduleSpecifier)
-    ) {
-      const clause = statement.importClause;
-      // No import clause at all == `import './m';` — the one form inline-requires cannot defer,
-      // because there is no binding for it to chase to a use site.
-      if (clause === undefined) {
-        const target = resolveSpecifier(file, statement.moduleSpecifier.text);
-        if (target !== undefined) bareImports.push(target);
-      } else if (clause.isTypeOnly !== true) {
-        // `import type ...` is erased at compile time and carries no runtime dependency.
-        if (clause.name !== undefined)
-          valueImportedNames.push(clause.name.text);
-        const named = clause.namedBindings;
-        if (named !== undefined && ts.isNamedImports(named)) {
-          for (const element of named.elements) {
-            if (!element.isTypeOnly) {
-              importedNames.add(element.name.text);
-              valueImportedNames.push(element.name.text);
-            }
-          }
-        }
-      }
+    if (ts.isImportDeclaration(statement)) {
+      noteImport(file, statement, importedNames, facts);
     }
-
-    if (
-      (ts.isClassDeclaration(statement) ||
-        ts.isFunctionDeclaration(statement) ||
-        ts.isVariableStatement(statement)) &&
-      isExported(statement)
-    ) {
-      if (ts.isVariableStatement(statement)) {
-        for (const declaration of statement.declarationList.declarations) {
-          if (ts.isIdentifier(declaration.name))
-            exportedNames.push(declaration.name.text);
-        }
-      } else if (statement.name !== undefined) {
-        exportedNames.push(statement.name.text);
-      }
-    }
-
-    // A top-level expression statement calling an imported register*/set* function.
-    if (
-      ts.isExpressionStatement(statement) &&
-      ts.isCallExpression(statement.expression)
-    ) {
-      const callee = statement.expression.expression;
-      if (ts.isIdentifier(callee) && REGISTRATION_CALLEE.test(callee.text)) {
-        if (importedNames.has(callee.text)) registrations.push(callee.text);
-      }
-    }
+    noteExport(statement, facts.exportedNames);
+    noteRegistration(statement, importedNames, facts.registrations);
   }
 
-  return { registrations, bareImports, valueImportedNames, exportedNames };
+  return facts;
 }
 
 // No classic throw/reject Negative group: this static analysis reports findings via a returned
@@ -263,9 +293,8 @@ describe('load-time registrations survive an inline-requires production bundle',
       expect(scanScratchDir()).toEqual(['thing.ts']);
     });
 
-    // why: this is the shape the repo's own fix landed on for AnimatedInterpolation — a bare
-    // side-effect import gives inline-requires a real use site with no binding to defer, so it
-    // must NOT be flagged even though nothing ever names the export as a value.
+    // The shape the repo's own fix landed on for AnimatedInterpolation
+    // A bare side-effect import is a real use site with no binding to defer, so it is not flagged
     it('does not flag a registration reached via a bare side-effect import', () => {
       writeModule(
         'thing.ts',

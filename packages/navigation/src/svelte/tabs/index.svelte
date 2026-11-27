@@ -9,8 +9,8 @@
 
 <script lang="ts">
   import type { Component } from 'svelte';
-  import { dlog } from '@symbiote-native/engine';
-  import type { ShimElement } from '@symbiote-native/svelte/native-view-bridge';
+  import { dlog, type ISymbioteNode } from '@symbiote-native/engine';
+  import { captureHost } from '@symbiote-native/svelte/native-view-bridge';
   import {
     buildFixedRoutes,
     buildTabBarItems,
@@ -111,9 +111,12 @@
     };
   });
 
-  // The root stays a literal tag so `bind:this` has a known one, and only the children go through
-  // the bridge. Their count varies with the registry, hence the wrapper that tolerates a new shape
-  let tabBarHost = $state.raw<ShimElement | null>(null);
+  // The root stays a literal tag so `captureHost` has a known one, and only the children go
+  // through the bridge. Their count varies with the registry, hence the wrapper for a new shape
+  let tabBarHost = $state.raw<ISymbioteNode | null>(null);
+  const captureTabBarHost = captureHost(host => {
+    tabBarHost = host;
+  });
   const syncTabBarChildren = createDescriptorSubtreeSync();
   $effect(() => {
     const host = tabBarHost;
@@ -134,5 +137,5 @@
       </NavigationScope>
     {/if}
   </view>
-  <view p={tabBar.props} bind:this={tabBarHost} />
+  <view p={tabBar.props} {@attach captureTabBarHost} />
 </view>

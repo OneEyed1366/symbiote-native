@@ -1,6 +1,6 @@
 ---
 name: symbiote-local-dev-registry
-description: "Use when getting a local `core/*`, `adapters/*` or `packages/*` build into an `examples/*` app — the everyday loop before a simulator build or a device measurement. Covers the LOCAL VERDACCIO registry that replaced the `pnpm pack` + `file:` tarball dance as of 2026-09-01: `pnpm run registry:setup|sync|publish|on|off|refresh|status`, the container and its tracked config under `scripts/verdaccio/`, and the gitignored `examples/<app>/.npmrc` that points a scope at it. Read BEFORE editing `scripts/local-registry.mjs`, `scripts/verdaccio/**`, `scripts/trust-publishers.mjs`, `.npmrc.example`, or any `examples/*/package.json` dependency on `@symbiote-native/*`; and before diagnosing an example that runs code older than the repo. Holds why a tracked pointer at localhost is forbidden (npm has NO registry fallback — an unreachable configured registry is an install FAILURE, not a fall-through to npmjs), what the registry does NOT fix (npm's lockfile still short-circuits: same version + new bytes + plain `npm install` = `up to date` and stale code), why a real npm `canary` dist-tag was tried and reverted, and why every npm call in `trust-publishers.mjs` pins `--registry` explicitly. ALSO holds the four iOS build failures that follow any reinstall and read as anything but an install problem: the deleted `.rn-bootsplash/` pod sandbox, the LINKER error naming `facebook::react::Sealable`/`getDebugProps` (a stale prebuilt `React.xcframework` flavor, with a two-command probe and the red-herring `ld: warning` lines), `examples/expo-*/node_modules` at 2.2GB from ~25 nested `expo` copies, and `EINTEGRITY` on a retry after a failed install. Trigger on: 'example runs old code', 'get my engine change into the example', 'file: tarball', '.tarballs', 'verdaccio', 'local registry', 'registry:sync', 'npm install serves stale', 'up to date but my change is missing', 'pod install', 'Build input file cannot be found', 'RNBootSplash.mm', 'Undefined symbols for architecture arm64', 'React.xcframework', 'RCT_USE_PREBUILT_RNCORE', 'node_modules is huge', 'EINTEGRITY'."
+description: "Use when getting a local `core/*`, `adapters/*` or `packages/*` build into an `examples/*` app — the everyday loop before a simulator build or a device measurement. Covers the LOCAL VERDACCIO registry that replaced the `pnpm pack` + `file:` tarball dance as of 2026-09-01: `pnpm run registry:setup|sync|publish|on|off|refresh|status`, the container and its tracked config under `scripts/verdaccio/`, and the gitignored `examples/<app>/.npmrc` that points a scope at it. Read BEFORE editing `scripts/local-registry.mjs`, `scripts/verdaccio/**`, `scripts/trust-publishers.mjs`, `.npmrc.example`, or any `examples/*/package.json` dependency on `@symbiote-native/*`; and before diagnosing an example that runs code older than the repo. Holds why a tracked pointer at localhost is forbidden (npm has NO registry fallback — an unreachable configured registry is an install FAILURE, not a fall-through to npmjs), what the registry does NOT fix (npm's lockfile still short-circuits: same version + new bytes + plain `npm install` = `up to date` and stale code), why a real npm `canary` dist-tag was tried and reverted, and why every npm call in `trust-publishers.mjs` pins `--registry` explicitly. ALSO holds the four iOS build failures that follow any reinstall and read as anything but an install problem: the deleted `.rn-bootsplash/` pod sandbox, the LINKER error naming `facebook::react::Sealable`/`getDebugProps` (a stale prebuilt `React.xcframework` flavor, with a two-command probe and the red-herring `ld: warning` lines), `examples/expo-*/node_modules` at 2.2GB from ~25 nested `expo` copies, and `EINTEGRITY` on a retry after a failed install. Trigger on: 'example runs old code', 'get my engine change into the example', 'file: tarball', '.tarballs', 'verdaccio', 'local registry', 'registry:sync', 'npm install serves stale', 'up to date but my change is missing', 'pod install', 'Build input file cannot be found', 'RNBootSplash.mm', 'Undefined symbols for architecture arm64', 'React.xcframework', 'RCT_USE_PREBUILT_RNCORE', 'node_modules is huge', 'EINTEGRITY'. Read BEFORE changing `packages/cli/templates/**`: it holds the fresh-app check."
 ---
 
 # The local dev registry
@@ -151,8 +151,18 @@ registry:*                    an example installs a real package from a real reg
                               serve, and the reason this file's diagnostics stay readable.
 check-packed-consumer-bundles CI only. Packs every direct internal dependency, installs it into a
                               disposable copy of the example, type-checks and bundles both
-                              platforms. Never touches a real example directory.
+                              platforms; an `expo-*` arm stops after the type check.
+                              Never touches a real example directory.
 ```
+
+To run the matrix locally, run `pnpm run prepublish-build`, then one arm per call:
+`SYMBIOTE_CONSUMER_FRAMEWORKS=<arm> pnpm run check:bundle-isolation`.
+
+- Set `SYMBIOTE_NPM_CACHE_ROOT` to keep the `npm` cache between calls.
+- Seven arms at once failed five installs. CI gives each arm its own job.
+- One arm per call, 2 of 5 runs still failed in `npm install`, and a rerun of both passed.
+- Such a failure can print only `A complete log of this run can be found in`. The two logs showed
+  `503` on first attempts and no final failure line, so the cause of the exit is unproven.
 
 **`overlay-local-packages.mjs` and `check-bundle-framework-isolation.mjs` were deleted
 2026-09-02.** The overlay swapped folder contents without running an install, so it could not carry
@@ -256,7 +266,7 @@ two states the silence cannot.
   success.
 - **The token exists to satisfy the npm CLI, not the registry.** The config grants anonymous
   publish; npm still refuses to attempt one with no token configured for the host. `registry:setup`
-  creates it, caching in the gitignored `scripts/verdaccio/token`. First run REGISTERS; a later run
+  creates it and caches it in a gitignored file next to the registry config. First run REGISTERS; a later run
   against a registry that already knows the user must LOG IN instead (same PUT, basic auth) — which
   is the normal state after the token file is deleted while the container's storage survives.
 - **`@symbiote-native/*` is deliberately NOT proxied.** A miss must be a miss; a silent
@@ -439,6 +449,28 @@ project's own lockfile, not in npm's cache. `rm -f package-lock.json` before ret
 shape as the lockfile short-circuit above (stale integrity vs changed bytes), just triggered by a
 failed install instead of a re-publish.
 
+## A fresh app from the local CLI is its own check (measured 2026-11-26)
+
+CLI unit tests assert generated files. They passed while every new Svelte app failed `npm run typecheck`.
+`examples/svelte` had the same `tsconfig.json` and passed, because its screens import the adapter.
+That import loads the global tag types. The template `App.svelte` imports nothing from the adapter.
+`tests/example-tag-types.test.ts` now requires each example config to load the tag types itself.
+It also reads the file the `typecheck` script names: a `types` list there replaced the one in `tsconfig.json`.
+`tsc --showConfig -p <that file>` prints the effective list.
+
+Steps, in order:
+
+- `pnpm run registry:publish`, not `sync`, which also re-points every example
+- `pnpm -C packages/cli run build`, which builds the file named by `bin` in the CLI manifest
+- from a folder outside the repo, run that file with `node`: `new <Name> --framework <fw> --pm npm --bundle-id <id>`
+- before `npm install`, give the app the scope pointer and token line shown in `.npmrc.example`
+- grep the app's `node_modules` for a string only the local build has
+- `npm run typecheck` and `npm run lint`
+- `react-native bundle` for both platforms
+- `pod install` in the app's iOS folder
+
+Re-check a template fix with a second scaffold in a scratch dir. `new --force` empties the target.
+
 ## `registry:sync` is incremental since 2026-11-11, `--full` is the old loop
 
 Measured on `examples/react`: the first sync published 77 and replaced 10 declared packages in 379 s.
@@ -460,6 +492,24 @@ sequential `npm pack --dry-run` loop is 97 s, 29 s in batches of 8 (12 cores).
   differs from the claim an install writes into the example's `node_modules` once it finishes, so a
   killed refresh is redone, not trusted;
   a full reinstall when `node_modules` is missing, a moved package is only transitive, or the
-  targeted install fails (a stale lockfile hash raises `EINTEGRITY`)
+  targeted install fails (a stale lockfile hash raises `EINTEGRITY`).
+  Only `sync` takes this path, `registry:refresh` always reinstalls from a clean `node_modules`
 - `--full` = clean build, publish all, clean reinstall; use it after a branch switch or a killed run
 - native-only edits (`core/engine/cpp`, `android/`) still need `e2e:build:android` / `pod install`
+
+### A second targeted install reverted the first one (fixed 2026-11-26)
+
+`npm install --no-save <name>@<version>` leaves `package-lock.json` as it was. The next such install
+restores every other package from the lockfile, so earlier targeted installs go back to old bytes.
+The tell was `changed 11 packages` next to `replaced 1 package(s)`. In `examples/expo-svelte` ten
+wrappers lost a fix that the sync before it had installed, and the example record still said current.
+
+An example installed before this fix has no `.symbiote-pinned.json`. Its first `sync` that has
+something to install names every stamped package, or reinstalls from clean. It is slow once.
+
+`packagesToInstall` (`scripts/lib/registry-stamps.mjs`) now also names every package that differs
+from `.symbiote-pinned.json`, a record in `node_modules` that only a full install writes.
+
+Do not compare lockfile integrities with `stamps.json`: they never match, 0 of 68 on a fresh install.
+A stamp hashes `npm pack --dry-run` of the source manifest, the registry holds the `pnpm pack` output.
+The unit tests cannot see that wiring, since `local-registry.mjs` runs a command on import.

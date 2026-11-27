@@ -55,9 +55,9 @@ function scrollerOf(props: object) {
   return live.findLive(root, node => node.viewName === 'RCTScrollView');
 }
 
-function enteringCancelled(): boolean {
-  return update.mock.calls.some(([, type, config]) => {
-    return type === LayoutAnimationType.ENTERING && config === undefined;
+function enteringSent(): boolean {
+  return update.mock.calls.some(([, type]) => {
+    return type === LayoutAnimationType.ENTERING;
   });
 }
 
@@ -81,13 +81,13 @@ describe('Animated.FlatList', () => {
   it('lets the rows animate in when the author does not say otherwise', () => {
     scrollerOf({});
 
-    expect(enteringCancelled()).toBe(false);
+    expect(enteringSent()).toBe(true);
   });
 
   it('skips the entering animation of the rows it mounts with when asked to', () => {
     scrollerOf({ skipEnteringExitingAnimations: true });
 
-    expect(enteringCancelled()).toBe(true);
+    expect(enteringSent()).toBe(false);
   });
 });
 

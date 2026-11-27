@@ -6,7 +6,11 @@ import {
   getCachePathAsync,
   prefetchImages,
 } from '@symbiote-native/image/vue';
-import type { IImageViewHandle } from '@symbiote-native/image/vue';
+import type {
+  IImageErrorEventData,
+  IImageLoadEventData,
+  IImageViewHandle,
+} from '@symbiote-native/image/vue';
 import { ActionButton } from '../components/ActionButton';
 import { Scenario } from '../components/Scenario';
 import { ResultRow, ScreenShell, lineColorOf } from '../components/ScreenShell';
@@ -38,8 +42,8 @@ const SmoothLoadScenario = defineComponent(
           contentFit="cover"
           transition={400}
           class="img-hero"
-          onLoad={event => { loadLine.value = describeLoad(event); }}
-          onError={event => { loadLine.value = `error: ${event.error}`; }}
+          onLoad={(event: IImageLoadEventData) => { loadLine.value = describeLoad(event); }}
+          onError={(event: IImageErrorEventData) => { loadLine.value = `error: ${event.error}`; }}
           accessibilityLabel="Mountain lake at dawn"
         />
         <ResultRow testID="image-hero-result" label="onLoad" value={loadLine.value} />
@@ -97,7 +101,7 @@ const CacheScenario = defineComponent(
           source={{ uri: photoUrl('1011', 500), cacheKey: CACHE_KEY }}
           cachePolicy="memory-disk"
           class="img-avatar"
-          onLoad={event => { loadLine.value = describeLoad(event); }}
+          onLoad={(event: IImageLoadEventData) => { loadLine.value = describeLoad(event); }}
         />
         <ResultRow testID="image-cache-result" label="onLoad" value={loadLine.value} />
         <view class="button-row">
@@ -184,8 +188,8 @@ const ErrorScenario = defineComponent(
           source={isBroken.value ? BROKEN_URI : photoUrl('1035', 400)}
           placeholder={{ blurhash: GREY_BLURHASH }}
           class="img-avatar"
-          onLoad={event => { line.value = `loaded: ${describeLoad(event)}`; }}
-          onError={event => { line.value = `error: ${event.error}`; }}
+          onLoad={(event: IImageLoadEventData) => { line.value = `loaded: ${describeLoad(event)}`; }}
+          onError={(event: IImageErrorEventData) => { line.value = `error: ${event.error}`; }}
         />
         <ResultRow testID="image-error-result" label="Event" value={line.value} />
         <ActionButton

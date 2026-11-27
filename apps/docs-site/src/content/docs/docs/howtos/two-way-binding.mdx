@@ -16,11 +16,13 @@ wiring your own change handler by hand.
   </TabItem>
   <TabItem label="Vue">
     This is Vue's `v-model` sugar, and it works on `switch`/`text-input` even though
-    they're bare tags now, not components: Vue's compiler emits its own runtime
-    `vModelText` directive for any element it doesn't recognize as a DOM input, and the
-    adapter's `runtime-helpers` shim overrides it just enough to write each primitive's
-    real value type (`Switch` needs a real boolean, not `vModelText`'s stringified
-    default). `Slider` is unrelated to this mechanism — it's a real component, from the
+    they're bare tags now, not components. Vue's compiler emits its own runtime
+    `vModelText` directive for any element it doesn't recognize as a DOM input.
+    The adapter's `runtime-helpers` shim overrides it just enough to write each
+    primitive's real value type (`Switch` needs a real boolean, not `vModelText`'s
+    stringified default).
+
+    `Slider` is unrelated to this mechanism. It's a real component from the
     separate [`@symbiote-native/slider`](/docs/packages/slider/) wrapper package
     (`@symbiote-native/slider/vue`):
 
@@ -67,12 +69,13 @@ wiring your own change handler by hand.
 
   </TabItem>
   <TabItem label="Svelte">
-    `switch` and `text-input` are bare tags now, not components — and Svelte's
-    `$bindable()` mechanism only exists inside a component's own `$props()`, so
-    there's nothing left to declare it on. `bind:value` doesn't even compile on a
-    plain tag (Svelte only recognizes `bind:` on a handful of real DOM elements or
-    a component that opts in), so two-way binding on these two is explicit `value` +
-    `onValueChange` — Svelte's own equivalent of React's controlled-component idiom:
+    `switch` and `text-input` are bare tags now, not components. Svelte's
+    `$bindable()` only exists inside a component's own `$props()`, so there's
+    nothing left to declare it on.
+
+    `bind:value` doesn't compile on an element under the custom renderer. Two-way
+    binding on these two is the explicit `value` + `onValueChange` pair, Svelte's
+    equivalent of React's controlled-component idiom:
 
     ```svelte
     <script lang="ts">
@@ -80,8 +83,8 @@ wiring your own change handler by hand.
       let name = $state('');
     </script>
 
-    <switch value={enabled} onValueChange={(next) => (enabled = next)} />
-    <text-input value={name} onValueChange={(next) => (name = next)} />
+    <switch value={enabled} onValueChange={event => (enabled = event.value)} />
+    <text-input value={name} onValueChange={event => (name = event.text)} />
     ```
 
     `Slider` is different: it's a real component from the separate
@@ -99,12 +102,11 @@ wiring your own change handler by hand.
     <Slider bind:value={volume} minimumValue={0} maximumValue={1} />
     ```
 
-    That caveat is specific to `$bindable()` and so only applies to `Slider` now:
-    supplying your own `onValueChange` on the same instance as `bind:value` silently
-    takes over — the component can't tell whether an instance is bound from the
-    inside, so it only echoes the native-reported value back into your bound
-    variable when `onValueChange` is absent. Pass one or the other, not both, on the
-    same control.
+    One caveat is specific to `$bindable()`, so it only applies to `Slider` now.
+    Supplying your own `onValueChange` on the same instance as `bind:value` silently
+    takes over, since the component can't tell from the inside whether it is bound.
+    It only echoes the native-reported value into your bound variable when
+    `onValueChange` is absent. Pass one or the other, not both, on the same control.
 
   </TabItem>
   <TabItem label="Solid">
@@ -121,22 +123,24 @@ wiring your own change handler by hand.
     const [name, setName] = createSignal('');
     const [volume, setVolume] = createSignal(0.5);
 
-    <switch value={enabled()} onValueChange={setEnabled} />
-    <text-input value={name()} onValueChange={setName} />
+    <switch value={enabled()} onValueChange={event => setEnabled(event.value)} />
+    <text-input value={name()} onValueChange={event => setName(event.text)} />
     <Slider value={volume()} onValueChange={setVolume} minimumValue={0} maximumValue={1} />
     ```
 
-    `setEnabled`/`setName`/`setVolume` are handed straight to `onValueChange`: a signal
-    setter already takes the new value as its one argument, so there's no wrapper to write.
+    `switch` and `text-input` hand `onValueChange` one change-event object, so the setter
+    reads `event.value` or `event.text`. `Slider` passes the number itself, so `setVolume`
+    goes in directly.
 
   </TabItem>
 </Tabs>
 
 ## Why this isn't fragile
 
-The controlled-write correction (native reports a change, you don't update
-`value`, SymbioteNative commands native back to the JS value) is shared logic in
-`@symbiote-native/components`, not reimplemented per adapter or per binding style —
-`v-model`/`[(value)]`/`$bindable()` are all sugar on top of the same contract
+The controlled-write correction is shared logic in `@symbiote-native/components`.
+Native reports a change, you don't update `value`, and SymbioteNative commands
+native back to the JS value. It is not reimplemented per adapter or per binding style.
+
+`v-model`/`[(value)]`/`$bindable()` are all sugar on top of the same contract,
 described in the [Events guide](/docs/learn/events/#controlled-components) and
 the [Vue API reference](/docs/api/vue/#model-bindings-v-model).

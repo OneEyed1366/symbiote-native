@@ -172,7 +172,7 @@ function HashScenario(props: { color: string }) {
       <ResultRow testID="image-blurhash" label="generateBlurhashAsync(4x3)" value={blurhash() ?? 'not generated'} />
       <ResultRow testID="image-thumbhash" label="generateThumbhashAsync" value={thumbhash()} />
       <Show when={blurhash()}>
-        {hash => (
+        {(hash: () => string) => (
           <Show when={!hash().startsWith(FAILED_PREFIX)}>
             <Image testID="image-hash-preview" source={{ blurhash: hash(), width: HASH_PREVIEW_SIZE, height: HASH_PREVIEW_SIZE }} class="img-hash" />
           </Show>
