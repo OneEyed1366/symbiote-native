@@ -1,5 +1,23 @@
 # @symbiote-native/solid
 
+## 3.4.1
+
+### Patch Changes
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The native view wrappers accept `class` in their types on Solid and Svelte. The prop already reached
+  the native view, so only `typecheck` rejected it. On Solid the components made by
+  `defineDescriptorComponent`, `defineOptionalDescriptorComponent` and `defineNativeViewComponent`
+  take it too.
+
+  `IGLViewHandle` of `@symbiote-native/gl/svelte` now matches what `bind:this` gives: `getContextId()`
+  in place of `exglCtxId`, which was never on the Svelte instance.
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Internal cleanup and per-package `test` and `lint` scripts. No change in behaviour.
+
+- Updated dependencies [[`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add), [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add)]:
+  - @symbiote-native/components@3.3.1
+  - @symbiote-native/css-parser@0.6.1
+
 ## 3.4.0
 
 ### Minor Changes

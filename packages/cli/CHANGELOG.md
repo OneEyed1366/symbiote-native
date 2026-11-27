@@ -1,5 +1,22 @@
 # @symbiote-native/cli
 
+## 0.5.1
+
+### Patch Changes
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A new Svelte app now passes `npm run typecheck`: its `tsconfig.json` loads the adapter types, so
+  `<image resizeMode>` is no longer read as the SVG tag.
+
+  An app created earlier with this error needs `'@symbiote-native/svelte'` in `compilerOptions.types`.
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `vue`: in a dev build a removed screen is now freed, as Vue's dev links on its elements are dropped.
+
+  `cli`: the Svelte template turns on `experimental.customRenderer`, adds the `svelte-custom-renderer`
+  Metro condition and requires `svelte >= 5.59.1`.
+
+  `test-utils`: `createLiveTree` leaves out an empty raw text, as a commit does. Pass `keepBlankText`
+  to keep it.
+
 ## 0.5.0
 
 ### Minor Changes
