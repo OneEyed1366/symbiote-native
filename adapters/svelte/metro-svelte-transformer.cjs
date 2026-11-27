@@ -1,14 +1,12 @@
 // Metro babel transformer that reads Svelte components (.svelte), twin of metro-vue-transformer.cjs
 // Metro has no Svelte plugin, so `compile()` runs here, then RN's own transformer takes the JS
 
-// Unlike Vue's, it rewrites no framework import: stock Svelte client output runs unchanged
-// against the `globalThis` DOM shim, so no runtime-helpers retarget is needed
-
-// `compile()` with `{fragments:'tree', css:'external', generate:'client'}` emits `$.from_tree(...)`
-// and `$.set_custom_element_data`, the shape the dom-shim's `init_operations` patches target
+// Unlike Vue's, it rewrites no framework import: `experimental.customRenderer` points every
+// component at `@symbiote-native/svelte/renderer`, so no runtime-helpers retarget is needed
 
 // Ships as the package export `@symbiote-native/svelte/metro-svelte-transformer`
-// A consumer's metro.config.js points `babelTransformerPath` at it
+// A consumer's metro.config.js points `babelTransformerPath` at it, and lists the
+// `svelte-custom-renderer` condition in `unstable_conditionNames`
 
 const { compile, compileModule } = require('svelte/compiler');
 const ts = require('typescript');
@@ -24,17 +22,17 @@ const SVELTE_EXTENSION = '.svelte';
 const RELABEL_EXTENSION = '.tsx';
 
 // The same `compilerOptions` as `svelte.config.js`, which is ESM while this file stays CommonJS
-// `fragments: 'tree'` is mandatory: it emits `from_tree()`, so the shim needs no HTML parser
+// `css: 'injected'` is refused by `customRenderer`, so the style stays external
 
-// `css: 'external'` keeps Svelte from injecting a <style> into a `document.head` that is a shim
 const COMPILER_OPTIONS = {
   fragments: 'tree',
   css: 'external',
   generate: 'client',
+  experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
 };
 
 // The web-only-construct guard runs here on every `.svelte` Metro compiles, not only in the editor
-// `{@html}` compiles to `$.html()`, which assigns an `innerHTML` the shim lacks, so nothing renders
+// The compiler refuses `{@html}` too, but the guard names the native alternative
 
 // Resolved by package self-reference so it works from `src/*.ts` here and `build/*.js` installed
 // Loaded lazily once, as `require()` cannot pull an ESM/TS module but `transform` is async

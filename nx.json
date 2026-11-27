@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "neverConnectToCloud": true,
+  "parallel": 2,
+  "namedInputs": {
+    "sharedGlobals": [
+      "{workspaceRoot}/vitest*.ts",
+      "{workspaceRoot}/tsconfig*.json",
+      "{workspaceRoot}/eslint.config.js",
+      "{workspaceRoot}/eslint-rules/**/*",
+      "{workspaceRoot}/package.json",
+      "{workspaceRoot}/pnpm-lock.yaml",
+      "{workspaceRoot}/pnpm-workspace.yaml",
+      "{workspaceRoot}/examples/**/*",
+      "{workspaceRoot}/scripts/**/*",
+      "{workspaceRoot}/.claude/**/*"
+    ],
+    "default": ["{projectRoot}/**/*", "sharedGlobals"]
+  },
+  "targetDefaults": {
+    "test": {
+      "cache": false,
+      "inputs": ["default", "^default"]
+    },
+    "lint": {
+      "cache": true,
+      "inputs": ["default", "^default"]
+    }
+  }
+}

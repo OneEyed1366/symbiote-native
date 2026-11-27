@@ -1,9 +1,8 @@
 // The compile-and-load harness every `*.smoke.test.ts` in this folder uses.
 //
-// There is no `.svelte`-aware bundler wired into this repo's vitest (svelte-adapter-dom-shim
-// skill §15, a deliberate choice), so a test that needs to RUN a component compiles the real
-// source with `svelte/compiler` itself and dynamic-`import()`s the output. Three rules fall out
-// of that, all of them learned the hard way in the adapter's own smokes:
+// There is no `.svelte`-aware bundler in this repo's vitest, so a test that needs to RUN a
+// component compiles the real source with `svelte/compiler` and dynamic-`import()`s the output
+// Three rules fall out of that:
 //
 //  1. The compiled file must sit NEXT TO the real source, because its own relative imports
 //     (`./stack-screen.svelte`, `../navigation-context`) resolve from wherever the compiled FILE
@@ -15,10 +14,9 @@
 //     already imported hands back the STALE module. Every harness instance therefore stamps its
 //     own id into the filenames.
 //
-// `aliases` covers the one case relative rewriting cannot: `@symbiote-native/svelte`'s main
-// barrel re-exports real `.svelte` sources, which Vite's plain (svelte-plugin-free) transform
-// cannot parse at all - so a test that needs something from it points the specifier at a module
-// it compiled itself instead.
+// `aliases` covers the one case relative rewriting cannot: the main barrel of
+// `@symbiote-native/svelte` re-exports real `.svelte` sources, which Vite's plain transform
+// cannot parse, so a test points that specifier at a module it compiled itself
 
 import { compile } from 'svelte/compiler';
 import { basename, dirname, join, relative, resolve } from 'node:path';

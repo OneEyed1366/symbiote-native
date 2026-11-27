@@ -88,10 +88,7 @@ This example shows state, native layout, text, and a press event.
       let count = $state(0);
     </script>
 
-    <!-- A press callback on a bare host tag goes through the `p={{ … }}` bag — an
-         individual `onPress={…}` attribute is silently misrouted through Svelte's
-         own DOM event system instead of the engine. -->
-    <view class="root" p={{ onPress: () => (count += 1) }}>
+    <view class="root" onPress={() => (count += 1)}>
       <text class="text">Count is {count}</text>
     </view>
 
@@ -132,15 +129,13 @@ This example shows state, native layout, text, and a press event.
 | Concern     | React                          | Vue                            | Angular                             | Svelte                                 | Solid                        |
 | ----------- | ------------------------------ | ------------------------------- | ------------------------------------ | --------------------------------------- | ----------------------------- |
 | State       | `useState()`                   | `ref()`                         | plain class field                    | `$state()` rune                         | `createSignal()`              |
-| Press event | `onPress` directly on `view`   | `@press` directly on `view`     | `(press)` on a `pressable` tag       | `onPress` via a `p={{ onPress }}` bag   | `onPress` directly on `view`  |
+| Press event | `onPress` directly on `view`   | `@press` directly on `view`     | `(press)` on a `pressable` tag       | `onPress` directly on `view`            | `onPress` directly on `view`  |
 | Styling     | `className="root"` + `App.css` | `class="root"` + SFC `<style>`  | `class="root"` + `app.css`           | `class="root"` + component `<style>`    | `class="root"` + `App.css`    |
 | Native path | shared engine                  | shared engine                   | shared engine                        | shared engine                           | shared engine                 |
 
-The `view` tag itself carries `onPress`/`onPressIn`/`onPressOut` — React, Vue,
-and Solid's simplest counter reaches for it directly rather than wrapping in
-`pressable`. Svelte needs the same handlers wrapped in a `p={{ … }}` bag
-because an individual `on*` attribute on a bare host tag is intercepted by
-Svelte's own compiled event system rather than reaching the engine directly.
+The `view` tag itself carries `onPress`/`onPressIn`/`onPressOut`. The simplest
+counter on React, Vue, Svelte, and Solid reaches for it directly rather than
+wrapping in `pressable`.
 Angular's counter uses the `pressable` tag here since its non-function-children
 form is the idiomatic starting point on that adapter; either works on every
 adapter (see the [Pressable example](/docs/examples/pressable/)).

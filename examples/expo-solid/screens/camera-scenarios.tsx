@@ -57,10 +57,12 @@ export function PhotoScenario(props: { deck: ICameraDeck; color: string }) {
       <ActionButton testID="camera-take-photo" title="Take photo" color={props.color} onPress={() => void shoot()} />
       <ResultRow testID="camera-photo-result" label="takePictureAsync" value={line()} />
       <Show when={picture()}>
-        {shot => <image testID="camera-photo" source={{ uri: shot().uri }} class="cam-photo" />}
+        {(shot: Accessor<ICameraCapturedPicture>) => <image testID="camera-photo" source={{ uri: shot().uri }} class="cam-photo" />}
       </Show>
       <Show when={picture()?.exif}>
-        {exif => <ResultRow testID="camera-photo-exif" label="EXIF tags" value={String(Object.keys(exif()).length)} />}
+        {(exif: Accessor<NonNullable<ICameraCapturedPicture['exif']>>) => (
+          <ResultRow testID="camera-photo-exif" label="EXIF tags" value={String(Object.keys(exif()).length)} />
+        )}
       </Show>
     </Scenario>
   );
@@ -106,7 +108,7 @@ export function VideoScenario(props: { deck: ICameraDeck; color: string }) {
         <ActionButton testID="camera-pause-record" title="Pause or resume (iOS 18)" color={props.color} onPress={() => void togglePause()} />
       </view>
       <ResultRow testID="camera-record-result" label="recordAsync" value={line()} />
-      <Show when={uri()}>{clip => <RecordedClip uri={clip()} />}</Show>
+      <Show when={uri()}>{(clip: Accessor<string>) => <RecordedClip uri={clip()} />}</Show>
     </Scenario>
   );
 }

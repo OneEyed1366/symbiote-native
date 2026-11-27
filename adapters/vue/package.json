@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/vue",
-  "version": "3.6.0",
+  "version": "3.6.1",
   "description": "SymbioteNative's Vue adapter — a @vue/runtime-core createRenderer driving real native iOS/Android views through the same engine as the React adapter.",
   "license": "MIT",
   "repository": {
@@ -78,6 +78,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run adapters/vue/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

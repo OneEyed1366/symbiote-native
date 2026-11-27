@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
-import { bindToNode, createElement, createSurface } from '../index';
+import {
+  appendChild,
+  bindToNode,
+  createElement,
+  createSurface,
+} from '../index';
 import { setTreeHost, treeHost } from '../tree-host';
 
 installRecordingFabric();
@@ -85,6 +90,22 @@ describe('a binding to a node', () => {
     bindToNode(node, () => release);
 
     surface.removeChild(node);
+    surface.commit();
+
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('is let go when an ancestor of its node leaves the tree', () => {
+    const release = vi.fn();
+    const { surface, node: screen } = mounted();
+    const row = createElement('RCTView');
+    appendChild(screen, row);
+    surface.commit();
+    const attach = vi.fn(() => release);
+    bindToNode(row, attach);
+    expect(attach).toHaveBeenCalledTimes(1);
+
+    surface.removeChild(screen);
     surface.commit();
 
     expect(release).toHaveBeenCalledTimes(1);

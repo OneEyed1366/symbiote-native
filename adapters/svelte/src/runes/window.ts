@@ -1,17 +1,13 @@
-// The React Native twin of `svelte/reactivity/window`. Upstream reads `window.innerWidth`,
-// `window.outerWidth`, `window.devicePixelRatio` and friends, all of which are absent here — the
-// dom-shim patches only the DOM classes stock compiled Svelte output touches (svelte-adapter-dom-
-// shim skill), never the browser's window-metric properties — so every one of those values would
-// read `undefined` forever and never update. Same names, same `.current` shape, real engine
-// sources underneath.
+// The React Native twin of `svelte/reactivity/window`, with the same names and `.current` shape
+// Upstream reads `window.innerWidth`, `window.devicePixelRatio` and friends, which are absent
+// here and would read `undefined` forever, so these sit on real engine sources instead
 //
 // Two deliberate differences from upstream, both improvements:
 //   - the type is `number`, not `number | undefined`. Upstream's `undefined` is its SSR branch;
 //     there is no SSR here, and Dimensions always answers (it falls back to zero metrics when
 //     DeviceInfo is unresolvable), so a consumer never has to unwrap.
-//   - `outerWidth`/`outerHeight` are the physical SCREEN, not a "browser window inside a desktop
-//     window" — the closest honest reading of outer-vs-inner on a device, where an app's window
-//     is the screen minus system chrome (status bar, navigation bar).
+//   - `outerWidth`/`outerHeight` are the physical screen, not a browser window in a desktop one.
+//     On a device the app window is the screen minus system chrome (status bar, navigation bar)
 //
 // NOT provided, on purpose: `scrollX` / `scrollY` / `screenLeft` / `screenTop`. There is no
 // window-level scroll offset in React Native (scrolling is per-ScrollView, observed through its

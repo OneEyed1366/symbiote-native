@@ -106,6 +106,28 @@ describe('a registered style claim', () => {
     });
   });
 
+  // Both hold only claimed keys, so nothing is published, yet the claim must hear them
+  it('hands the claim a style written after a class that held only claimed keys', () => {
+    registerRules([
+      {
+        tokens: ['spinning'],
+        specificity: [0, 1, 0],
+        order: 0,
+        style: { animationName: 'spin' },
+      },
+    ]);
+    const receive = claimingAnimationKeys();
+    const node = createElement('RCTView');
+    routeProp(node, 'className', 'spinning');
+
+    routeProp(node, 'style', { animationDuration: '600ms' });
+
+    expect(receive).toHaveBeenLastCalledWith(node, {
+      animationName: 'spin',
+      animationDuration: '600ms',
+    });
+  });
+
   it('tells the claim the keys are gone when the style stops carrying them', () => {
     const receive = claimingAnimationKeys();
     const node = createElement('RCTView');

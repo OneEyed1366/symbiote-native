@@ -3,8 +3,8 @@
 // React reads `children` as an inspectable array; Vue scans the default slot's vnodes
 // (`vnode.type === Screen`); Angular queries `@ContentChildren`. Svelte has NO equivalent: a
 // component receives its children as an opaque `Snippet`, with no way to enumerate or inspect
-// what is inside it (the same wall the Svelte adapter's ScrollView hit for
-// `stickyHeaderIndices`, svelte-adapter-dom-shim skill §18). So registration is INVERTED here:
+// what is inside it, as the ScrollView of the Svelte adapter found for `stickyHeaderIndices`
+// So registration is INVERTED here:
 // the navigator publishes a collector on the context, each marker registers ITSELF during its own
 // init, and the navigator's route list derives from what came back.
 //

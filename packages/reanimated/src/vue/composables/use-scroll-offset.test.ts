@@ -1,5 +1,6 @@
 import { installRecordingFabric } from '@symbiote-native/test-utils';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from 'react-native-reanimated/src/common';
 import { WorkletEventHandler } from 'react-native-reanimated/src/WorkletEventHandler';
 import { renderComposable } from '../../../test-support/render-composable';
 import type { IAnimatedRef } from '../../core/animated-ref';
@@ -102,5 +103,61 @@ describe('useScrollOffset', () => {
     renderComposable(() => useScrollOffset(null));
 
     expect(registered).toHaveLength(0);
+  });
+});
+
+// The real ref calls a new observer at once, and during setup it has no view to give a tag of
+function unmountedRef() {
+  const { ref, attach } = observableRef();
+  const real: Pick<IAnimatedRef, 'observe'> = {
+    observe: observer => {
+      const stop = ref.observe(observer);
+      attach(null);
+      return stop;
+    },
+  };
+  return { ref: real, attach };
+}
+
+describe('useScrollOffset with a ref that has no view during setup', () => {
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    warn.mockClear();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('stays quiet when the view arrives within the turn', () => {
+    const { ref, attach } = unmountedRef();
+    renderComposable(() => useScrollOffset(ref));
+
+    attach(5);
+    vi.runAllTimers();
+
+    expect(warn).not.toHaveBeenCalled();
+    expect(registered.map(entry => entry.tag)).toEqual([5]);
+  });
+
+  it('warns once when no view ever arrives', () => {
+    const { ref } = unmountedRef();
+    renderComposable(() => useScrollOffset(ref));
+
+    vi.runAllTimers();
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('animatedRef is not initialized'),
+    );
+  });
+
+  it('says nothing about a component that left within the turn', () => {
+    const { ref } = unmountedRef();
+    const composable = renderComposable(() => useScrollOffset(ref));
+
+    composable.unmount();
+    vi.runAllTimers();
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });

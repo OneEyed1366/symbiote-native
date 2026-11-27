@@ -15,9 +15,10 @@ framework's API conventions. The reference is organized around that split.
 - [Angular API](/docs/api/angular/) — real `@Output()` `EventEmitter`s,
   `<ng-content>` projection, standalone components, and imports from
   `@symbiote-native/angular`.
-- [Svelte API](/docs/api/svelte/) — a DOM shim over stock compiled Svelte
-  output, so components are ordinary Svelte markup with `bind:`, events, and
-  slots working as-is. Imports come from `@symbiote-native/svelte`.
+- [Svelte API](/docs/api/svelte/) - Svelte's custom renderer API
+  (experimental, `svelte >= 5.59.1`), so components are ordinary Svelte markup
+  with `bind:value`, callback props, and snippets. Imports come from
+  `@symbiote-native/svelte`.
 - [Solid API](/docs/api/solid/) - signals and effects for lifecycle, `class`
   for styling, and a render-prop child (`Pressable`, list `renderItem`) that
   takes a Solid `Accessor` rather than a snapshot value. Imports come from

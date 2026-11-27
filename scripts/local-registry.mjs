@@ -21,13 +21,14 @@ import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { listSvelteFiles } from './copy-svelte-sources.mjs';
+import { parseJson, readJsonFile } from './lib/parse-json.mjs';
 import { publishablePackageEntries } from './lib/publishable-packages.mjs';
 import {
   declaredAmong,
   isUnchanged,
   isUntouched,
-  movedSince,
   newestMtimeMs,
+  packagesToInstall,
   readStamps,
   withDependents,
   writeStamps,
@@ -44,6 +45,9 @@ const TOKEN_FILE = join(REPO_ROOT, 'scripts', 'verdaccio', 'token');
 const STAMPS_FILE = join(REPO_ROOT, 'scripts', 'verdaccio', 'stamps.json');
 // Lives in an example's `node_modules`, so wiping it also wipes the claim of what it holds
 const INSTALLED_FILE = '.symbiote-installed.json';
+// What the lockfile pins, in stamp hashes: those differ from the lockfile's, `pnpm pack` publishes
+// Only a full install writes it, since a targeted one leaves the lockfile as it was
+const PINNED_FILE = '.symbiote-pinned.json';
 const USER = 'symbiote-dev';
 const IMAGE = 'verdaccio/verdaccio';
 const CONTAINER = 'verdaccio';
@@ -110,14 +114,10 @@ async function ensureToken() {
   return payload.token;
 }
 
-// `publishablePackageEntries()` yields { name, dir } and nothing else, so the version is read here
-// rather than assumed to be on the entry — an `entry.version` of `undefined` would silently install
-// `@symbiote-native/engine@undefined`, which npm resolves as the `undefined` DIST-TAG and fails with
-// a message about a tag rather than a version.
+// `publishablePackageEntries()` yields no version. An `undefined` one would install
+// `@symbiote-native/engine@undefined`, which npm reads as a dist-tag and fails on with a tag error
 function versionOf(entry) {
-  return JSON.parse(
-    readFileSync(join(REPO_ROOT, entry.dir, 'package.json'), 'utf8'),
-  ).version;
+  return readJsonFile(join(REPO_ROOT, entry.dir, 'package.json')).version;
 }
 
 const npmrcFor = token =>
@@ -198,7 +198,8 @@ function planPublish(selected, stamps, isForced) {
       ['pack', '--dry-run', '--json', '--ignore-scripts'],
       { cwd: join(REPO_ROOT, entry.dir) },
     );
-    const current = { version, integrity: JSON.parse(stdout)[0].integrity };
+    const [packed] = parseJson(stdout, `\`npm pack\` of ${entry.name}`);
+    const current = { version, integrity: packed.integrity };
     const isHeld = !isForced && isUnchanged(stamp, current, isHeldInRegistry);
     return { entry, current, isHeld };
   });
@@ -256,9 +257,7 @@ function packagesToBuild(entries, stamps) {
   });
   const dependenciesByName = Object.fromEntries(
     entries.map(({ name, dir }) => {
-      const manifest = JSON.parse(
-        readFileSync(join(REPO_ROOT, dir, 'package.json'), 'utf8'),
-      );
+      const manifest = readJsonFile(join(REPO_ROOT, dir, 'package.json'));
       const declared = {
         ...manifest.dependencies,
         ...manifest.peerDependencies,
@@ -345,14 +344,14 @@ async function commandPublish(dirs, { isFull = false, isFast = false } = {}) {
 }
 
 // Written once an install has finished, so a killed refresh leaves the old claim and is redone
-function recordInstalled(exampleRoot) {
+function recordInstalled(exampleRoot, files) {
   const modules = join(exampleRoot, 'node_modules');
   const installed = Object.fromEntries(
     Object.entries(readStamps(STAMPS_FILE))
       .filter(([name]) => existsSync(join(modules, name)))
       .map(([name, stamp]) => [name, stamp.integrity]),
   );
-  writeStamps(join(modules, INSTALLED_FILE), installed);
+  files.forEach(file => writeStamps(join(modules, file), installed));
 }
 
 // The repair for the lockfile short-circuit and any drift of `node_modules` from the manifest
@@ -364,22 +363,21 @@ function refreshFully(exampleRoot) {
     cwd: exampleRoot,
     stdio: 'inherit',
   });
-  recordInstalled(exampleRoot);
+  recordInstalled(exampleRoot, [INSTALLED_FILE, PINNED_FILE]);
 }
 
-// The moved packages this example declares, or `null` when only a full install is safe
-// That is the case with nothing installed yet and with a moved package reached only transitively
+// The packages to install that this example declares, or `null` when only a full install is safe
+// That is the case with nothing installed yet and with one of them reached only transitively
 // Moved means the stamped bytes differ from what the example recorded, not what this run published
 function declaredChanges(exampleRoot) {
   const modules = join(exampleRoot, 'node_modules');
   if (!existsSync(modules)) return null;
-  const changed = movedSince(
+  const changed = packagesToInstall(
     readStamps(STAMPS_FILE),
     readStamps(join(modules, INSTALLED_FILE)),
+    readStamps(join(modules, PINNED_FILE)),
   );
-  const manifest = JSON.parse(
-    readFileSync(join(exampleRoot, 'package.json'), 'utf8'),
-  );
+  const manifest = readJsonFile(join(exampleRoot, 'package.json'));
   const declared = declaredAmong(
     manifest,
     changed.map(item => item.name),
@@ -417,7 +415,7 @@ function commandRefresh(targets, { isIncremental = false } = {}) {
         ['install', '--no-save', '--no-audit', '--no-fund', ...specs],
         { cwd: exampleRoot, stdio: 'inherit' },
       );
-      recordInstalled(exampleRoot);
+      recordInstalled(exampleRoot, [INSTALLED_FILE]);
       console.log(`  ${dir}: replaced ${packages.length} package(s)`);
     } catch {
       console.log(`  ${dir}: targeted install failed, reinstalling cleanly`);

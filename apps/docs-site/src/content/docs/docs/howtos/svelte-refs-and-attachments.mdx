@@ -1,32 +1,29 @@
 ---
 title: 'How to: refs and attachments in Svelte'
-description: bind:this vs {@attach} for imperative access to a Symbiote host node from Svelte.
+description: '{@attach} for imperative access to a Symbiote host node from Svelte.'
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 Svelte has no React-style `ref` prop and no Vue template ref. Symbiote's
 primitives (`view`, `text`, `pressable`, …) are ordinary lowercase host tags, so
-reaching the real native node from app code takes one of two mechanisms depending
-on what you're touching.
+reaching the real native node from app code takes `{@attach}`. The compiler
+rejects `bind:this` on an element, so an attachment that stores the node is
+the plain ref.
 
-## `bind:this` — direct, on any primitive tag
+## `{@attach}` as a ref, on any primitive tag
 
-`bind:this` on a primitive tag gives you back a real `ShimElement` directly — no
-wrapper in the way. `hostInstance()` unwraps that into the imperative
-host-instance API (`measure`, `measureInWindow`, `setNativeProps`, `focus`,
-`blur`), and `findNodeHandle()` reads the committed native tag off it — the
-tag only exists after the first commit, so read it from an `$effect`:
+An attachment on a primitive tag receives the engine's own node for that tag.
+`hostInstance()` turns it into the imperative host-instance API
+(`measure`, `measureInWindow`, `setNativeProps`, `focus`, `blur`), and
+`findNodeHandle()` reads the committed native tag off it. The tag only exists
+after the first commit, so read it from an `$effect`:
 
 ```svelte
 <script lang="ts">
-  import {
-    findNodeHandle,
-    hostInstance,
-    type ShimElement,
-  } from '@symbiote-native/svelte';
+  import { findNodeHandle, hostInstance } from '@symbiote-native/svelte';
 
-  let box = $state.raw<ShimElement | null>(null);
+  let box = $state.raw<unknown>(null);
   let tag = $state<number | null>(null);
 
   $effect(() => {
@@ -43,23 +40,28 @@ tag only exists after the first commit, so read it from an `$effect`:
   }
 </script>
 
-<view testID="ref-box" bind:this={box}> ... </view>
+<view
+  testID="ref-box"
+  {@attach node => {
+    box = node;
+  }}
+> ... </view>
 ```
 
-Source: `examples/svelte/components/RefApiDemo.svelte` — the port of React's
+Source: `examples/svelte/components/RefApiDemo.svelte`, the port of React's
 `RefApiDemo.tsx`, backing `measure`/`setNativeProps`/`findNodeHandle`.
 
-Some components expose their own imperative surface without any of this:
-`ScrollView` reads its own `bind:this` internally and exports plain functions
-— `scrollTo`/`scrollToEnd`/`flashScrollIndicators`/`getScrollNode` — the
-Svelte-5 twin of React's `useImperativeHandle`/Vue's `expose()`. Check the
+Some components expose their own imperative surface without any of this.
+`ScrollView` exports plain functions:
+`scrollTo`/`scrollToEnd`/`flashScrollIndicators`/`getScrollNode`. They are the
+Svelte-5 twin of React's `useImperativeHandle` and Vue's `expose()`. Check the
 [Components API](/docs/api/components/) for a component's own exported
 surface before reaching for the raw host tag.
 
-## `{@attach}` — the route for a component, and it works on a tag too
+## `{@attach}` - the route for a component, and it works on a tag too
 
 On a primitive tag, `{@attach}` is nothing but Svelte's own compiler feature working
-directly against the element — no adapter code involved, same as `bind:this`:
+directly against the element, with no adapter code involved:
 
 ```svelte
 <script>
@@ -73,15 +75,16 @@ directly against the element — no adapter code involved, same as `bind:this`:
 ```
 
 Where it earns its keep is the handful of primitives that stay real components
-(`Modal`, `KeyboardAvoidingView`, the list family) — the Svelte compiler rejects
+(`Modal`, `KeyboardAvoidingView`, the list family). The Svelte compiler rejects
 `use:`/`transition:`/`class:`/`style:` on a **component** ("This type of directive is
 not valid on components"), so `{@attach fn}` is the one directive-shaped construct
-that still compiles there: it lands as a prop keyed by a real JS `Symbol`
-(`createAttachmentKey()`), which rides through `$props()`/`...rest` untouched —
-`routeProp` only ever walks string keys — and each of those components spreads
-`...rest` onto its own host tag, forwarding it there for free. From there, the
-adapter's own `createAttachmentsSync()` wires it to the real committed node
-(`adapters/svelte/src/runes/attachments.ts`).
+that still compiles there.
+
+It lands as a prop keyed by a real JS `Symbol` (`createAttachmentKey()`), which
+rides through `$props()`/`...rest` untouched, as `routeProp` only walks string keys.
+Each of those components spreads `...rest` onto its own host tag, forwarding it
+there for free. From there, the adapter's own `createAttachmentsSync()` wires it
+to the real committed node (`adapters/svelte/src/runes/attachments.ts`).
 
 <Aside type="tip">
   `{@attach}` swaps cleanly even when the expression is conditional
@@ -133,13 +136,12 @@ silently does nothing there. An attachment sidesteps that path entirely by
 assigning the property from plain JS:
 
 ```ts
-// packages/navigation/src/svelte/attachments.ts
+// adapters/svelte/src/host-props.ts
 export function hostProps(
   props: Record<string, unknown>,
 ): (node: unknown) => void {
   return node => {
-    if (!isShimElement(node)) return;
-    node.p = props;
+    if (isSymbioteNode(node)) setHostPropBag(node, props);
   };
 }
 ```
@@ -152,23 +154,23 @@ export function hostProps(
 
 ## Which one?
 
-| You have…                                                                          | Use                                               |
+| You have                                                                           | Use                                               |
 | ---------------------------------------------------------------------------------- | ------------------------------------------------- |
-| A primitive tag (`view`, `pressable`, …) and you just need the node                | `bind:this` (or `{@attach}` — both are direct)    |
-| A component with its own exported imperative functions (`ScrollView.scrollTo`, …)  | that component's own `bind:this`                  |
+| A primitive tag (`view`, `pressable`, ...) and you just need the node              | `{@attach}` storing the node                      |
+| A component with its own exported imperative functions (`ScrollView.scrollTo`, ...) | `bind:this` on that component                    |
 | A primitive that still stays a component (`Modal`, `KeyboardAvoidingView`, the list family) | `{@attach}`                               |
 | A third-party Svelte action                                                        | `{@attach fromAction(action, () => arg)}`         |
-| A `<svelte:element>` native leaf (a capitalized, un-hyphenated native view name)   | `{@attach}` setting `node.p`                      |
+| A `<svelte:element>` native leaf (a capitalized, un-hyphenated native view name)   | `{@attach hostProps(bag)}`                        |
 
 <Aside type="caution" title="Symbol keys don't survive every forwarding shape">
   On one of the primitives that still stays a component, `{@attach}` reaches the host
   node only because that component spreads `...rest` (or otherwise forwards the
-  attachment's symbol key). That covers the large majority for free, but a component
-  that rebuilds its child's props by NAME instead — the list family forwarding ~30 named
-  props, or `Animated`'s `reduceProps`, which returns a plain string-keyed
-  `Record` — drops the symbol key silently. Those wrappers explicitly
-  re-forward it with `pickAttachmentProps` from the same module; this is
-  already handled inside `@symbiote-native/svelte`'s own components, so it
-  only matters if you're authoring a new wrapper of your own with the same
-  by-name shape.
+  attachment's symbol key). That covers the large majority for free.
+
+  A component that rebuilds its child's props by NAME drops the symbol key silently.
+  The list family forwarding ~30 named props does, and so does `Animated`'s
+  `reduceProps`, which returns a plain string-keyed `Record`. Those wrappers
+  re-forward it with `pickAttachmentProps` from the same module. It is already
+  handled inside `@symbiote-native/svelte`'s own components, so it only matters if
+  you author a new wrapper with the same by-name shape.
 </Aside>

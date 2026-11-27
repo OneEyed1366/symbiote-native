@@ -1,14 +1,10 @@
-// The first REAL execution of the Svelte DOM-shim pipeline (patchGlobals -> shim tree ->
-// engine -> fake Fabric), not just a typecheck. Every other file in this package has only ever
-// been proven by `tsc --build`; this compiles REAL `.svelte` source through the real
-// `svelte/compiler` (same `fragments: 'tree'` / `css: 'external'` options as svelte.config.js),
-// mounts the output through this adapter's own `mount()`, and asserts on what actually landed
-// in a faked `nativeFabricUIManager`. No `@sveltejs/vite-plugin-svelte` is wired into this
-// repo's vitest config yet, so compiled output is written to a real temp file and dynamic-
-// imported rather than transformed by a loader — see `compileComponent` below.
-//
-// No Negative group: `mount`/`unmount` validate nothing of their own — a malformed
-// `RootComponent` would throw from Svelte's own `mount()`, not from this adapter's contract.
+// The whole chain end to end: real `.svelte` source, compiled by the real `svelte/compiler`
+// Mounted through this adapter's own `mount()`, asserted on what landed in a fake Fabric
+
+// No loader is wired into vitest, so `compileComponent` writes a temp file and imports it
+
+// No Negative group, as `mount` and `unmount` validate nothing of their own
+// A malformed root component would throw from Svelte's own `mount()`, not from this adapter
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -21,12 +17,8 @@ import {
 } from '@symbiote-native/test-utils';
 import { mount, unmount } from './render';
 
-// RN's own bootstrap (setUpGlobals.js / setUpNavigator.js, verified against
-// .vendors/react-native) sets these before any app code runs — `global.window = global` and
-// `global.navigator = {product: 'ReactNative'}`. Neither is patched by patchGlobals() itself
-// (patch-globals.ts's header comment, verified true above), so a bare vitest/Node sandbox
-// needs this same one-time setup to faithfully stand in for a real RN JS runtime; svelte's
-// own `init_operations()` reads both at first mount.
+// RN's own bootstrap sets `window` and `navigator` before any app code runs
+// A bare Node sandbox has neither, and Svelte's `init_operations()` reads both at first mount
 if (globalThis.window === undefined) {
   Object.assign(globalThis, { window: globalThis });
 }
@@ -35,13 +27,9 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_001;
-// Under `build/`: already git-ignored repo-wide, and inside adapters/svelte's own
-// node_modules resolution chain so the compiled output's `import 'svelte/internal/client'`
-// resolves without extra wiring. Its own subfolder (not the bare `__smoke__` dir every smoke
-// file used to share) — vitest runs test FILES in parallel, and a shared directory meant one
-// file's afterEach `rmSync(..., {recursive:true})` could delete a `.mjs` another file's test
-// had just written but not yet dynamic-imported, an intermittent "Cannot find module" failure
-// with nothing wrong in either file's own logic.
+// Under `build/`, which is git-ignored and inside the package's own resolution chain
+// Its own subfolder, as vitest runs files in parallel and a shared one lets an `afterEach` delete
+// a `.mjs` another file just wrote
 const TMP_DIR = join(__dirname, '../build/__smoke__/mount-pipeline');
 
 const fabric = installRecordingFabric();
@@ -49,10 +37,8 @@ const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-// `currentAppRoot()` answers the FIRST box-none surface in the creation log, which is right for
-// every test but the remount ones below: re-mounting the same rootTag tears down the old surface
-// and creates a brand new one, so the log holds two matches and the stale one would still win.
-// Those two tests need the CURRENT surface, so they read the last match instead.
+// Reads the last box-none surface in the creation log
+// A remount of the same `rootTag` leaves two matches, and the first one is the stale surface
 function currentAppRoot(): ReturnType<typeof live.appRoot> {
   const matches = fabric.findAll(
     node => node.props.pointerEvents === 'box-none',
@@ -97,8 +83,7 @@ async function compileComponent(
 describe('mount (real compiled output, real fake-Fabric)', () => {
   describe('Positive', () => {
     it('mounts a static text and commits it under the root view', async () => {
-      // why: proves the whole chain end to end — compiled Svelte output believing it talks
-      // to a real DOM actually reaches a committed native Fabric node, not just a shim tree.
+      // Compiled output reaches a committed native Fabric node, not just the renderer's own tree
       const Hello = await compileComponent(
         '<text p={{}}>hello</text>',
         'Hello',
@@ -114,10 +99,8 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
     });
 
     it('reacts to a $state mutation (self-driven via $effect) and re-commits', async () => {
-      // why: Drives its own second render via $effect rather than an externally-called
-      // exported function, so this exercises the SAME public mount() contract real app code
-      // uses — proving reactivity survives the shim's lazy engine-node binding (skill §9),
-      // not just the initial paint.
+      // A `$effect` drives the second render, so it uses the same public `mount()` as app code
+      // That proves reactivity survives past the initial paint
       const Counter = await compileComponent(
         `<script>
            let count = $state(0);
@@ -136,16 +119,10 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       );
     });
 
-    // root-element.ts's wrapper ShimElement sits between the engine's synthetic flex:1
-    // box-none AppContainer (appRoot()) and the mounted Svelte component's own real
-    // root — unlike Vue/React, which mount their app's root node directly onto the
-    // surface. Without flex:1 on this wrapper, a flex:1-styled app root inside it has no
-    // resolved parent height to grow into and the whole tree collapses to 0x0 (blank,
-    // untappable screen; every prop still commits correctly, which is why this only
-    // shows up visually, never as a thrown error).
+    // The root wrapper from `root-element.ts` sits between the AppContainer and the app root
+    // Without `flex: 1` a `flex: 1` app root has no parent height and the tree collapses to 0x0
     it('gives the root wrapper flex:1 so a flex:1 app root actually fills the screen', async () => {
-      // why: a wrapper missing flex:1 is a silent visual regression (nothing throws), so
-      // this pins the one prop that prevents it.
+      // Nothing throws on a missing `flex: 1`, so this pins the one prop that prevents it
       const Hello = await compileComponent(
         '<text p={{}}>hello</text>',
         'Hello',
@@ -155,18 +132,14 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
       await tick();
       await tick();
 
-      // The engine's flattenStyle/fabricProps step hoists flex onto the top-level Fabric
-      // prop bag (not nested under `style`) — the same shape every other layout prop lands
-      // in once it reaches nativeFabricUIManager.
+      // The engine hoists `flex` onto the top-level Fabric prop bag, not under `style`
       const wrapper = live.nodeOf(currentAppRoot()).children[0];
       expect(wrapper.payload.flex).toBe(1);
     });
 
     it('re-mounting the same rootTag tears down the previous app before mounting the new one', async () => {
-      // why: Fast Refresh and focus-lifecycle restart a surface reusing the same rootTag
-      // (render.ts's own header comment) — mount() must self-teardown rather than stacking a
-      // second Svelte app onto the same target, or the tree would carry both components'
-      // committed nodes side by side.
+      // Fast Refresh restarts a surface on the same `rootTag`, so `mount()` must tear down first
+      // Otherwise the tree would carry both apps' nodes side by side
       const Hello = await compileComponent(
         '<text p={{}}>hello</text>',
         'HelloA',
@@ -190,13 +163,8 @@ describe('mount (real compiled output, real fake-Fabric)', () => {
     });
 
     it('wires global.RN$stopSurface so a real C++-side surface stop reaches unmount()', async () => {
-      // why: global.RN$stopSurface is the JSI hook AppRegistryBinding::stopSurface calls
-      // directly — RN's own renderer installs it, and this adapter REPLACES that renderer, so
-      // without this wiring a real device throws "Global was not installed" on every surface
-      // stop and the screen goes blank (render.ts's own header comment on
-      // installStopSurfaceGlobal). Proven end to end: stopping via the global, then mounting a
-      // fresh component on the same rootTag, must show ONLY the fresh content — the same
-      // teardown a direct unmount() call produces, reached through the C++ entry point instead.
+      // `AppRegistryBinding::stopSurface` calls `RN$stopSurface`, which RN's own renderer installs
+      // This adapter replaces that renderer, so stopping through the global must tear down too
       expect(typeof globalThis.RN$stopSurface).toBe('function');
 
       const Hello = await compileComponent(

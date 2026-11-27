@@ -1,4 +1,5 @@
 import { descriptorToSolid } from '@symbiote-native/solid';
+import type { IViewProps } from '@symbiote-native/solid';
 import {
   isContactAccessButtonAvailable,
   renderContactAccessButton,
@@ -8,7 +9,7 @@ import type { IContactAccessButtonProps } from '../core/contact-access-button';
 // The platform decision is made once at mount: the descriptor bridge builds the node once and
 // only diffs prop values afterwards, so the descriptor's shape must not change
 function ContactAccessButtonView(
-  props: IContactAccessButtonProps,
+  props: IContactAccessButtonProps & Pick<IViewProps, 'class'>,
 ): ReturnType<typeof descriptorToSolid> | null {
   const initial = renderContactAccessButton({ ...props });
   if (!initial) return null;

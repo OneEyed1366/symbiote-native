@@ -1,15 +1,6 @@
-// The whole benchmark screen through the Svelte adapter — all eight device steps, headless.
-//
-// why, the step definitions, the oracle and the one-file-per-arm rule: `bench-suite.ts`.
-//
-// Svelte batches its effects, so a step settles with `tick()` and the await sits inside the
-// stopwatch — the same turn a device pays.
-//
-// The keyed `{#each … (row.id)}` is what makes `Replace` a real teardown rather than a thousand
-// no-op updates, and the row keeps its own component boundary because that is what the device screen
-// has.
-//
-// RUN ON `build-release` (`pnpm run bench:itest`).
+// The whole benchmark screen through the Svelte adapter, all eight device steps, headless
+// The steps, the oracle and the one-file-per-arm rule are explained in `bench-suite.ts`
+// Effects are batched, so a step settles with `tick()` inside the stopwatch, as on a device
 
 import { tick } from 'svelte';
 
@@ -32,10 +23,8 @@ describe('the benchmark screen through the Svelte adapter', () => {
 
     await runBenchSuite({
       name: 'svelte',
-      // One more than every other adapter: the root, the container `createSurface` puts under it,
-      // the screen's own wrapper, AND the DOM shim's root element (`createRootShimElement`,
-      // `adapters/svelte/src/root-element.ts`), which Svelte needs as a mount target and no other
-      // adapter has.
+      // One more than every other adapter: the root, the `createSurface` container, the screen's
+      // wrapper and the mount-target root view (`createRootElement` in `adapters/svelte`)
       chrome: 4,
       readTelemetry: () => readSurfaceTelemetry(ROOT_TAG),
       apply: async next => {

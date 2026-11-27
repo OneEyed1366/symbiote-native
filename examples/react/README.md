@@ -39,6 +39,11 @@ npm run android
 Press <kbd>R</kbd> in the simulator to reload. Because `DEBUG` is Babel-inlined into the bundle,
 changing it needs a fresh `npm start -- --reset-cache`, not just a rebuild.
 
+After any reinstall of `node_modules`, run `npm run dev` once and load the app before a Release build.
+Worklets Bundle Mode writes files into `react-native-worklets/.worklets`, and Metro's cache outlives
+them. The build then fails with `ENOENT` on `.worklets/<id>.js`
+([reanimated#11313](https://github.com/software-mansion/react-native-reanimated/issues/11313)).
+
 ## Test it
 
 ```sh

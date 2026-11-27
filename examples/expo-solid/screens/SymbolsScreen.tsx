@@ -168,7 +168,9 @@ function MaterialSourceCard() {
       <text class="hero-body">For APIs that want an image, such as a native tab bar icon, a Material symbol can be rendered to an image source.</text>
       <ResultRow testID="symbols-source-status" label="unstable_getMaterialSymbolSourceAsync" value={status()} />
       <Show when={source()}>
-        {current => <image testID="symbols-source-image" source={current()} class="sym-image-icon" />}
+        {(current: () => NonNullable<ReturnType<typeof source>>) => (
+          <image testID="symbols-source-image" source={current()} class="sym-image-icon" />
+        )}
       </Show>
     </Card>
   );

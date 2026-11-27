@@ -1,9 +1,6 @@
-// Guards the ONE thing this preprocessor exists for: constructs that compile cleanly under the
-// DOM shim and then silently do nothing (svelte-adapter-dom-shim skill §7/§22d/§25). A regression
-// here is invisible — the build stays green and the screen stays blank — so each construct gets an
-// explicit case asserting the SPECIFIC thrown message, not just "it threw something", and the
-// clean-markup cases assert the preprocessor is not over-reaching into constructs it must leave
-// alone.
+// Guards constructs that compile cleanly and then silently do nothing on a native tree
+// A regression is invisible, as the build stays green and the screen stays blank
+// Each case asserts the specific thrown message, and clean markup must pass through untouched
 
 import { describe, expect, it } from 'vitest';
 import { forbidWebOnlyConstructs } from './forbid-web-only-constructs';
@@ -47,17 +44,16 @@ describe('forbidWebOnlyConstructs — markup', () => {
       ],
       ['<svelte:body>', '<svelte:body onclick={() => {}} />'],
     ])(
-      // why: each of these compiles and then is permanently inert under the DOM shim (skill §4)
-      // — silent, not a crash — so the only safe behavior is refusing at build time.
+      // Each of these compiles and then stays inert on a native tree, silently and with no crash
+      // So the only safe behavior is refusing at build time
       'rejects %s',
       (label, source) => {
         expect(() => run(source)).toThrow(label);
       },
     );
 
-    // why: with no filename (a preprocessor can legitimately be invoked without one), the error
-    // still has to name SOME source rather than crash on a missing string — the '<svelte>'
-    // placeholder is the documented fallback for that path.
+    // A preprocessor can be invoked without a filename, and the error must still name a source
+    // The '<svelte>' placeholder is the documented fallback for that path
     it('falls back to a <svelte> placeholder in the message when no filename is given', () => {
       expect(() =>
         runWithNoFilename('<svelte:head><title>x</title></svelte:head>'),
@@ -90,9 +86,8 @@ describe('forbidWebOnlyConstructs — markup', () => {
 });
 
 // Browser-only IMPORTS fail the same way the special elements do — permanently undefined values,
-// no error anywhere — one level up from the markup. The boundary matters as much as the ban: the
-// rest of these modules is pure and must keep working, so both directions are covered. Mapping
-// measured per subpackage, see svelte-adapter-dom-shim skill §25.
+// no error anywhere, one level up from the markup
+// The rest of these modules is pure and must keep working, so both directions are covered
 describe('forbidWebOnlyConstructs — browser-only svelte imports', () => {
   describe('Positive (pure members of the same modules stay importable)', () => {
     it('leaves the pure members of svelte/reactivity alone', () => {

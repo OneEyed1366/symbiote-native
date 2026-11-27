@@ -3,9 +3,11 @@
   // so the tag is dynamic
   import { hostProps } from '@symbiote-native/svelte/native-view-bridge';
   import { renderAppleAuthenticationButton } from '../core/apple-authentication-button';
+  import type { IViewProps } from '@symbiote-native/svelte';
   import type { IAppleAuthenticationButtonProps } from '../core/apple-authentication-button';
 
-  const props: IAppleAuthenticationButtonProps = $props();
+  const props: IAppleAuthenticationButtonProps & Pick<IViewProps, 'class'> =
+    $props();
   const descriptor = $derived(renderAppleAuthenticationButton({ ...props }));
 </script>
 

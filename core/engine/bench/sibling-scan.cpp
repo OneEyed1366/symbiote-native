@@ -1,36 +1,19 @@
-// What an INSERT costs as the sibling list grows, and whether that is where Append went.
-//
-// WHY THIS EXISTS. `examples/svelte` regressed against its 2026-09-01 baseline by Create +40 ms,
-// Append +147 and Replace +54, with `WRITES` and the tree byte-identical — so the same work is
-// being priced higher. Append's share is the readable one: baseline Append was Create + 18 ms and
-// it is now Create + 125, and the only thing that distinguishes the two rows is that Append inserts
-// into a list ALREADY holding a thousand children. That is the signature of a per-insert cost
-// proportional to the number of siblings standing.
-//
-// There is exactly one such scan on the path, `SymbioteTree.cpp`'s
-//
-//   auto position = std::find(siblings.begin(), siblings.end(), before);
-//
-// and Svelte reaches it on every single row: `{#each}` appends with `anchor.before(node)`, which the
-// shim spells as `insertBefore(node, anchor)`, and the anchor sits AFTER the items — so the find
-// walks the whole list, every time, by construction rather than by bad luck.
-//
-// SO WHY MEASURE SOMETHING THAT OBVIOUS. Because the arithmetic says it should not matter: a
-// thousand inserts against an average of 1 500 siblings is ~1.5M pointer comparisons over a 24 KB
-// vector that sits in L2, which ought to cost single-digit milliseconds and not 107. Either the
-// arithmetic is wrong or the mechanism is elsewhere, and guessing between those two has already
-// cost one wrong attribution this session (teardown was blamed for Replace and explained 14 ms of
-// 68). The curve settles it: flat per-insert cost exonerates the scan outright.
-//
-// WHAT THIS IS NOT. It prices the CONTAINER OPERATIONS, not the engine — no JSI, no Fabric, no
-// folly, no props. That is deliberate and it is the same scope `dynamic-copy.cpp` takes: the
-// question is about `std::find` over a `vector<shared_ptr<Node>>` and nothing else. A node here
-// therefore carries only what the scan actually touches. If the arms come back flat, the answer is
-// "not the container" and the next instrument has to be a real one.
-//
-// THE CONTROL IS ARM A. `appendChild` does no find at all, so it is the floor every other arm is
-// read against. Without it a large number in arm C is unreadable — it could just be what inserting
-// a thousand nodes costs.
+// Prices an insert as the sibling list grows, and whether that is where Append went
+// `examples/svelte` regressed on Create, Append and Replace with `WRITES` and the tree identical
+// Append inserts into a list that already holds a thousand children, so a per-sibling cost fits
+
+// The one such scan on the path is the `std::find` over siblings in `SymbioteTree.cpp`
+// Svelte reaches it on every row: `{#each}` inserts before an anchor that sits after the items,
+// which the renderer spells as `insertBefore(node, anchor)`, so the find walks the whole list
+
+// The arithmetic says it should not matter: a thousand inserts over ~1 500 siblings is ~1.5M
+// pointer comparisons in a 24 KB vector held in L2, single-digit ms and not 107
+// A flat per-insert cost across the arms exonerates the scan outright
+
+// Prices the container operations only (no JSI, Fabric, folly or props), as `dynamic-copy.cpp` does
+// A node carries only what the scan touches, and flat arms mean a real instrument is next
+
+// Arm A is the control: `appendChild` does no find, so it is the floor for every other arm
 
 #include <algorithm>
 #include <chrono>
@@ -43,17 +26,14 @@ namespace {
 struct Node;
 using NodePtr = std::shared_ptr<Node>;
 
-// Only the two fields the insert path touches. `props`/`committedProps`/`attachedHandle` exist on
-// the real node and are never read by a scan, so leaving them out changes the cache footprint of
-// the NODES and not of the vector being walked — and it is the vector that is walked.
+// Only the two fields the insert path touches, so node size does not skew the vector being walked
 struct Node {
   Node *parent = nullptr;
   std::vector<NodePtr> children;
 };
 
 double millisOf(const char *label, int inserts, void (*arm)(int), int argument) {
-  // Two warm passes then the timed one: the first pass pays page faults for the pool, which would
-  // otherwise land entirely on whichever arm ran first.
+  // Two warm passes, then the timed one, as the first pass pays the pool's page faults
   arm(argument);
   arm(argument);
   const auto start = std::chrono::steady_clock::now();
@@ -68,7 +48,7 @@ double millisOf(const char *label, int inserts, void (*arm)(int), int argument) 
 
 constexpr int kInserts = 1000;
 
-// Arm A — appendChild: push_back, no scan. The floor.
+// Arm A, `appendChild`: push_back with no scan, the floor
 void armAppend(int) {
   auto parent = std::make_shared<Node>();
   for (int at = 0; at < kInserts; at += 1) {
@@ -78,9 +58,8 @@ void armAppend(int) {
   }
 }
 
-// Arms B..D — insertBefore against a TRAILING anchor, which is the Svelte `{#each}` shape: the find
-// walks every standing sibling before reaching it. `standing` is what the list already holds, so
-// B is the Create row (empty list) and C/D are the Append row at two widths.
+// Arms B to D, `insertBefore` against a trailing anchor, the `{#each}` shape: the find walks every
+// standing sibling first, and `standing` is what the list holds (B is Create, C and D are Append)
 void armInsertBeforeAnchor(int standing) {
   auto parent = std::make_shared<Node>();
   for (int at = 0; at < standing; at += 1) {
@@ -99,9 +78,8 @@ void armInsertBeforeAnchor(int standing) {
   }
 }
 
-// Arm E — removal, for reference. Already fixed on the JS side (the sweep no longer walks per node),
-// and Clear came back to baseline, so this arm should read SMALL. If it does not, the container is
-// implicated after all and the JS fix was masking it.
+// Arm E, removal, for reference: already fixed on the JS side and Clear is back at baseline
+// If it reads large the container is implicated after all, and the JS fix was masking it
 void armRemoveAll(int) {
   auto parent = std::make_shared<Node>();
   std::vector<NodePtr> held;
@@ -112,26 +90,16 @@ void armRemoveAll(int) {
     held.push_back(child);
     parent->children.push_back(std::move(child));
   }
-  // Front-to-back, the worst order: every erase shifts the whole remaining tail.
+  // Front-to-back is the worst order, as every erase shifts the whole remaining tail
   for (const auto &child : held) {
     auto &siblings = parent->children;
     siblings.erase(std::remove(siblings.begin(), siblings.end(), child), siblings.end());
   }
 }
 
-// ── ARM F — THE POST-COMMIT ADOPT PASS, AT ITS WORST ─────────────────────────────────────────────
-//
-// `adoptCommitted` re-points the retained tree at what Fabric actually committed. It claims
-// O(changed) on the grounds that an identical pointer means an identical subtree and stops the
-// descent — but that early-out only fires while Fabric leaves nodes alone, and the pass exists
-// precisely BECAUSE Fabric substitutes clones inside the commit. When it substitutes throughout,
-// the pass degenerates to O(tree), and its per-node body is not free: a `vector<Node *>` for the
-// owners, and a ChildSet COPY into `committedChildren`, which is an atomic increment per edge.
-//
-// Whether Fabric really substitutes the whole tree is Fabric's business and no headless stand-in can
-// answer it honestly. What CAN be answered here is the ceiling: if the worst case — every node
-// visited, both allocations paid — cannot reach the 107 ms being explained, the mechanism is not
-// this one and no device build is needed to say so.
+// Arm F, the post-commit adopt pass at its worst: `adoptCommitted` claims O(changed) via the
+// identical-pointer early-out, but Fabric substitutes clones in the commit, so it can be O(tree)
+// Whether Fabric does is not answerable headless, so this prices the ceiling: every node visited
 struct Landed {
   std::vector<std::shared_ptr<Landed>> children;
 };
@@ -147,11 +115,11 @@ void adoptShaped(Node &node, const std::shared_ptr<Landed> &landed,
     std::vector<std::shared_ptr<Landed>> theirs;
     adoptShaped(*owners[index], landed->children[index], theirs);
   }
-  // The ChildSet copy: one heap allocation plus an atomic increment per child.
+  // The ChildSet copy: one heap allocation plus an atomic increment per child
   committedChildren = landed->children;
 }
 
-// Ten nodes per row, the shape `examples/svelte`'s benchmark row actually builds.
+// Ten nodes per row, the shape of `examples/svelte`'s benchmark row
 void buildRow(Node &parent, std::shared_ptr<Landed> &landedParent) {
   for (int at = 0; at < 10; at += 1) {
     auto child = std::make_shared<Node>();
@@ -176,20 +144,9 @@ void armAdoptWholeTree(int rows) {
   adoptShaped(*root, landedRoot, committed);
 }
 
-// ── ARM H — THE FLOOR FOR A ONE-CHILD CHANGE ─────────────────────────────────────────────────────
-//
-// A persistent tree cannot mutate a parent in place: one child changing means the parent gets a NEW
-// child vector, and that vector is O(siblings) whatever the implementation does. So "a one-node
-// write costs O(siblings)" is not by itself a defect — it is the price of clone-on-write, and React
-// pays it on the identical tree.
-//
-// What is NOT inherent is how that vector gets built. The floor is a memcpy-shaped copy of the
-// standing vector with one slot replaced. `materialize` instead re-derives it: a function call per
-// child through `appendRenderable`, each re-deciding reuse against the dirty pair, the family and
-// the text context, pushing into a fresh vector AND into a second `owners` vector alongside.
-//
-// This arm prices the floor so the gap between it and the real thing is a number rather than an
-// opinion. Same widths as the insert arms, so the two tables can be read together.
+// Arm H, the floor for a one-child change: a persistent tree gives the parent a NEW child vector,
+// O(siblings) whatever the implementation, so that cost is clone-on-write's price and React pays it
+// The floor is a copy of the standing vector with one slot replaced, at the insert arms' widths
 void armReplaceOneChild(int standing) {
   auto parent = std::make_shared<Node>();
   parent->children.reserve(static_cast<size_t>(standing));
@@ -198,7 +155,7 @@ void armReplaceOneChild(int standing) {
   }
   const size_t middle = static_cast<size_t>(standing) / 2;
 
-  // kInserts commits, each replacing one child — the `select` row, repeated so the timer can see it.
+  // `kInserts` commits each replacing one child, like `select`, repeated so the timer sees it
   for (int at = 0; at < kInserts; at += 1) {
     std::vector<NodePtr> next = parent->children;  // the unavoidable copy
     next[middle] = std::make_shared<Node>();       // the one slot that actually changed
@@ -206,19 +163,9 @@ void armReplaceOneChild(int standing) {
   }
 }
 
-// ── ARM I — HOW `materialize` ACTUALLY BUILDS THAT SAME VECTOR ───────────────────────────────────
-//
-// Arm H is the floor and arm I is the shape of the real thing, in the SAME language so the two are
-// comparable — a TypeScript number against a C++ one would say nothing about either.
-//
-// Per child, `materialize` → `appendRenderable` does: a call, the anchor test, the empty-raw-text
-// test, then `materialize` on the child, which re-decides the fast path against `selfDirty`,
-// `pathDirty`, a committed pointer, the family (view name plus committed parent) and the text
-// context — then pushes into the new child set AND into the `owners` vector beside it.
-//
-// Modelled here with the same branch and allocation shape. Nothing is measured about WHICH answers
-// those checks give; the point is that they are asked N times to rediscover what the standing
-// vector already recorded.
+// Arm I, how `materialize` builds that same vector, in the same language so the arms compare
+// Per child: anchor and empty-raw-text tests, then a reuse decision over dirty flags, committed
+// pointer, family and text context, modelled with the same branch and allocation shape
 struct Modelled {
   bool selfDirty = false;
   bool pathDirty = false;
@@ -292,8 +239,7 @@ int main() {
               floor4000 > 0.0 ? rederive4000 / floor4000 : 0.0);
 
   std::printf("\nthe post-commit adopt pass, every node visited (its worst case)\n\n");
-  // Per NODE, not per insert: what is being priced is the walk, and the Create tree holds 10 001 of
-  // them against Append's 20 001.
+  // Per NODE, not per insert, as the walk is priced: Create holds 10 001 nodes, Append 20 001
   const double adoptCreate =
       millisOf("F  adopt 1 000 rows  (10 001 nodes, Create)", 10001, armAdoptWholeTree, 1000);
   const double adoptAppend =
@@ -303,39 +249,25 @@ int main() {
 
   std::printf("\nthe scan's own cost, against the no-scan floor: B %+.3f ms, C %+.3f, D %+.3f\n",
               empty - floor, thousand - floor, fourThousand - floor);
-  // Four times the siblings for four times the cost means the scan is the term; anything flatter
-  // means it is not, whatever the pointer arithmetic suggested.
+  // Four times the siblings for four times the cost means the scan is the term, flatter means not
   std::printf("C -> D is a 4x widening: %.2fx the time\n",
               thousand > 0.0 ? fourThousand / thousand : 0.0);
   std::printf("\ndevice gap this is trying to explain: Append is now Create + 125 ms, was + 18\n\n");
   return 0;
 }
 
-// Build and run (no pod, no simulator, no device — it needs nothing but a C++20 compiler):
-//
+// Build and run, it needs nothing but a C++20 compiler
+
 //   clang++ -std=c++20 -O2 -DNDEBUG -o /tmp/sibling-scan core/engine/bench/sibling-scan.cpp \
 //     && /tmp/sibling-scan
 
-// ── ANSWER, measured (2026-09-17) ───────────────────────────────────────────────────────────────
-//
-// The scan is exonerated, exactly as arms B/C/D predicted it might be: at 4 000 standing siblings,
-// its OWN cost over the no-scan floor is +1.224 ms for 1 000 inserts (C -> D widens 4x in sibling
-// count but only 2.76x in time — sub-linear, the opposite of what a quadratic culprit would show).
-// Nowhere near the 107 ms device gap this file was built to explain. Do not re-open `std::find` as
-// a suspect without a new device measurement pointing back at it.
-//
-// Arms H/I found the real signal instead, unprompted: the FLOOR for a single-child-change commit
-// (copy the sibling vector, splice one slot) already costs real time at scale — 13.8 us/commit at
-// 4 000 siblings, expected, that is clone-on-write's own price. What `materialize` actually pays
-// for the SAME commit is 28.7 us/commit at the same width: a stable ~2.1x over the floor (2.9x at
-// 500 siblings, 2.1x at 1000/2000/4000 — converges, does not grow, so this is a constant per-child
-// overhead, not a second quadratic term hiding behind the first). The 14.8 us/commit gap at 4 000
-// siblings is `appendRenderable`'s own cost: a function call, the anchor test, the empty-raw-text
-// test, and a five-field reuse decision (`selfDirty`, `pathDirty`, committed pointer, family,
-// context), asked fresh for every UNCHANGED sibling on a commit where only one child differs.
-//
-// NOT fixed here. This is a real correctness-adjacent hot path (family tracking, anchor handling,
-// text-ancestor context all feed the reuse decision `materialize` makes per child) and changing it
-// needs the itest suite's full weight behind it, not a headless container bench. Left as the next
-// concrete target: a fast path for "parent structurally unchanged, exactly one child self-dirty"
-// that splices instead of re-deriving. Quantified in `.docs/tree-inefficiency-findings.md`.
+// Result: the scan costs +1.224 ms over the no-scan floor at 4 000 siblings and 1 000 inserts
+// C to D widens 4x in siblings and 2.76x in time, so it is sub-linear and far from the 107 ms gap
+// Do not reopen `std::find` as a suspect without a new device measurement pointing back at it
+
+// Arms H and I found the real signal: a one-child commit costs 13.8 us at 4 000 siblings (floor)
+// against 28.7 us through `materialize`, a stable ~2.1x (2.9x at 500, 2.1x at 1000 to 4000)
+// The 14.8 us gap is `appendRenderable`'s per-sibling work, asked again for every unchanged child
+
+// Not fixed here, as the reuse decision feeds family, anchor and text-ancestor handling
+// The next target is a fast path that splices when the parent is unchanged and one child is dirty

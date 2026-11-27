@@ -19,12 +19,12 @@ import type { IPanResponderGestureState } from './gesture-math';
 
 export type { IPanResponderGestureState };
 
-// (event, gestureState) -> boolean: the should-set / termination-request gate.
+// `(event, gestureState) => boolean`: the should-set and termination-request gate
 type IActiveCallback = (
   event: ISymbioteEvent,
   gestureState: IPanResponderGestureState,
 ) => boolean;
-// (event, gestureState) -> void: grant / move / release / terminate side effects.
+// `(event, gestureState) => void`: grant, move, release and terminate side effects
 type IPassiveCallback = (
   event: ISymbioteEvent,
   gestureState: IPanResponderGestureState,
@@ -47,12 +47,9 @@ export type IPanResponderCallbacks = {
   onShouldBlockNativeResponder?: IActiveCallback | null;
 };
 
-// The responder props PanResponder produces, handed to a primitive as `panHandlers`.
-//
-// A `type` and not an `interface` on purpose: an interface gets no implicit index signature, so it
-// is not assignable to a `Record<string, unknown>` — and that is exactly what the Svelte shim's
-// bag prop takes. Declared as an interface, `p={panResponder.panHandlers}` is a type error while
-// the identical object literal is fine.
+// The responder props `PanResponder` produces, handed to a primitive as `panHandlers`
+// A `type`, as an interface has no implicit index signature and so is not assignable to the
+// `Record<string, unknown>` that the Svelte `p` bag prop takes
 export type IGestureResponderHandlers = {
   onStartShouldSetResponder: (event: ISymbioteEvent) => boolean;
   onStartShouldSetResponderCapture: (event: ISymbioteEvent) => boolean;
@@ -74,7 +71,7 @@ export type IPanResponderInstance = {
 };
 
 const SINGLE_TOUCH_COUNT = 1;
-// onShouldBlockNativeResponder defaults to true (RN: block native by default).
+// `onShouldBlockNativeResponder` defaults to true, as in RN
 const DEFAULT_BLOCK_NATIVE_RESPONDER = true;
 
 type IShouldSetHandlers = Pick<

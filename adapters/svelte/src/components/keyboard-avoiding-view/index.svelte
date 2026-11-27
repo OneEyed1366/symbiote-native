@@ -14,8 +14,7 @@
     type IEventSubscription,
     type ISymbioteEvent,
   } from '@symbiote-native/engine';
-  import { createAttachmentsSync } from '../../runes/attachments';
-  import type { ShimElement } from '../../dom-shim';
+  import { forwardAttachments } from '../../runes/attachments';
   import {
     createKeyboardAvoidingModel,
     keyboardAvoidingEventNamesFor,
@@ -96,21 +95,17 @@
   );
 
   // Bound to the OUTER wrapper, the node this component's own style lands on in both layouts
-  let hostShim = $state.raw<ShimElement | null>(null);
-  const syncAttachments = createAttachmentsSync();
-  $effect(() => {
-    syncAttachments(hostShim, passthrough);
-  });
+  const forwardToHost = forwardAttachments(() => passthrough);
 </script>
 
 {#if layout.kind === 'nested'}
-  <view p={wrapperBag} bind:this={hostShim}>
+  <view p={wrapperBag} {@attach forwardToHost}>
     <view p={innerBag}>
       {@render children?.()}
     </view>
   </view>
 {:else}
-  <view p={wrapperBag} bind:this={hostShim}>
+  <view p={wrapperBag} {@attach forwardToHost}>
     {@render children?.()}
   </view>
 {/if}

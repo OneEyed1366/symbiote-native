@@ -1,27 +1,16 @@
-// Verification (svelte-support Check 2): does `$inspect` — pure reactivity machinery with no
-// DOM dependency — fire through this adapter's own mount/commit pipeline (build-once-then-
-// clone, lazy engine-node creation)? Same compile-real-source-through-svelte/compiler + mount()
-// harness as mount-pipeline.smoke.test.ts; see that file's header for why a temp-file dynamic
-// import is used instead of a vite-plugin-svelte transform.
-//
-// FINDING: it does not, in this adapter's REAL build. `$inspect` is not a mount-pipeline defect
-// — it is a general svelte/compiler fact: every `$inspect(...)` call is compiled away entirely
-// unless `dev: true` is passed to `compile()` (verified directly against svelte@5.56.8, no DOM
-// shim involved). metro-svelte-transformer.cjs's `COMPILER_OPTIONS` never sets `dev`, so every
-// real Metro build — dev or release — compiles in production mode and silently drops every
-// `$inspect` call with no error, no warning, nothing in the output. The two cases below prove
-// the split: the first compiles WITHOUT `dev` (this adapter's actual Metro option, and the
-// smoke suite's own `COMPILER_OPTIONS` twin) and documents the current no-op; the second passes
-// `dev: true` and proves the mount pipeline itself has no problem with `$inspect` once the
-// compiler is told to keep it.
-//
-// NOT fixed here: gating `dev` in metro-svelte-transformer.cjs is a real build-mode decision,
-// not a one-line config fix — Svelte's dev codegen adds ownership/binding/mutation validation
-// throughout EVERY compiled component (not just ones that use $inspect), which could newly
-// throw on patterns this adapter's DOM shim already relies on (skill: "the engine node must be
-// LAZY", "build-once-then-clone"), and needs its own env-flag wiring (mirroring this repo's
-// DEBUG-gated `dlog`) plus a full pass of the existing component suite before it's safe to flip
-// even conditionally. Scope it as a follow-up task, not folded into this verification pass.
+// Does `$inspect` fire through this adapter's mount and commit pipeline?
+// The harness is `mount-pipeline.smoke.test.ts`'s, see its header
+
+// It does not in the real build, and that is a `svelte/compiler` fact, not a mount defect
+// Every `$inspect(...)` is compiled away unless `dev: true` is passed to `compile()`
+// `metro-svelte-transformer.cjs` never sets `dev`, so a Metro build drops it with no warning
+
+// The first case compiles without `dev`, as Metro does, and documents the no-op
+// The second passes `dev: true` and shows the mount pipeline itself handles `$inspect`
+
+// Not fixed here: gating `dev` is a build-mode decision, not a one-line config change
+// Svelte's dev codegen validates ownership and mutation in every compiled component
+// That could newly throw on patterns the renderer relies on, so it needs a full suite pass first
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -41,11 +30,8 @@ if (globalThis.navigator === undefined) {
 }
 
 const ROOT_TAG = 91_002;
-// Own subfolder, not the bare `__smoke__` dir — vitest runs test FILES in parallel, and a
-// shared directory with mount-pipeline.smoke.test.ts meant one file's afterEach
-// `rmSync(..., {recursive:true})` could delete a `.mjs` the other file's test had just written
-// but not yet dynamic-imported (an intermittent "Cannot find module" failure, unrelated to
-// either file's own logic — found running this package's suite as a whole).
+// Own subfolder, as vitest runs files in parallel and a shared one lets an `afterEach`
+// delete a `.mjs` another file just wrote
 const TMP_DIR = join(__dirname, '../build/__smoke__/inspect-rune');
 
 const fabric = installRecordingFabric();
@@ -87,23 +73,14 @@ async function compileComponent(
   return mod.default as Component;
 }
 
-// No Negative group: neither compile option throws — the finding is a silent difference in
-// compiled OUTPUT, which is exactly why it needed a real-execution test to catch at all (a
-// dropped call site produces no error, no warning, nothing `tsc`/`svelte-check` can see).
+// No Negative group, as neither compile option throws
+// The difference is silent in the compiled output, so only a real run can catch it
 describe('$inspect under the svelte adapter mount pipeline', () => {
   describe('characterization — svelte/compiler decides this, not this adapter', () => {
     it("does NOT fire under this adapter's real (non-dev) compile options — documents the known gap", async () => {
-      // why: this IS the adapter's real Metro compile mode (metro-svelte-transformer.cjs's
-      // COMPILER_OPTIONS never sets `dev`) — pins the current, accepted, non-dev-mode behavior
-      // so a future compile-option change is caught rather than silently drifting further.
-      // QUESTION: gating `dev` in metro-svelte-transformer.cjs is a real build-mode decision
-      // (see the file header) — not resolved here, left as a documented gap rather than fixed.
-      //
-      // The component drives its own second/third render via $effect (same self-driven
-      // pattern as mount-pipeline.smoke.test.ts's Counter case) and pushes every $inspect
-      // callback invocation onto a global array the test reads back after mounting —
-      // $inspect itself has no return value the compiled module could re-export. No `dev`
-      // option passed here, matching metro-svelte-transformer.cjs's real COMPILER_OPTIONS.
+      // This is the real Metro compile mode, so a future option change is caught here
+      // QUESTION: gating `dev` is a build-mode decision (see the file header), left as a gap
+      // The component pushes every `$inspect` callback onto a global array the test reads back
       (globalThis as { __inspectLog?: number[] }).__inspectLog = [];
       const Counter = await compileComponent(
         `<script>
@@ -123,9 +100,8 @@ describe('$inspect under the svelte adapter mount pipeline', () => {
 
       const log =
         (globalThis as { __inspectLog?: number[] }).__inspectLog ?? [];
-      // The component itself still renders and re-renders correctly (count reaches 2) — only
-      // the $inspect probe is silently gone, proving svelte/compiler stripped the call site
-      // rather than the mount pipeline breaking reactivity.
+      // The component still re-renders to 2 and only the probe is gone
+      // So the compiler stripped the call site, and the mount pipeline kept reactivity
       expect(log).toEqual([]);
       const texts = live
         .findAllLive(live.appRoot(), node => node.viewName === 'RCTRawText')
@@ -136,10 +112,7 @@ describe('$inspect under the svelte adapter mount pipeline', () => {
 
   describe('Positive', () => {
     it('isolation probe: with dev:true passed to svelte/compiler, $inspect DOES fire through this same mount pipeline', async () => {
-      // why: confirms the test above is a compile-option fact (svelte/compiler erases every
-      // `$inspect` call unless `dev: true`), not a defect in this adapter's own mount/commit
-      // path — isolates the mount pipeline as innocent so a future investigation doesn't
-      // re-chase it if the compile-option story ever changes.
+      // Confirms the case above is a compile-option fact, not a defect in the mount and commit path
       (globalThis as { __inspectLog?: number[] }).__inspectLog = [];
       const Counter = await compileComponent(
         `<script>

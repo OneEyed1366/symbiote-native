@@ -1,4 +1,5 @@
 const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const { bundleModeMetroConfig } = require('react-native-worklets/bundleMode');
 
 const projectRoot = __dirname;
 
@@ -18,9 +19,8 @@ const defaultConfig = getDefaultConfig(projectRoot);
  */
 const config = {
   transformer: {
-    // @symbiote-native/solid ships the standalone .css/.module.css transformer itself (the same
-    // framework-agnostic path the React, Vue-TSX and Angular examples use via their own adapter's
-    // ./metro-css-parser export), so no local wiring file is needed.
+    // @symbiote-native/solid ships the standalone .css/.module.css transformer itself
+    // Same framework-agnostic path as the other examples, so no local wiring file is needed
     babelTransformerPath:
       require.resolve('@symbiote-native/solid/metro-css-parser'),
   },
@@ -48,23 +48,10 @@ const config = {
     // `/\.svelte$/` entry.
     unstable_forceFullRefreshPatterns: [/\.tsx$/],
 
-    // DELIBERATELY NOT setting `unstable_conditionNames`, unlike the Svelte canary — verified
-    // against the installed Metro rather than assumed, because solid-js's export map DOES have a
-    // `node` branch pointing at its SSR build (dist/server.js), the same shape that resolved into
-    // Svelte's native bundle and threw `lifecycle_function_unavailable` on first mount.
-    //
-    // Metro builds its condition set as {'default', 'import'|'require' (from the call syntax),
-    // ...unstable_conditionNames, ...unstable_conditionsByPlatform[platform]} — see
-    // metro-resolver/src/utils/matchSubpathFromExportsLike.js. RN's own default contributes
-    // ['react-native'] (@react-native/metro-config/dist/index.js). `node` is never in that set, so
-    // solid-js's SSR branch is unreachable and the first matching key is the top-level `import`:
-    // dist/solid.js, the client build. Correct by default.
-    //
-    // Adding 'browser' would NOT change which file wins (solid-js declares `browser` after
-    // `import`, and first-match-in-declaration-order decides), but mergeConfig REPLACES the array
-    // rather than extending it — so it would silently drop 'react-native' and with it every
-    // package's react-native-specific entry point. Strictly a loss.
+    // `unstable_conditionNames` stays unset, т.к. Metro never adds `node` and solid-js then
+    // resolves its client build (`dist/solid.js`), not the SSR one that broke the Svelte canary
+    // Setting it drops the default `react-native` condition, as `mergeConfig` replaces arrays
   },
 };
 
-module.exports = mergeConfig(defaultConfig, config);
+module.exports = mergeConfig(defaultConfig, bundleModeMetroConfig, config);

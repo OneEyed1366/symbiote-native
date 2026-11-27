@@ -1,11 +1,8 @@
 <script lang="ts">
-  // Verification panel for five feature-parity behaviors: Text.onLongPress synthesis,
-  // Keyboard.dismiss (blur the focused input), animated FlatList scroll, sticky SectionList
-  // headers, and AccessibilityInfo.sendAccessibilityEvent. Port of
-  // examples/react/components/ParityDemo.tsx.
-  //
-  // `bind:this` on the title's host tag hands back a ShimElement, which `hostInstance()` resolves
-  // into the engine node AccessibilityInfo.sendAccessibilityEvent takes as its target.
+  // Panel for five parity checks: `onLongPress`, `Keyboard.dismiss`, animated `FlatList` scroll
+  // sticky `SectionList` headers and `AccessibilityInfo.sendAccessibilityEvent`
+
+  // The title's `{@attach}` gets its element, and `hostInstance()` turns it into the event target
   import {
     FlatList,
     SectionList,
@@ -54,7 +51,12 @@
 </script>
 
 <view class="section-nested">
-  <text class="section-label" bind:this={titleRef}>
+  <text
+    class="section-label"
+    {@attach (node: unknown) => {
+      titleRef = node;
+    }}
+  >
     Parity checks · longPress · dismiss · animated scroll · sticky · a11y focus
   </text>
   <text

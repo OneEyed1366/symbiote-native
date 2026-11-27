@@ -2,6 +2,8 @@
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "types": [],
+    // The WebGL context type of @symbiote-native/gl comes from the DOM lib, as in expo-react
+    "lib": ["ES2022", "DOM"],
     // Vue's JSX is compiled by @vue/babel-plugin-jsx, never by tsc — `preserve` leaves it alone and
     // `jsxImportSource` only tells tsc whose JSX namespace to type-check against. Both override
     // @react-native/typescript-config's React defaults, which would otherwise type every element

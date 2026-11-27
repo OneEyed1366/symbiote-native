@@ -3,8 +3,10 @@ import {
   getNativeTag,
   registerBeforeFlush,
   registerPostCommit,
+  registerPreCommit,
   registerPropClaim,
   unregisterPostCommit,
+  unregisterPreCommit,
   routeProp,
   type ISymbioteNode,
 } from '@symbiote-native/engine';
@@ -37,12 +39,6 @@ function isTagKeyed(key: string): key is ITagKeyedProp {
   return key in TAG_KEYED;
 }
 
-function configureEntering(node: ISymbioteNode, config: IConfig): number {
-  const id = layoutConfigIdOf(node);
-  updateLayoutAnimations(id, LayoutAnimationType.ENTERING, maybeBuild(config));
-  return id;
-}
-
 type IHeld = { config: unknown; unbind: () => void };
 
 function configureByTag(
@@ -58,9 +54,13 @@ function configureByTag(
   });
 }
 
-// An entering animation a scope skipped is taken back, and with it the id the node carried
-function cancelEntering({ node, id }: IPendingEntering): void {
-  updateLayoutAnimations(id, LayoutAnimationType.ENTERING, undefined);
+// Native hears of an entering animation once the scope of its node is known, before it mounts
+function sendEntering({ id, config }: IPendingEntering): void {
+  updateLayoutAnimations(id, LayoutAnimationType.ENTERING, maybeBuild(config));
+}
+
+// A skipped node loses the id it was given, so it may flatten and native keeps nothing for it
+function dropEntering({ node }: IPendingEntering): void {
   routeProp(node, 'nativeID', undefined);
 }
 
@@ -86,9 +86,9 @@ function followTagKeyed(
 // release of the claim
 export function claimLayoutAnimationProps(): () => void {
   const entered = new WeakSet<ISymbioteNode>();
-  const held: IHeldByNode = new WeakMap();
-  const scopes = createLayoutScopes(cancelEntering);
+  const scopes = createLayoutScopes(sendEntering, dropEntering);
   const overwrite = createStyleOverwriteCheck();
+  const held: IHeldByNode = new WeakMap();
 
   const releaseClaim = registerPropClaim((node, key, value) => {
     if (isConfig(value) && (key === ENTERING || key === EXITING)) {
@@ -101,7 +101,8 @@ export function claimLayoutAnimationProps(): () => void {
     if (key === ENTERING) {
       if (isConfig(value) && !entered.has(node)) {
         entered.add(node);
-        scopes.noteEntering(node, configureEntering(node, value));
+        const id = layoutConfigIdOf(node);
+        scopes.noteEntering({ node, id, config: value });
       }
       return true;
     }
@@ -109,13 +110,13 @@ export function claimLayoutAnimationProps(): () => void {
     followTagKeyed(held, node, key, value);
     return true;
   });
-  const releaseFlush = registerBeforeFlush(scopes.flush);
   const releaseOverwrite = registerBeforeFlush(overwrite.flush);
+  registerPreCommit(scopes.beforeCommit);
   registerPostCommit(scopes.afterCommit);
   return () => {
     releaseClaim();
-    releaseFlush();
     releaseOverwrite();
+    unregisterPreCommit(scopes.beforeCommit);
     unregisterPostCommit(scopes.afterCommit);
   };
 }

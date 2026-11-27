@@ -1,26 +1,18 @@
 <script lang="ts" module>
-  // `readCommitProfile()` is read-and-RESET, and this meter calls it once per window off rAF. A
-  // benchmark step that wants the profile of its OWN commit must stop the meter first: otherwise a
-  // window can close inside the step and consume the step's numbers, leaving a plausible zero and
-  // no sign that anything was lost.
-  //
-  // A plain mutable object in module scope, not a rune and not a prop. Either reactive form would
-  // re-render the meter, and that re-render is a commit landing inside the very window being
-  // measured — which would both perturb the duration and (because the screen's post-commit hook
-  // stops the clock on ANY commit) risk settling the step early against the wrong commit.
+  // `readCommitProfile()` is read-and-RESET and this meter calls it once per window off rAF
+  // A step that wants the profile of its OWN commit must stop the meter first, or a window
+  // closing inside the step eats its numbers and leaves a plausible zero
+
+  // A plain mutable object in module scope, not a rune or a prop
+  // A reactive form re-renders the meter, and that commit lands inside the measured window
+  // That perturbs the duration and can settle the step early against the wrong commit
   export const commitProfileGate = { isHeldByBenchmark: false };
 </script>
 
 <script lang="ts">
-  // JS-thread frame rate. A requestAnimationFrame loop measures the delta between consecutive
-  // frames, reports the averaged rate over a half-second window, and keeps a running count of
-  // frames that arrived later than one and a half budgets - the visible cost of a long commit.
-  // Svelte twin of examples/react/components/JsFrameRateMeter.tsx; the constants below are
-  // copied verbatim so the four canaries report the same quantity under the same name.
-  //
-  // MARKUP FORMATTING IS LOAD-BEARING here as everywhere in this example: sibling tags are packed
-  // edge-to-edge with zero whitespace (svelte-adapter-dom-shim skill §16). Verify with
-  // `node scripts/audit-svelte-stray-whitespace.mjs`.
+  // JS-thread frame rate: a rAF loop times consecutive frames and reports the average per window
+  // It also counts frames later than 1.5 budgets, the visible cost of a long commit
+  // Svelte twin of `examples/react/components/JsFrameRateMeter.tsx`, constants copied verbatim
   import {
     readCommitProfile,
     type ICommitProfile,
@@ -31,7 +23,7 @@
   // JS, so a stall here is a stall in the code we actually optimize. The native UI thread keeps
   // compositing at 60/120 Hz regardless, which is why a native FPS readout would stay flat and
   // tell us nothing about the engine's commit cost.
-  const FRAME_BUDGET_MS = 1000 / 60;
+  const FRAME_BUDGET_MS = 1_000 / 60;
 
   // 1.5x slack so ordinary scheduler jitter (a frame landing a millisecond or two late) is not
   // counted as jank - only a frame that missed its slot outright.
@@ -46,13 +38,9 @@
   // would itself dominate the very commit path this meter is supposed to observe.
   const SAMPLE_WINDOW_MS = 500;
 
-  // How much the engine wrote inside the last window, next to the frame numbers so the two can be
-  // read against each other: writes are what an adapter generates, and a spread between adapters on
-  // the same screen is the adapter's, not the platform's.
-  //
-  // This block used to time the reconcile walk (% of window, nodes/commit, ms/commit). There is no
-  // walk left to time - the shadow tree lives in C++ and JS only fills a command buffer, so the
-  // engine's own cost is no longer readable from JS at all; sizing it means instrumenting the host.
+  // What the engine wrote in the last window, shown beside the frame numbers
+  // Writes are what an adapter generates, so a spread between adapters is the adapter's own
+  // The engine's own cost is not readable from JS, since the shadow tree lives in C++
   const EMPTY_COMMIT_SAMPLE: ICommitProfile = {
     commits: 0,
     propWrites: 0,
@@ -97,15 +85,14 @@
       }
 
       const windowMs = now - windowStartedAt;
-      // While a benchmark step holds the gate the whole window-close block is skipped, publish and
-      // reset alike: the readCommitProfile() below would eat the step's profile, and the rune
-      // writes would put an extra commit inside its measured window. The window simply grows and
-      // publishes once, longer, after the step releases.
+      // Held by a benchmark step, the whole block is skipped: `readCommitProfile()` would eat the
+      // step's profile and the rune writes would add a commit inside its window
+      // The window just grows and publishes once after release
       if (
         windowMs >= SAMPLE_WINDOW_MS &&
         !commitProfileGate.isHeldByBenchmark
       ) {
-        framesPerSecond = Math.round((framesInWindow * 1000) / windowMs);
+        framesPerSecond = Math.round((framesInWindow * 1_000) / windowMs);
         droppedFrames = droppedSoFar;
         worstFrameMs = worstSoFar;
         // Read-and-reset, once per window, so each sample covers exactly the window just closed

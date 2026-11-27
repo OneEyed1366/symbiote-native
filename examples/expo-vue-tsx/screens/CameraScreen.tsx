@@ -6,7 +6,11 @@ import {
   useCameraPermissions,
   useMicrophonePermissions,
 } from '@symbiote-native/camera/vue';
-import type { ICameraBarcodeScanningResult, ICameraViewHandle } from '@symbiote-native/camera/vue';
+import type {
+  ICameraBarcodeScanningResult,
+  ICameraMountError,
+  ICameraViewHandle,
+} from '@symbiote-native/camera/vue';
 import { ActionButton } from '../components/ActionButton';
 import { CallConsole } from '../components/CallConsole';
 import { Explorer } from '../components/Scenario';
@@ -97,7 +101,7 @@ const Stage = defineComponent<IStageProps>(
                 status.value = 'ready';
                 props.setSettings({ isReady: true });
               }}
-              onMountError={event => { status.value = `mount error: ${event.message}`; }}
+              onMountError={(event: ICameraMountError) => { status.value = `mount error: ${event.message}`; }}
             />
           ) : (
             <view testID="camera-placeholder" class="cam-placeholder">
@@ -123,25 +127,28 @@ const Stage = defineComponent<IStageProps>(
 );
 
 const ExplorerCard = defineComponent<ISettingsProps & { setSettings: IStageProps['setSettings'] }>(
-  props => () => (
-    <Explorer testID="camera-explorer" color={color}>
-      <ToggleRow testID="camera-active" label="active: the session runs (iOS)" value={props.deck.settings.value.isActive} onChange={isActive => props.setSettings({ isActive })} color={color} />
-      <CallConsole
-        prefix="camera-calls"
-        title="Handle calls"
-        color={color}
-        hint="Each call runs on the live preview above."
-        calls={[
-          { label: 'getAvailablePictureSizesAsync', run: async () => props.deck.camera.value?.getAvailablePictureSizesAsync() },
-          { label: 'getAvailableLensesAsync', run: async () => props.deck.camera.value?.getAvailableLensesAsync() },
-          { label: 'getSupportedFeatures', run: async () => props.deck.camera.value?.getSupportedFeatures() },
-          { label: 'getAvailableVideoCodecsAsync', run: getAvailableVideoCodecsAsync },
-          { label: 'pausePreview', run: async () => props.deck.camera.value?.pausePreview() },
-          { label: 'resumePreview', run: async () => props.deck.camera.value?.resumePreview() },
-        ]}
-      />
-    </Explorer>
-  ),
+  props => () => {
+    const { camera, settings } = props.deck;
+    return (
+      <Explorer testID="camera-explorer" color={color}>
+        <ToggleRow testID="camera-active" label="active: the session runs (iOS)" value={settings.value.isActive} onChange={isActive => props.setSettings({ isActive })} color={color} />
+        <CallConsole
+          prefix="camera-calls"
+          title="Handle calls"
+          color={color}
+          hint="Each call runs on the live preview above."
+          calls={[
+            { label: 'getAvailablePictureSizesAsync', run: async () => camera.value?.getAvailablePictureSizesAsync() },
+            { label: 'getAvailableLensesAsync', run: async () => camera.value?.getAvailableLensesAsync() },
+            { label: 'getSupportedFeatures', run: async () => camera.value?.getSupportedFeatures() },
+            { label: 'getAvailableVideoCodecsAsync', run: getAvailableVideoCodecsAsync },
+            { label: 'pausePreview', run: async () => camera.value?.pausePreview() },
+            { label: 'resumePreview', run: async () => camera.value?.resumePreview() },
+          ]}
+        />
+      </Explorer>
+    );
+  },
   { name: 'ExplorerCard', props: ['deck', 'setSettings'] },
 );
 

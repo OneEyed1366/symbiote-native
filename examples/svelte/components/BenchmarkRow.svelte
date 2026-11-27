@@ -3,21 +3,15 @@
   // Svelte component owns its own prop types (the same idiom every adapter component follows) -
   // BenchmarkScreen imports IBenchmarkRow back.
   //
-  // TEN native views, and the count is the whole point (see BenchmarkScreen's own note): the
-  // outer View is 1, each of the three Texts is a text plus its RCTRawText child (6),
-  // each Pressable is exactly one view (2) - Pressable only adds a second host view when
-  // android_ripple is supplied, which it is not here - and the TextInput is exactly one more. Its
-  // text rides as the `text` prop rather than as a RawText child, so it does not bring the +1 a
-  // Text does.
-  //
-  // The input is UNCONDITIONAL, and on this adapter that is a measurement decision: an `{#if}`
-  // costs one anchor per instantiation even while its condition is false, so a row shape behind a
-  // conditional would put 1 000 extra retained nodes on the tree with every FABRIC counter reading
-  // identically (`svelte-adapter-dom-shim` §32). This component carries no conditional at all.
-  //
-  // The input is also as bare as it can be: `class` and a controlled `value`, nothing else.
-  // `multiline` would select the other intrinsic, and `onChangeText` or `bind:this` would each add
-  // work this row is not measuring.
+  // Ten native views, the count is the point (see `BenchmarkScreen`): the outer View is 1
+  // Each Text is a text plus a `RCTRawText` child (3 x 2), each Pressable is one view (2)
+  // The TextInput is one more, its text a prop, and `android_ripple` would add a Pressable view
+
+  // The input is unconditional, as an `{#if}` costs one anchor per instantiation even when false
+  // A conditional row shape would add 1 000 retained nodes with the Fabric counters unchanged
+
+  // The input is bare: `class` and a controlled `value`, nothing else
+  // `multiline` selects the other intrinsic, and `onChangeText` or `bind:this` add unmeasured work
   export type IBenchmarkRow = {
     id: number;
     label: string;

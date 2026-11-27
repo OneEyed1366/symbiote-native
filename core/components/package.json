@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/components",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "description": "Framework-agnostic component logic (state machines + render functions) for SymbioteNative — written once, inherited by every adapter (React, Vue, Angular, ...).",
   "license": "MIT",
   "repository": {
@@ -68,6 +68,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run core/components/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

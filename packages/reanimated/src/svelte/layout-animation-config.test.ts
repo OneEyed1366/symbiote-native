@@ -18,9 +18,9 @@ let unmountTree = () => {};
 beforeEach(() => update.mockClear());
 afterEach(() => unmountTree());
 
-function enteringCancelled(): boolean {
-  return update.mock.calls.some(([, type, config]) => {
-    return type === LayoutAnimationType.ENTERING && config === undefined;
+function enteringSent(): boolean {
+  return update.mock.calls.some(([, type]) => {
+    return type === LayoutAnimationType.ENTERING;
   });
 }
 
@@ -32,29 +32,29 @@ describe('LayoutAnimationConfig', () => {
   it('skips the entering animation of the views under it when they mount with it', async () => {
     await mountTree({ skipEntering: true });
 
-    expect(update).toHaveBeenCalledWith(
+    expect(update).not.toHaveBeenCalledWith(
       expect.any(Number),
       LayoutAnimationType.ENTERING,
-      undefined,
+      expect.anything(),
     );
-    expect(enteringCancelled()).toBe(true);
+    expect(enteringSent()).toBe(false);
   });
 
   it('lets the views under it animate in when it does not skip', async () => {
     await mountTree({ skipEntering: false });
 
-    expect(enteringCancelled()).toBe(false);
+    expect(enteringSent()).toBe(true);
   });
 
   it('skips a view nested under other views, not only its own children', async () => {
     await mountTree({ skipEntering: true, nested: true });
 
-    expect(enteringCancelled()).toBe(true);
+    expect(enteringSent()).toBe(false);
   });
 
   it('leaves views outside it alone', async () => {
     await mountTree({ skipEntering: true, outside: true });
 
-    expect(enteringCancelled()).toBe(false);
+    expect(enteringSent()).toBe(true);
   });
 });

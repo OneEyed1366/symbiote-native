@@ -33,6 +33,11 @@ pnpm ios
 pnpm android
 ```
 
+After any reinstall of `node_modules`, run `pnpm dev` once and load the app before a Release build.
+Worklets Bundle Mode writes files into `react-native-worklets/.worklets`, and Metro's cache outlives
+them. The build then fails with `ENOENT` on `.worklets/<id>.js`
+([reanimated#11313](https://github.com/software-mansion/react-native-reanimated/issues/11313)).
+
 ## Test it
 
 ```bash
@@ -44,6 +49,6 @@ pnpm e2e:test:ios              # run the canary journeys on the iOS simulator
 
 ## Note — its own native shell
 
-Unlike the other examples (Vue, Svelte, and Solid all copy `examples/react`'s native projects
-verbatim), `examples/angular` has its **own** separate `ios`/`android` native project, so it can
-run side-by-side with the other canaries on the same simulator without conflicting.
+The Vue, Svelte and Solid examples copy `examples/react`'s native projects verbatim.
+`examples/angular` has its **own** `ios`/`android` native project, so it can run side by side with
+the other canaries on the same simulator.

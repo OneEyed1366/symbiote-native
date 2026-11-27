@@ -136,17 +136,11 @@ real `ngc` build does.
 
 ## Why not Svelte's `transition:`/`animate:`/`in:`/`out:`?
 
-Those directives — along with `use:`, `class:`, and `style:` — are Svelte's own
-**element**-only directives, rejected on a component tag ("This type of
-directive is not valid on components"). Every SymbioteNative primitive is now a
-lowercase intrinsic tag (`<view>`, `<pressable>`, …), which Svelte's compiler
-treats as a plain element. So these directives do compile there today, unlike when
-the primitives were capitalized components. Whether
-`transition:`/`animate:` actually animate anything through the DOM shim's
-Fabric-backed properties is unverified; nothing in this adapter tests or
-supports that path. `Animated` plus the `$effect`-driven lifecycle shown above
-remains the supported route for animation; `{@attach fn}` remains your route to
-the underlying host node for anything else.
+The Svelte compiler rejects them in this adapter. The custom renderer has no
+DOM to run a transition on, so `transition:`, `in:`, `out:` and `animate:` are
+compile errors on every tag and component. `Animated` plus the `$effect`-driven
+lifecycle shown above is the supported route for animation, and `{@attach fn}`
+is your route to the underlying host node for anything else.
 
 ## JS driver vs native driver
 

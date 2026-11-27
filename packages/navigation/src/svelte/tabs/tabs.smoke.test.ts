@@ -1,16 +1,17 @@
-// Tab, driven through the REAL compiled index.svelte against a fake Fabric. Tab is a pure-JS UI
-// (no react-native-screens views), so what this proves on top of Stack's own smoke is:
-//  - the shared `renderTabBar` Descriptor really is mounted through the bridge rather than
-//    hand-copied, and survives the item count going 0 -> N as the markers register,
-//  - only the FOCUSED route's screen is mounted, and jumpTo swaps it,
-//  - focus/blur are synthesized correctly for a navigator with no native appear/disappear event.
-//
-// Out of scope here (already covered where the logic actually lives):
-//  - jumpTo/setParams params-merge semantics (array vs object) -> tabRouterReducer's own
-//    framework-free unit test (core/tab-router-state/tab-router-state.test.ts).
-//  - renderTabBar's own prop->Descriptor mapping (icon/badge/tint-color resolution) is a pure
-//    function with no dedicated core test of its own; this file only proves it is WIRED, not
-//    every one of its branches - a gap worth a core-level render-tabs test, not this file's job.
+// Tab, driven through the real compiled `index.svelte` against a fake Fabric
+// Tab is pure JS with no react-native-screens views, so this adds to the Stack smoke test
+
+// The shared `renderTabBar` Descriptor is mounted through the bridge, not hand-copied
+// It survives the item count going from 0 to N as the markers register
+
+// Only the focused route is mounted, and `jumpTo` swaps it
+// Focus and blur are synthesized, as the navigator has no native appear event
+
+// Out of scope: the params merge of `jumpTo` and `setParams`, tested in core
+// `core/tab-router-state/tab-router-state.test.ts`
+
+// The prop to Descriptor mapping of `renderTabBar` has no core test, and is only wired here
+// A core-level render-tabs test would cover its branches
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
@@ -57,11 +58,9 @@ afterEach(() => {
   harness.cleanup();
 });
 
-// A navigator mounts a registered screen with NO props of its own (route/navigation are read
-// through the runes off the context), so each fixture hardcodes its own testID and reports
-// route name + focus + params + key through accessibilityLabel, the only channel this
-// black-box harness has into what the mounted screen actually received. '|'-separated because
-// params serializes through JSON, which itself contains ':'.
+// A navigator mounts a screen with no props, as route and navigation come from the context
+// So each fixture sets its own `testID` and reports name, focus, params and key as a label
+// The label fields are '|'-separated, as JSON params contain ':'
 function screenSource(testID: string): string {
   return `<script lang="ts">
      import { useRoute } from '../runes/use-route.svelte';
@@ -88,8 +87,7 @@ function appSource(tabAttributes: string): string {
    </Tab>`;
 }
 
-// No <Tab.Screen> markers registered at all - the boundary at the bottom of the registered-count
-// range the "one item per screen" rule above has to hold for.
+// No `<Tab.Screen>` marker registered at all, the low boundary of the one item per screen rule
 function emptyAppSource(): string {
   return `<script lang="ts">
      import Tab from './index.svelte';
@@ -100,9 +98,8 @@ function emptyAppSource(): string {
    <Tab bind:this={navigator} />`;
 }
 
-// A live toggle around the "profile" marker, to exercise the unregister half of the
-// register/unregister collector contract (setScreenCollector in tabs/index.svelte) - the
-// registered-count fixtures above only ever register, never remove.
+// A live toggle around the "profile" marker, for the unregister half of the collector contract
+// The fixtures above only ever register, and never remove
 function toggleAppSource(): string {
   return `<script lang="ts">
      import Tab from './index.svelte';
@@ -125,6 +122,20 @@ function toggleAppSource(): string {
 
 function isTabHandle(value: unknown): value is ITabNavigatorHandle {
   return typeof value === 'object' && value !== null && 'jumpTo' in value;
+}
+
+type IToggleHandle = {
+  navigator: ITabNavigatorHandle;
+  hideProfile: () => void;
+};
+
+function isToggleHandle(value: unknown): value is IToggleHandle {
+  if (typeof value !== 'object' || value === null) return false;
+  const hideProfile = Reflect.get(value, 'hideProfile');
+  return (
+    isTabHandle(Reflect.get(value, 'navigator')) &&
+    typeof hideProfile === 'function'
+  );
 }
 
 async function mountTab(
@@ -190,24 +201,14 @@ async function mountToggleTab(): Promise<{
   });
   await tick();
   await tick();
-  if (
-    handle === null ||
-    typeof handle !== 'object' ||
-    !('navigator' in handle) ||
-    !('hideProfile' in handle) ||
-    !isTabHandle(handle.navigator) ||
-    typeof handle.hideProfile !== 'function'
-  ) {
+  if (!isToggleHandle(handle)) {
     throw new Error('Tab did not expose the toggle-test handle shape');
   }
   return { navigator: handle.navigator, hideProfile: handle.hideProfile };
 }
 
-// Tab's OWN root (not appRoot(), which is the outer mount wrapper a few levels up) is the
-// node with exactly 3 children shaped [registry host (RCTText), content, bar] - the same shape
-// the "paints the shared tab bar" outline test below asserts explicitly. Locating it structurally
-// (rather than assuming a fixed depth under appRoot()) keeps these helpers from picking up
-// the registry-host's own incidental whitespace text, which is not a tab-bar label at all.
+// The Tab root is the node with 3 children shaped [registry host (RCTText), content, bar]
+// It is found by that shape, not by depth under `appRoot()`, to skip the registry host whitespace
 function tabRootNode(): IFabricNode | undefined {
   let found: IFabricNode | undefined;
   walkLive(appRoot(), node => {
@@ -237,9 +238,8 @@ function isSelectionState(value: unknown): value is { selected?: boolean } {
   return typeof value === 'object' && value !== null;
 }
 
-// Every bar-item wrapper carries `accessibilityState` (renderTabBar's passthrough), in
-// registration order - the one prop that survives onto the live tree and lets a black-box test
-// tell which item is "selected" without depending on paint position.
+// Every bar-item wrapper carries `accessibilityState` in registration order
+// It is the one prop that tells which item is selected, without depending on paint position
 function tabBarItemSelection(): boolean[] {
   const bar = tabBarNode();
   if (bar === undefined) return [];
@@ -258,14 +258,8 @@ function readScreenLabel(
   const label = findLiveByTestId(appRoot(), testID)?.props?.accessibilityLabel;
   if (typeof label !== 'string') return undefined;
   const [name, focused, paramsJson, key] = label.split('|');
-  if (
-    name === undefined ||
-    focused === undefined ||
-    paramsJson === undefined ||
-    key === undefined
-  ) {
-    return undefined;
-  }
+  if (name === undefined || focused === undefined) return undefined;
+  if (paramsJson === undefined || key === undefined) return undefined;
   return {
     name,
     focused: focused === 'true',
@@ -276,20 +270,14 @@ function readScreenLabel(
 
 describe('Tab (real compiled index.svelte)', () => {
   describe('positive — mounts and renders without error', () => {
-    // why: renderTabBar's Descriptor tree must reach the screen through the SAME bridge every
-    // other navigator uses (createDescriptorSubtreeSync), not a hand-authored parallel markup
-    // path - otherwise the bar would silently drift from what renderTabBar actually produces.
+    // The `renderTabBar` Descriptor reaches the screen through the bridge every navigator uses
+    // A hand-authored parallel markup would drift from what `renderTabBar` produces
     it('paints the shared tab bar with one item per registered screen', async () => {
       await mountTab();
 
-      // Root > [registry host, content, bar]; the bar's own subtree comes from the shared
-      // renderTabBar Descriptor, mounted through the bridge rather than hand-authored markup.
-      //
-      // The root line reads `#surface` rather than `RCTView`, and the change is a CORRECTION.
-      // The app root is the surface node; it is created as an `RCTView` and then set to the
-      // surface component, so `componentOf` says `#surface` and Fabric commits it as `RootView`.
-      // The stand-in tree kept the creation name — a third answer, and the only one nothing
-      // downstream agrees with. Everything below the root is unchanged.
+      // The tree is root > [registry host, content, bar], with the bar built by `renderTabBar`
+      // The root reads `#surface`, as it is created as an `RCTView` and then set to the surface
+      // component, which Fabric commits as `RootView`
       expect(outline(appRoot()).slice(0, 6)).toEqual([
         '#surface',
         '  RCTView',
@@ -300,26 +288,24 @@ describe('Tab (real compiled index.svelte)', () => {
       ]);
     });
 
-    // why: a route's tab-bar label follows react-navigation's own fallback chain -
-    // tabBarLabel, then title, then the bare route name - and a badge only paints when the
-    // screen actually supplied one (Feed has tabBarBadge: 3, Profile does not).
+    // A label follows the react-navigation fallback: `tabBarLabel`, then `title`, then the name
+    // A badge paints only when the screen supplied one
     it('resolves each item label through the tabBarLabel -> title -> name chain and renders a badge only where supplied', async () => {
       await mountTab();
-      // Feed: tabBarLabel 'Feed' + badge '3'. Profile: no tabBarLabel, falls back to its
-      // options.title 'Profile'; no badge supplied, so none renders.
+      // Feed has the label 'Feed' and the badge '3'
+      // Profile has no `tabBarLabel`, so it takes `options.title`, and it has no badge
       expect(tabBarLabels()).toEqual(['3', 'Feed', 'Profile']);
     });
 
-    // why: react-navigation marks the active tab via accessibilityState.selected, which a
-    // screen reader and any test harness rely on to identify the current tab without scraping
-    // paint order or color.
+    // The active tab is marked by `accessibilityState.selected`, as in react-navigation
+    // Screen readers and tests find the current tab by it, not by paint order or color
     it('marks only the focused route as selected in the bar, in registration order', async () => {
       await mountTab();
       expect(tabBarItemSelection()).toEqual([true, false]);
     });
 
-    // why: a tab navigator shows exactly one screen at a time - the other route's whole
-    // subtree (and any state it holds) must not exist in the tree until it becomes focused.
+    // A tab navigator shows one screen at a time
+    // The other route subtree and its state must not exist until that route is focused
     it('mounts only the focused route and swaps it on jumpTo', async () => {
       const handle = await mountTab();
       expect(findLiveByTestId(appRoot(), 'feed')).toBeDefined();
@@ -332,17 +318,15 @@ describe('Tab (real compiled index.svelte)', () => {
       expect(findLiveByTestId(appRoot(), 'profile')).toBeDefined();
     });
 
-    // why: `initialRouteName` lets a consumer land on a tab other than the first registered
-    // one - the common "deep link into the second tab" case.
+    // `initialRouteName` lands on a tab other than the first, as a deep link does
     it('honours initialRouteName', async () => {
       await mountTab('initial-route', 'initialRouteName="profile"');
       expect(findLiveByTestId(appRoot(), 'profile')).toBeDefined();
       expect(findLiveByTestId(appRoot(), 'feed')).toBeUndefined();
     });
 
-    // why: there is no native appear/disappear event for a pure-JS tab bar, so focus/blur must
-    // be synthesized in JS - both on initial mount (a screen that is never "navigated to" must
-    // still see itself as focused) and again when the focused route changes.
+    // A pure-JS tab bar has no native appear event, so focus and blur are synthesized in JS
+    // That holds on mount, as a screen never navigated to is focused, and on each route change
     it('synthesizes focus on mount and moves it with the focused route', async () => {
       const handle = await mountTab();
       await tick();
@@ -363,10 +347,8 @@ describe('Tab (real compiled index.svelte)', () => {
       });
     });
 
-    // why: setParams must reach the target route's params without touching which route is
-    // focused - a param update is not a navigation. The route key is read off the mounted
-    // screen itself rather than assumed, since the key format is an internal id this test has
-    // no product reason to depend on.
+    // `setParams` reaches the target route without changing the focused one, as it is no navigation
+    // The key is read off the mounted screen, as its format is an internal id
     it('propagates setParams to the target route without changing which route is focused', async () => {
       const handle = await mountTab();
       await tick();
@@ -385,16 +367,15 @@ describe('Tab (real compiled index.svelte)', () => {
       expect(findLiveByTestId(appRoot(), 'profile')).toBeUndefined();
     });
 
-    // why: an app can render <Tab> before any <Tab.Screen> marker resolves (e.g. behind a
-    // data-driven {#each}) - this must degrade to an empty bar and no content, never throw.
+    // An app can render `<Tab>` before any marker resolves, e.g. behind a data-driven `{#each}`
+    // It must degrade to an empty bar and no content, and never throw
     it('renders an empty bar and no focused screen when no screens are registered', async () => {
       await mountEmptyTab();
       expect(findAllLive(appRoot(), 'RCTView').length).toBeGreaterThan(0);
       expect(tabBarLabels()).toEqual([]);
     });
 
-    // why: jumping between tabs must not leak or drop structural wrappers - the root, the
-    // content host and the bar are the three fixed slots every navigation must preserve.
+    // A jump must not leak or drop the three fixed slots: the root, the content host and the bar
     it('keeps exactly one root, one content host and one bar after a jump', async () => {
       const handle = await mountTab();
       const before = countLive(appRoot(), 'RCTView');
@@ -404,11 +385,9 @@ describe('Tab (real compiled index.svelte)', () => {
       expect(countLive(appRoot(), 'RCTView')).toBe(before);
     });
 
-    // why: the navigator templates are formatted normally, so Svelte emits a ' ' text node
-    // between sibling tags; only the shim's parent check keeps it out of Fabric
-    // (svelte-adapter-dom-shim §16b). One that got through would be a real RCTRawText under a
-    // view, corrupting every paint-order assertion above. Re-checked after a jumpTo, because
-    // the focused screen's subtree is rebuilt on each focus change.
+    // Formatted templates make Svelte emit a ' ' text node between sibling tags
+    // The renderer blanks it, as a real `RCTRawText` under a view would corrupt the paint order
+    // It is re-checked after `jumpTo`, as each focus change rebuilds the screen subtree
     it('commits no raw text outside a text container', async () => {
       const handle = await mountTab('hygiene');
       expect(rawTextsOutsideTextContainer(appRoot())).toEqual([]);
@@ -420,16 +399,13 @@ describe('Tab (real compiled index.svelte)', () => {
     });
   });
 
-  // No negative group: this composition layer has no guard clause or throwing path of its own -
-  // an unknown route name reaching jumpTo/setParams is absorbed by tabRouterReducer (core,
-  // tested there), and there is no permission/validation gate at the Svelte lifecycle layer.
-  // The nearest thing to a rejection path is the registry-mismatch dlog in screen-registry.ts,
-  // which is silent by design (not a throw) and shared by every navigator kind, not Tab-specific.
+  // No negative group: this layer has no guard clause or throwing path of its own
+  // An unknown route name in `jumpTo` or `setParams` is absorbed by `tabRouterReducer` in core
+  // The registry-mismatch `dlog` in `screen-registry.ts` is silent and shared by all navigators
 
   describe('registry changes after mount', () => {
-    // why: a <Tab.Screen> behind an {#if} is how react-navigation apps gate a tab on a feature
-    // flag or a permission; the route list is a projection of the registry, so the tab has to
-    // disappear with its marker rather than linger as an item labelled with the raw route name.
+    // A `<Tab.Screen>` behind an `{#if}` gates a tab on a feature flag or a permission
+    // The routes project the registry, so the tab must go with its marker, not linger as a raw name
     it('drops the tab of a screen unregistered after mount', async () => {
       const { hideProfile } = await mountToggleTab();
       expect(tabBarLabels()).toEqual(['Feed', 'Profile']);
@@ -441,9 +417,8 @@ describe('Tab (real compiled index.svelte)', () => {
       expect(tabBarLabels()).toEqual(['Feed']);
     });
 
-    // why: dropping the user's current tab because a DIFFERENT screen was removed would be a
-    // worse bug than the stale item itself - focus follows the route NAME, and the params
-    // jumpTo/setParams accumulated onto the surviving route must ride along with it.
+    // Removing a different screen must not drop the current tab, as focus follows the route name
+    // The params accumulated onto the surviving route must stay with it
     it('keeps the focused route and its params when an unrelated screen unregisters', async () => {
       const { navigator, hideProfile } = await mountToggleTab();
       await tick();
@@ -466,9 +441,8 @@ describe('Tab (real compiled index.svelte)', () => {
       });
     });
 
-    // why: when the FOCUSED screen is the one that unregisters there is no route left to stay
-    // on, so the fallback has to be explicit - the first remaining tab, the same landing spot a
-    // navigator with an unresolvable initialRouteName gets.
+    // When the focused screen unregisters, no route is left to stay on
+    // The fallback is the first remaining tab, as for an unresolvable `initialRouteName`
     it('falls back to the first remaining tab when the focused screen unregisters', async () => {
       const { navigator, hideProfile } = await mountToggleTab();
       navigator.jumpTo('profile');

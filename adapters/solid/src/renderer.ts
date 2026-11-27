@@ -60,23 +60,19 @@ function isRawText(node: IHostNode): boolean {
   return !isSurface(node) && isRawTextNode(node);
 }
 
-// One active surface per process. This is FORCED here, not chosen: the compiled-JSX contract above
-// means every mutation arrives through module-level functions with no surface argument, so there is
-// nowhere for a per-surface renderer instance to be threaded through (Vue can close over its
-// surface because Vue's createRenderer is called by US, per mount). Threading it per node instead
-// would mean walking `parent` to the root on EVERY setProperty to find which surface to recommit —
-// too hot for the prop path. Same single-root-per-process conclusion the Svelte adapter reached for
-// its own reasons (svelte-adapter-dom-shim §10).
+// One active surface per process, forced by the compiled-JSX contract above
+// Every mutation arrives through module-level functions with no surface argument
+// Finding the surface by walking `parent` to the root on each `setProperty` is too hot
 let activeSurface: SymbioteSurface | undefined;
 
 export function setActiveSurface(surface: SymbioteSurface | undefined): void {
   activeSurface = surface;
 }
 
-// Every mutation asks the surface to (microtask-coalesced) recommit. Solid updates fine-grained and
-// often — a single signal write can touch several props across several nodes — so a burst within one
-// tick collapses into a single completeRoot, which is exactly what requestCommit() is for.
-//
+// Every mutation asks the surface to recommit, coalesced on a microtask
+// Solid updates fine-grained, so one signal write can touch several props across several nodes
+// A burst within one tick collapses into one `completeRoot`, which `requestCommit()` is for
+
 // A missing surface is not an error: Solid disposes its reactive graph asynchronously, so a
 // cleanup-driven removeNode can legitimately land after unmount() cleared the surface. Dropping the
 // commit is correct there (nothing to commit into), but it stays logged rather than silent.
@@ -88,10 +84,9 @@ function requestCommit(): void {
   activeSurface.requestCommit();
 }
 
-// Hoisted out of nodeOps and exported because descriptor-to-solid.ts needs the same text-update
-// path for a Descriptor's string child, and createRenderer() only hands back the 11 names the JSX
-// compiler imports — replaceText is not among them. Going through here rather than calling the
-// engine's setText directly is what keeps the mutation paired with requestCommit().
+// Exported for descriptor-to-solid.ts, which needs the same text-update path for a string child
+// `createRenderer()` hands back only the 11 names the JSX compiler imports, and this is not one
+// Going through here keeps the mutation paired with `requestCommit()`
 export function replaceText(textNode: IHostNode, value: string): void {
   if (isSurface(textNode)) return;
   setEngineText(textNode, asText(value));
@@ -108,25 +103,17 @@ function asText(value: unknown): string {
   return typeof value === 'string' ? value : String(value);
 }
 
-// Hoisted and exported for the same reason as replaceText above: createRenderer() hands back only
-// the 11 names the JSX compiler imports, and removeNode is not among them — but create-portal.tsx
-// has to DETACH its anchor host from the portal target on cleanup. Going through here rather than
-// calling the engine's removeChild directly is what keeps the mutation paired with requestCommit(),
-// and keeps the surface-vs-node branch in one place.
-// The `:active` half: one call here puts the node into its pressed state so `.btn:active` applies.
-//
-// Exported paired with requestCommit() for the same reason removeNode below is: the press arrives
-// from a NATIVE EVENT, outside any renderer mutation, so nothing else schedules a commit. React's
-// twin (`setNodeHidden` from hideInstance) needs none because its reconciler is already mid-commit
-// when it calls; Solid's is not. Costs nothing when no `:active` rule is registered — the engine
-// hands back the same style object and `isAlreadyPublished` turns the re-push away without dirtying
-// the node.
+// Puts the node into its pressed state so `.btn:active` applies, then recommits
+// The press comes from a native event outside any renderer mutation, so nothing else schedules one
+// Free when no `:active` rule is registered, as the engine hands back the same style object
 export function setHostPressed(node: IHostNode, pressed: boolean): void {
   if (isSurface(node)) return;
   setNodePressed(node, pressed);
   requestCommit();
 }
 
+// Exported for create-portal.tsx, which detaches its anchor host from the portal target on cleanup
+// This pairs the mutation with `requestCommit()` and keeps the surface-vs-node branch in one place
 export function removeNode(parent: IHostNode, node: IHostNode): void {
   if (isSurface(node)) return;
   if (isSurface(parent)) parent.removeChild(node);
@@ -134,21 +121,19 @@ export function removeNode(parent: IHostNode, node: IHostNode): void {
   requestCommit();
 }
 
-// RN's two Text defaults are answered below the adapter now: the rule reads the AUTHORED bag at
-// payload time (`foldTextDefaults`, `SymbioteFabricProps.cpp`), where a null, an explicit
-// `undefined` and an absent prop are all "not a value the author chose" — one rule, every adapter.
+// RN's two Text defaults are answered below the adapter, by `foldTextDefaults` in
+// `SymbioteFabricProps.cpp`, which reads the authored bag so null, `undefined` and absent agree
 
 // The `id` -> `nativeID` fold lives in `routeProp` now, so all five adapters resolve the
 // precedence identically instead of each doing it their own way.
 
 // `multiline` selects between TWO Fabric views, so the TAG decides and no prop write moves a node
 // between them. An author writing `<text-input multiline>` instead of `<text-input-multiline>` gets
-// the single-line view with a prop no ViewConfig on it declares — two silent divergences.
-//
-// The shared behavior (`core/components/src/behaviors/text-input.ts`) already makes the PAYLOAD
-// follow the tag. The complaint has to live here instead of there: `foldPayload` runs inside the
-// commit, so a throw from it lands a tick later as an uncaught exception with no frame naming the
-// call site — measured, a test awaiting the mount sees `nothing committed` rather than the error.
+// the single-line view with a prop no ViewConfig on it declares, two silent divergences
+
+// `core/components/src/behaviors/text-input.ts` already makes the payload follow the tag
+// The throw lives here, as `foldPayload` runs inside the commit and a throw there lands a tick
+// later with no frame naming the call site, so a test awaiting the mount sees `nothing committed`
 const MULTILINE_PROP = 'multiline';
 
 function assertMultilineMatchesTag(node: ISymbioteNode, value: unknown): void {
@@ -163,11 +148,9 @@ function assertMultilineMatchesTag(node: ISymbioteNode, value: unknown): void {
 const nodeOps: RendererOptions<IHostNode> = {
   createElement(tag) {
     const descriptor = descriptorFor(tag);
-    // The TAG goes over as well, not just the resolved Fabric name. The host-behavior registry is
-    // keyed by intrinsic tag while a node only ever carries the resolved view name — `symbiote-
-    // pressable` resolves to `RCTView` — so without this the lookup asks for `RCTView` and finds
-    // nothing, and the press machine silently never attaches. Registering under the Fabric name
-    // instead would be worse: every plain `View` would get a press machine.
+    // The tag goes over too, as host behaviors are keyed by intrinsic tag and not by view name
+    // `symbiote-pressable` resolves to `RCTView`, so a lookup by name would miss the press machine
+    // Registering by view name instead would give every plain `View` a press machine
     const node = createEngineElement(
       descriptor.component,
       descriptor.isText,
@@ -177,12 +160,9 @@ const nodeOps: RendererOptions<IHostNode> = {
     // a key the wrapper's payload does not carry, i.e. a divergence in the other direction.
     if (tag === TEXT_INPUT_MULTILINE_TAG)
       setEngineProp(node, MULTILINE_PROP, true);
-    // Graft the imperative public-instance API (measure / setNativeProps / focus / …) onto the raw
-    // node so a `ref` to a host element exposes it exactly like React's getPublicInstance.
-    // toPublicInstance mutates in place and returns the SAME node identity, so the engine's commit
-    // mirror (keyed on the raw node) still resolves it. Solid hands a plain `ref={el}` this object
-    // by assignment, so identity survives — but it must never be put in a createStore(), whose deep
-    // proxy would become a different WeakMap key and silently break every imperative command.
+    // Graft the public-instance API (`measure`, `setNativeProps`, `focus`) so a `ref` exposes it
+    // `toPublicInstance` returns the same node identity, so the commit mirror still resolves it
+    // Never put the result in a `createStore()`, whose deep proxy would be a different WeakMap key
     dlog(`solid createElement ${descriptor.component} -> public instance`);
     return toPublicInstance(node);
   },
@@ -233,38 +213,30 @@ const nodeOps: RendererOptions<IHostNode> = {
       anchor !== undefined && !isSurface(anchor) ? anchor : undefined;
 
     if (isRawText(node) && (isSurface(parent) || !isTextContainer(parent))) {
-      // Fabric has no bare-text host: RCTRawText is only valid as a <Text> child. Reached by a
-      // dynamic expression that resolves to a string outside a <Text>, e.g.
-      // `<symbiote-view>{label()}</symbiote-view>`. Failing loudly at mount beats building an
-      // invalid tree that crashes deeper in native with a far less legible error.
+      // Fabric has no bare-text host, as RCTRawText is only valid as a <Text> child
+      // A dynamic string outside a <Text> reaches this: `<symbiote-view>{label()}</symbiote-view>`
+      // Failing loudly at mount beats a tree that crashes deeper in native with a vaguer error
       throw new Error(
         `Text string "${textOf(node) ?? ''}" must be rendered inside a <Text>`,
       );
     }
 
     if (isSurface(parent)) {
-      if (before !== undefined) parent.insertBefore(node, before);
-      else parent.appendChild(node);
-    } else if (before !== undefined) {
-      insertBefore(parent, node, before);
-    } else {
+      if (before === undefined) parent.appendChild(node);
+      else parent.insertBefore(node, before);
+    } else if (before === undefined) {
       appendChild(parent, node);
+    } else {
+      insertBefore(parent, node, before);
     }
     requestCommit();
   },
 
   removeNode,
 
-  // Reverse of `getFirstChild`'s `childHost` redirect: a child under a composed primitive's slot
-  // has `node.parent` pointing at the SLOT, but `cleanChildren`'s `isParent = getParentNode(el)
-  // === parent` compares against the OWNER — the same reference the JSX-level `insert()` call was
-  // given. Left un-redirected, that comparison is false for every child of a bare `<scroll-view>`
-  // (or any other slotted primitive) with a following sibling, so `isParent` never fires,
-  // `removeNode` is never called on a full array clear, and the old children are orphaned: still
-  // committed to Fabric, still retained, and re-diffed against on the next reconciliation —
-  // reproduced as unbounded RAM growth and an increasingly slow "Clear" on the benchmark screen.
-  // One level up only: `childHost` is always a DIRECT child the owner built (see `buildStructure`),
-  // never a deeper descendant.
+  // Reverse of the `childHost` redirect in `getFirstChild`, as a slotted child's parent is the slot
+  // `cleanChildren` compares against the owner. A mismatch leaves old children committed after a
+  // full clear, which grew RAM without bound, so this goes one level up from the slot
   getParentNode(node) {
     if (isSurface(node)) return undefined;
     const parent = parentOf(node) ?? activeSurface;
@@ -282,14 +254,10 @@ const nodeOps: RendererOptions<IHostNode> = {
   // getFirstChild(parent) to replace text in place). Hiding a node the runtime itself inserted
   // desyncs that record from the real tree. Anchors are invisible to FABRIC — the commit walk skips
   // them — not to tree traversal.
-  //
-  // `childHost` redirected, same as the engine's own `appendChild`/`insertBefore`/`removeChild`
-  // (`hostFor`, core/engine/src/node.ts): a composed primitive's real children live on the slot it
-  // built, not on the owner it was asked to insert into, and `insert()`'s reconciliation reads this
-  // to know what is ALREADY there before deciding what to insert/move/remove. Reading the owner's
-  // own (single-child) array here would have every dynamic child on a bare `<scroll-view>` diffed
-  // against the wrong node — invisible on VirtualizedList, which never calls `insert()` on the
-  // owner directly, and wrong for any app writing `<scroll-view>{dynamicChildren}</scroll-view>`.
+
+  // `childHost` is redirected as in the engine's `hostFor` (core/engine/src/node.ts)
+  // A composed primitive's real children live on its slot, and `insert()` reads this to know what
+  // is already there, so reading the owner's own array would diff against the wrong node
   getFirstChild(node) {
     if (isSurface(node)) return node.children[0];
     return firstChildOf(node.childHost ?? node);

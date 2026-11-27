@@ -40,14 +40,11 @@
     showSun = !showSun;
   }
 
-  // {@attach} directly on the `<touchable-highlight>` TAG — no forwarding needed, unlike an
-  // attach on a component (svelte-adapter-dom-shim skill §22c, category 2), because there is no
-  // wrapper standing between this markup and the engine node any more.
-  // The run counter is a plain closure variable, exactly as in RunesDemo's $effect: an
-  // attachment body runs inside an effect, so `touchableAttachCount += 1` would READ the $state
-  // it writes, and Svelte re-runs the effect on its own write forever
-  // (`effect_update_depth_exceeded`). Write-only into the $state keeps the readout reactive with
-  // no self-dependency.
+  // `{@attach}` directly on the `<touchable-highlight>` tag needs no forwarding, as no wrapper
+  // stands between this markup and the engine node
+  // The run counter is a plain closure variable, as in the `$effect` of `RunesDemo`
+  // An attachment body runs inside an effect, so `+= 1` on the `$state` would read what it writes
+  // and loop forever (`effect_update_depth_exceeded`)
   let attachRunsRaw = 0;
   let touchableAttachCount = $state(0);
   function onTouchableAttach(): void {

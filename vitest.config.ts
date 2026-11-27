@@ -260,15 +260,20 @@ const SHARED = {
   },
 };
 
-// svelte's "." export splits on a `browser` condition, the SSR runtime throws in `mount()`
+// solid-js splits its "." export on a `browser` condition, and the SSR runtime throws in `mount()`
 // Vitest reads `ssr.resolve.conditions`, so both `resolve` and `ssr.resolve` set it
-// Metro needs the equivalent `conditionNames` fix, see the svelte-adapter-dom-shim skill
 
-// Scoped to the svelte project: `less`/`sass`/`stylus` list a `browser` key first in their exports
+// Scoped per project: `less`/`sass`/`stylus` list a `browser` key first in their exports
 // A global condition would resolve them to browser bundles that fail under Node
 const BROWSER_CONDITIONS = {
   resolve: { conditions: ['browser'] },
   ssr: { resolve: { conditions: ['browser'] } },
+};
+
+// Условие `svelte-custom-renderer` включает сборку рантайма с `svelte/renderer`
+const SVELTE_CONDITIONS = {
+  resolve: { conditions: ['svelte-custom-renderer'] },
+  ssr: { resolve: { conditions: ['svelte-custom-renderer'] } },
 };
 
 export default defineConfig({
@@ -334,7 +339,7 @@ export default defineConfig({
           EXAMPLE_IMPORTS,
         ],
         resolve: {
-          ...BROWSER_CONDITIONS.resolve,
+          ...SVELTE_CONDITIONS.resolve,
           alias: REANIMATED_ALIAS,
         },
         test: {
@@ -346,9 +351,10 @@ export default defineConfig({
       },
       {
         ...SHARED,
-        ...BROWSER_CONDITIONS,
+        ...SVELTE_CONDITIONS,
         test: {
           ...SHARED.test,
+          setupFiles: [...SHARED.test.setupFiles, './vitest.svelte.setup.ts'],
           name: 'svelte',
           include: SVELTE_TESTS,
           exclude: [...EXCLUDE_ALL, ...REANIMATED_SVELTE_TESTS],

@@ -131,7 +131,7 @@
         const first = await reader.read();
         reader.releaseLock();
         return {
-          viaReadableStream: first.value?.byteLength,
+          viaReadableStream: first.value instanceof Uint8Array ? first.value.byteLength : undefined,
           viaStream: file().stream() !== undefined,
         };
       },

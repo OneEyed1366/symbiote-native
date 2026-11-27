@@ -16,6 +16,7 @@ import {
   isUntouched,
   movedSince,
   newestMtimeMs,
+  packagesToInstall,
   readStamps,
   withDependents,
   writeStamps,
@@ -128,6 +129,45 @@ describe('movedSince', () => {
 
     expect(movedSince(stamps, installed)).toEqual([
       { name: '@symbiote-native/engine', version: '1.0.0' },
+      { name: '@symbiote-native/vue', version: '2.0.0' },
+    ]);
+  });
+});
+
+describe('packagesToInstall', () => {
+  const stamps = {
+    '@symbiote-native/engine': STAMP,
+    '@symbiote-native/vue': { version: '2.0.0', integrity: 'sha512-v' },
+  };
+  const lockfile = {
+    '@symbiote-native/engine': 'sha512-old',
+    '@symbiote-native/vue': 'sha512-old',
+  };
+
+  // `npm install --no-save` restores every other package to the bytes its lockfile pins
+  it('names an earlier targeted install again, which the lockfile would revert', () => {
+    const installed = { ...lockfile, '@symbiote-native/engine': 'sha512-a' };
+
+    expect(packagesToInstall(stamps, installed, lockfile)).toEqual([
+      { name: '@symbiote-native/engine', version: '1.0.0' },
+      { name: '@symbiote-native/vue', version: '2.0.0' },
+    ]);
+  });
+
+  it('installs nothing when nothing moved, whatever the lockfile pins', () => {
+    const installed = {
+      '@symbiote-native/engine': 'sha512-a',
+      '@symbiote-native/vue': 'sha512-v',
+    };
+
+    expect(packagesToInstall(stamps, installed, lockfile)).toEqual([]);
+  });
+
+  it('leaves out a package the lockfile already pins at the stamped bytes', () => {
+    const installed = { ...lockfile, '@symbiote-native/engine': 'sha512-a' };
+    const pinned = { ...lockfile, '@symbiote-native/engine': 'sha512-a' };
+
+    expect(packagesToInstall(stamps, installed, pinned)).toEqual([
       { name: '@symbiote-native/vue', version: '2.0.0' },
     ]);
   });

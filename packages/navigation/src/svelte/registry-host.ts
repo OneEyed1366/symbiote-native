@@ -1,9 +1,8 @@
 // Where a navigator renders its `<*.Screen>` markers so they can register themselves.
 //
-// The markers have to be RENDERED for their init to run (screen-registry.ts explains why
-// registration is inverted on Svelte), and Svelte turns whitespace between two sibling non-text
-// nodes into a REAL text node - svelte-adapter-dom-shim skill §16, a correctness bug rather than
-// a formatting one. Naturally formatted app markup
+// The markers have to be rendered for their init to run (see `screen-registry.ts`), and Svelte
+// turns whitespace between two sibling non-text nodes into a real text node, a correctness bug
+// Naturally formatted app markup
 //
 //   <Stack>
 //     <Stack.Screen name="home" component={Home} />

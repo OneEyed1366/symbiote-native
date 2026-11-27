@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/cellular",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "description": "expo-cellular wrapped for SymbioteNative — one framework-agnostic core, built once and reachable from the React, Vue, Svelte, Solid, and Angular adapters. Cellular generation (2G/3G/4G/5G), carrier/SIM info on Android (ISO country code, carrier name, MCC/MNC), VoIP-support detection, and the permission get/request pair gating carrier info on Android.",
   "license": "MIT",
   "repository": {
@@ -84,6 +84,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run packages/cellular/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "prepare": "pnpm run ng:build",
     "typecheck": "tsc --build",
     "clean": "rm -rf build-ngc",
@@ -106,7 +108,7 @@
     "react": ">=19.0.0",
     "react-native": ">=0.86",
     "solid-js": ">=1.9.0",
-    "svelte": ">=5.56.0",
+    "svelte": ">=5.59.1",
     "vue": ">=3.5.0"
   },
   "peerDependenciesMeta": {

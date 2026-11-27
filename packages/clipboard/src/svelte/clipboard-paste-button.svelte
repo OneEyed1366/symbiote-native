@@ -3,9 +3,11 @@
   // so the tag is dynamic
   import { hostProps } from '@symbiote-native/svelte/native-view-bridge';
   import { renderClipboardPasteButton } from '../core/clipboard-paste-button';
+  import type { IViewProps } from '@symbiote-native/svelte';
   import type { IClipboardPasteButtonProps } from '../core/clipboard-paste-button';
 
-  const props: IClipboardPasteButtonProps = $props();
+  const props: IClipboardPasteButtonProps & Pick<IViewProps, 'class'> =
+    $props();
   const descriptor = $derived(renderClipboardPasteButton({ ...props }));
 </script>
 

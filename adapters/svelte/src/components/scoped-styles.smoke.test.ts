@@ -1,39 +1,21 @@
-// The runtime proof for `<style>` support: a REAL `.svelte` source with a `<style>` block goes
-// through the real preprocessor, the real `svelte/compiler`, this adapter's own `mount()`, and
-// the assertions read the COMMITTED fake-Fabric node — not the compiled text.
-//
-// Two things are proven here that the preprocessor's own unit test structurally cannot:
-//   1. the declarations in a `<style>` block actually land on the native node (they landed
-//      nowhere at all before this feature — Svelte's own CSS output is empty by the time it
-//      exists, see scoped-styles.ts's header);
-//   2. scoping is REAL — two components each defining their own `.card` do not bleed into each
-//      other, even though the class registry is one flat global Map.
-//
-// Harness shape and its three gotchas are §15 of the svelte-adapter-dom-shim skill. Every variant
-// gets its OWN filename because Node's `import()` caches by path.
-//
-// Coverage ledger:
-//   - the preprocessor's TEXT-level rewrite (suffixing, `:global()`, kebab matching, the dynamic
-//     wrap, the interpolated template literal, the existing-`<script module>` splice, line-number
-//     preservation) — N/A here: covered directly and exhaustively at
-//     preprocessor/scoped-styles.test.ts (16 tests). This file proves the RUNTIME half that a
-//     compiled-text assertion structurally cannot: does the declaration actually reach the
-//     committed Fabric node, and does per-component scoping actually prevent cross-component
-//     bleed at runtime.
-//   - `resolveClassName`'s core resolution algorithm (token-subset matching, cascade ordering,
-//     array/object passthrough) — N/A: covered directly at
-//     core/engine/src/style-registry/{style-registry,scope,scoped-conformance}.test.ts. This file
-//     only proves index.svelte's own `class` prop actually FEEDS a scoped token into that
-//     resolver at runtime (static and dynamic clsx forms) — covered below.
-//   - declarations landing on the committed native node at all (dead before this feature existed,
-//     per the file header) — covered below (first test).
-//   - per-component scope isolation — two components each defining `.card` must not bleed —
-//     covered below (second test).
-//   - a dynamic clsx `class={['boxed', on && 'lit']}` resolving through the scope at runtime —
-//     covered below (third test).
-//   - compound selector (`.card.big`) layering over its own single-class rules, for both a
-//     static `class="card big"` and a dynamic clsx form, while an element carrying only `.card`
-//     stays on the single rule — covered below (nested "compound selector under scope" group).
+// Runtime proof for `<style>` support: a real `.svelte` source runs through the real
+// preprocessor, `svelte/compiler` and `mount()`; assertions read the committed fake-Fabric node
+
+// Proves what the preprocessor's unit test cannot: declarations reach the native node (Svelte's
+// own CSS output is empty, see `scoped-styles.ts`). Two components each defining `.card` must
+// not bleed through the flat global class registry
+
+// Each variant gets its own filename because Node's `import()` caches by path
+
+// Text-level rewrite (suffixing, `:global()`, kebab matching, dynamic wrap, `<script module>`
+// splice, line numbers) is covered at `preprocessor/scoped-styles.test.ts`, not here
+
+// `resolveClassName` resolution is covered at `core/engine/src/style-registry/*.test.ts`; here
+// only that the `class` prop of `index.svelte` feeds a scoped token into it, static and dynamic
+
+// Tests below: declarations land on the node, scopes stay isolated, and a dynamic clsx class
+// resolves through the scope. Compound `.card.big` layers over its single-class rules in both
+// forms, while a `.card`-only element stays on the single rule
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -116,10 +98,8 @@ async function loadDefault(outPath: string): Promise<Component> {
   return component;
 }
 
-// fabric.find() walks the CREATION log, so it can return a node that is no longer mounted and
-// whose props are stale (§15). Every assertion below reads the LIVE committed tree instead. The
-// declarations under test (padding, backgroundColor, color, margin) all travel through the style
-// slot, so they only show up in the flattened payload.
+// `fabric.find()` walks the creation log and can return an unmounted node with stale props, so
+// assertions read the live committed tree. Style declarations show only in the flattened payload
 function findLive(nativeID: string) {
   return live.findLive(
     live.appRoot(),
@@ -149,10 +129,9 @@ const DYNAMIC = `<script>
 </style>
 `;
 
-// A compound rule whose second part has NO standalone rule — the arrangement that exercises both
-// halves of the compound-under-scope fix at once. `big` reaches `localNames` only through the
-// `.card.big` selector's tokens, and the registered key `cardBig__<scope>` is reachable only
-// because the runtime factors the shared suffix back out of `card__<scope> big__<scope>`.
+// A compound rule whose second part has no standalone rule, so both halves of the fix run:
+// `big` reaches `localNames` only via `.card.big` tokens, and `cardBig__<scope>` is found only
+// because the runtime factors the suffix back out of `card__<scope> big__<scope>`
 const COMPOUND = `<script>
   let { big = false } = $props();
 </script>
@@ -204,16 +183,12 @@ async function mountBoth(): Promise<void> {
 }
 
 describe('svelte <style> block (real preprocess + compile + mount)', () => {
-  // No Negative group: the preprocessor build-time guard (§24a/§22d's forbidWebOnlyConstructs)
-  // covers the actual throwing contract for malformed Svelte source, and that guard has its own
-  // dedicated test file. A `<style>` block itself has no runtime rejection path — every rule
-  // either resolves to a native style field or is silently dropped with a warning (@media,
-  // pseudo-classes — documented, not exercised here since those are N/A per the ledger above:
-  // pure css-parser/registry behavior, not adapter runtime behavior).
+  // No Negative group: the build-time guard `forbidWebOnlyConstructs` owns the throwing contract
+  // and has its own test file. A `<style>` block has no runtime rejection path, a rule either
+  // resolves to a native style field or is dropped with a warning
   describe('Positive (scoped declarations reach the committed native node)', () => {
-    // why: before this feature, a `<style>` block's declarations landed NOWHERE — Svelte's own
-    // CSS output is structurally empty for a component tag (skill §25a). This is the basic
-    // product claim the whole feature exists to satisfy.
+    // Svelte's own CSS output is empty for a component tag, so without this feature a `<style>`
+    // block's declarations land nowhere. This is the basic product claim of the feature
     it('lands the block declarations on the committed Fabric node', async () => {
       await mountBoth();
 
@@ -223,9 +198,8 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
       expect(card?.payload.backgroundColor).toBe('#262626');
     });
 
-    // why: the class registry is ONE flat global Map (skill §25b) — scoping must be real, not
-    // incidental, or two components each authoring their own `.card` would silently collide the
-    // moment both are mounted in the same app.
+    // The class registry is one flat global Map, so scoping must be real or two components each
+    // authoring `.card` would collide once both are mounted in the same app
     it('does not let one component .card bleed into another component .card', async () => {
       await mountBoth();
 
@@ -236,9 +210,8 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
       expect(findLive('b')?.payload.backgroundColor).toBeUndefined();
     });
 
-    // why: a scoped `<style>` block must compose with the adapter's OWN clsx `class` value
-    // (skill §22b), not just a literal string — the two features are independently implemented
-    // and this is the seam where they could silently stop talking to each other.
+    // A scoped `<style>` block must compose with the adapter's own clsx `class` value, not just a
+    // literal string: two independent features, and this is the seam where they could stop meeting
     it('scopes a dynamic clsx class at runtime', async () => {
       await buildFixture(DYNAMIC, 'Dynamic', DYNAMIC_OUT);
       mount(ROOT_TAG, await loadDefault(DYNAMIC_OUT), { on: true });
@@ -251,9 +224,8 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
       expect(node?.payload.color).toBe('#fff');
     });
 
-    // why: a compound selector (`.card.big`) must LAYER over its own single-class rules rather
-    // than replace them (skill §26) — a naive suffix-per-token scheme could easily lose the
-    // single-class declarations a compound rule doesn't restate.
+    // A compound selector (`.card.big`) must layer over its single-class rules, not replace them:
+    // a naive suffix-per-token scheme could lose declarations the compound rule does not restate
     describe('compound selector under scope', () => {
       beforeEach(async () => {
         await buildFixture(COMPOUND, 'Compound', COMPOUND_OUT);
@@ -281,10 +253,9 @@ describe('svelte <style> block (real preprocess + compile + mount)', () => {
       });
     });
 
-    // why: `:global()` around PART of a selector is the escape hatch for styling markup this
-    // file does not own, and its two halves are suffixed by DIFFERENT rules — the key as a
-    // whole, the markup token not at all. The preprocessor's suite proves each half in the
-    // compiled text; only a mounted component proves they still meet at the registry.
+    // `:global()` around part of a selector styles markup this file does not own, and its halves
+    // are suffixed by different rules (key as a whole, markup token not at all). Only a mount
+    // proves they meet at the registry; the preprocessor suite checks each half in text
     describe('partial :global() under scope', () => {
       beforeEach(async () => {
         await buildFixture(PARTIAL_GLOBAL, 'PartialGlobal', PARTIAL_GLOBAL_OUT);

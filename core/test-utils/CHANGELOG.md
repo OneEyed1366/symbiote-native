@@ -1,5 +1,23 @@
 # @symbiote-native/test-utils
 
+## 0.5.2
+
+### Patch Changes
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - README: the recorder does not emulate Fabric's clone-on-write, and the package has its own tests.
+  No change in behaviour.
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `vue`: in a dev build a removed screen is now freed, as Vue's dev links on its elements are dropped.
+
+  `cli`: the Svelte template turns on `experimental.customRenderer`, adds the `svelte-custom-renderer`
+  Metro condition and requires `svelte >= 5.59.1`.
+
+  `test-utils`: `createLiveTree` leaves out an empty raw text, as a commit does. Pass `keepBlankText`
+  to keep it.
+
+- Updated dependencies [[`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add), [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add), [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add)]:
+  - @symbiote-native/engine@1.9.0
+
 ## 0.5.1
 
 ### Patch Changes

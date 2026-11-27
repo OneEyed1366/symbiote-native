@@ -1,7 +1,6 @@
 <script>
-  // The same ten-node row every other suite arm builds. Its own component so the each-block below
-  // has a real boundary, which is what a benchmark row is — see `svelte-adapter-dom-shim` on what a
-  // component boundary costs an each-block in anchors.
+  // The same ten-node row every other suite arm builds
+  // Its own component so the each-block has a real boundary, as a benchmark row does
   import {
     CELL_STYLE,
     INPUT_STYLE,

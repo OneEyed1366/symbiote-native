@@ -11,7 +11,11 @@ import {
   useImage,
   writeToCacheAsync,
 } from '@symbiote-native/image/vue';
-import type { IImageContentFit, IImageViewHandle } from '@symbiote-native/image/vue';
+import type {
+  IImageContentFit,
+  IImageLoadEventData,
+  IImageViewHandle,
+} from '@symbiote-native/image/vue';
 import { ActionButton } from '../components/ActionButton';
 import { CallConsole } from '../components/CallConsole';
 import { Explorer, Scenario } from '../components/Scenario';
@@ -57,7 +61,7 @@ const AnimatedScenario = defineComponent(
           autoplay={isAutoplay.value}
           contentFit="cover"
           class="img-animated"
-          onLoad={event => { line.value = `animated: ${String(event.source.isAnimated)}, ${event.source.mediaType ?? 'unknown'}`; }}
+          onLoad={(event: IImageLoadEventData) => { line.value = `animated: ${String(event.source.isAnimated)}, ${event.source.mediaType ?? 'unknown'}`; }}
         />
         <ResultRow testID="image-animated-result" label="onLoad" value={line.value} />
         <view class="button-row">
