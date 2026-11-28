@@ -30,4 +30,5 @@ export type IAddLayerName =
   | 'slider'
   | 'splash-screen'
   | 'reanimated'
+  | 'react-migrator'
   | IExpoPackageLayerName;

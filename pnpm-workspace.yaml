@@ -223,7 +223,9 @@ catalog:
   # Exact pin: `@symbiote-native/navigation` vendors its codegen specs, so a newer consumer install
   # would use native types our snapshot never generated (rule `native-proxy-package-files`)
   react-native-screens: 4.30.0
-  react-native-safe-area-context: ^5.5.2
+  # Exact pins: `packages/react-migrator` asserts hook counts and an upstream render against them
+  react-native-safe-area-context: 5.11.1
+  react-native-keyboard-controller: 1.24.0
   # Exact pins: packages/reanimated imports hook helpers that Reanimated does not publish
   # (`src/hook/*Common`), so a caret range could resolve a release where they moved
   react-native-reanimated: 4.7.2
@@ -412,6 +414,14 @@ catalog:
   invariant: ^2.2.4
   '@types/invariant': ^2.2.37
   '@babel/core': ^7.25.2
+  '@babel/parser': ^7.29.0
+  '@babel/types': ^7.29.0
+  '@babel/traverse': ^7.29.0
+  '@babel/generator': ^7.29.0
+  '@types/babel__traverse': ^7.28.0
+  '@types/babel__generator': ^7.27.0
+  # Exact pin: a beta whose compile output `packages/react-migrator` reads helper by helper
+  '@vidact/compiler': 0.2.0-beta.11
   # The pair that lets Vitest read react-native's own Flow source (vitest.config.ts). The parser
   # swap is NOT optional: @babel/preset-flow is behind Flow's syntax and dies on the conditional
   # type in flattenStyle.js, so RN compiles itself with Hermes' parser and so do we.

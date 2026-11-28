@@ -129,7 +129,7 @@ export async function resolveAddLayers(
   if (!isInteractive()) {
     throw new CliUsageError(
       'No layer flags given and not running in an interactive terminal — pass at least one of ' +
-        '--navigation/--expo-modules/--testing/--splash-screen/--slider/--reanimated, or an ' +
+        '--navigation/--expo-modules/--testing/--splash-screen/--slider/--reanimated/--react-migrator, or an ' +
         'Expo-package flag such as --battery/--sensors.',
     );
   }

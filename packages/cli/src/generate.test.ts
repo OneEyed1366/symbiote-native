@@ -76,6 +76,7 @@ describe('scaffoldApp splash-screen option', () => {
       hasSplashScreen,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -200,6 +201,7 @@ describe('scaffoldApp splash-screen option', () => {
         hasSplashScreen: true,
         hasSlider: false,
         hasReanimated: false,
+        hasReactMigrator: false,
         styling: 'css',
         packageManager: 'npm',
       };
@@ -298,6 +300,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
         hasSplashScreen: true,
         hasSlider: false,
         hasReanimated: false,
+        hasReactMigrator: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -326,6 +329,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
         hasSplashScreen: true,
         hasSlider: false,
         hasReanimated: false,
+        hasReactMigrator: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -354,6 +358,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     });
@@ -383,6 +388,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
         hasSplashScreen: true,
         hasSlider: false,
         hasReanimated: false,
+        hasReactMigrator: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -413,6 +419,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
         hasSplashScreen: true,
         hasSlider: false,
         hasReanimated: false,
+        hasReactMigrator: false,
         styling,
         packageManager: 'npm',
       });
@@ -453,6 +460,7 @@ describe('scaffoldApp vue-tsx navigation dereferences the ComputedRef with .valu
         hasSplashScreen: false,
         hasSlider: false,
         hasReanimated: false,
+        hasReactMigrator: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -507,6 +515,7 @@ describe('scaffoldApp svelte images use {uri} sources, not require() (real bug)'
         hasSplashScreen: false,
         hasSlider: false,
         hasReanimated: false,
+        hasReactMigrator: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -550,6 +559,7 @@ describe('scaffoldApp tsconfig correctness (each framework, testing off)', () =>
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -667,6 +677,7 @@ describe("scaffoldApp sanitizes package.json's name", () => {
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -724,6 +735,7 @@ describe('scaffoldApp declares the metro/babel packages every framework config r
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -774,6 +786,7 @@ describe('scaffoldApp ships an eslint.config.js for every framework', () => {
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -826,6 +839,7 @@ describe('scaffoldApp angular includes rxjs and @angular/forms', () => {
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -869,6 +883,7 @@ describe('scaffoldApp wires the pretypecheck/typecheck scripts each framework ex
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -960,6 +975,7 @@ describe('scaffoldApp vue-tsx wires the adapter-provided JSX plugin, not the bar
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1001,6 +1017,7 @@ describe('scaffoldApp expo-modules option wires the postinstall linker', () => {
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1050,6 +1067,7 @@ describe('scaffoldApp slider option', () => {
       hasSplashScreen: false,
       hasSlider,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1075,6 +1093,56 @@ describe('scaffoldApp slider option', () => {
       throw new Error('generated package.json has no "dependencies" field');
     }
     expect(pkg.dependencies).not.toHaveProperty('@symbiote-native/slider');
+  });
+});
+
+describe('scaffoldApp react-migrator option', () => {
+  const tmpDirs: string[] = [];
+
+  afterEach(() => {
+    for (const dir of tmpDirs.splice(0))
+      fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  function scaffoldWithReactMigrator(hasReactMigrator: boolean): string {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'symbiote-cli-scaffold-'),
+    );
+    tmpDirs.push(root);
+    scaffoldApp({
+      appName: root,
+      framework: 'react',
+      vueFlavor: undefined,
+      hasTypescript: true,
+      bundleId: BUNDLE_ID,
+      hasExpoModules: false,
+      hasNavigation: false,
+      hasTesting: false,
+      hasSplashScreen: false,
+      hasSlider: false,
+      hasReanimated: false,
+      hasReactMigrator,
+      styling: 'css',
+      packageManager: 'npm',
+    });
+    return root;
+  }
+
+  it('adds it to devDependencies when opted in', () => {
+    const root = scaffoldWithReactMigrator(true);
+    expect(readPackageSection(root, 'devDependencies')).toMatchObject({
+      '@symbiote-native/react-migrator': 'latest',
+    });
+    expect(readPackageSection(root, 'dependencies')).not.toHaveProperty(
+      '@symbiote-native/react-migrator',
+    );
+  });
+
+  it('is off by default', () => {
+    const root = scaffoldWithReactMigrator(false);
+    expect(readPackageSection(root, 'devDependencies')).not.toHaveProperty(
+      '@symbiote-native/react-migrator',
+    );
   });
 });
 
@@ -1107,6 +1175,7 @@ describe('scaffoldApp expo-package options', () => {
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       expoPackages,
       styling: 'css',
       packageManager: 'npm',
@@ -1179,6 +1248,7 @@ describe('scaffoldApp declares @symbiote-native/android for every framework', ()
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1228,6 +1298,7 @@ describe('scaffoldApp expo-modules option adds the iOS usage-description strings
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1284,6 +1355,7 @@ describe('scaffoldApp expo-modules option adds the Android permissions/backup co
       hasSplashScreen,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1350,6 +1422,7 @@ describe('scaffoldApp declares @symbiote-native/engine as a direct dependency fo
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1389,6 +1462,7 @@ describe('scaffoldApp does not ship a lockfile for any package manager', () => {
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     };

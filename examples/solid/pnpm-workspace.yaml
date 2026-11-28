@@ -1,0 +1,4 @@
+allowBuilds:
+  '@parcel/watcher': set this to true or false
+  detox: set this to true or false
+  dtrace-provider: set this to true or false

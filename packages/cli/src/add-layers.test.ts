@@ -47,6 +47,7 @@ function scaffoldBareApp(
     hasSplashScreen: false,
     hasSlider: false,
     hasReanimated: false,
+    hasReactMigrator: false,
     styling: 'css',
     packageManager: 'npm',
   };
@@ -102,6 +103,20 @@ describe('addLayersToApp', () => {
       '@symbiote-native/slider': 'latest',
     });
     expect(result.appliedLayers).toEqual(['slider']);
+  });
+
+  // The app runs the migrator and never bundles it, so it lands in `devDependencies`
+  it('merges the react-migrator devDependency', async () => {
+    const root = scaffold();
+    const result = await addLayers(root, ['react-migrator']);
+    const manifest = readJson(root, 'package.json');
+    expect(manifest.devDependencies).toMatchObject({
+      '@symbiote-native/react-migrator': 'latest',
+    });
+    expect(manifest.dependencies).not.toHaveProperty(
+      '@symbiote-native/react-migrator',
+    );
+    expect(result.appliedLayers).toEqual(['react-migrator']);
   });
 
   // Any EXPO_PACKAGE_LAYERS id (battery, sensors) is dependency-only, like slider above

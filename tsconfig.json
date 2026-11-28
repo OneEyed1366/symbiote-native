@@ -75,6 +75,8 @@
     { "path": "packages/print" },
     { "path": "packages/screen-capture" },
     { "path": "packages/speech" },
-    { "path": "packages/video-thumbnails" }
+    { "path": "packages/video-thumbnails" },
+    { "path": "packages/react-migrator" },
+    { "path": "packages/react-migrator/fixtures" }
   ]
 }

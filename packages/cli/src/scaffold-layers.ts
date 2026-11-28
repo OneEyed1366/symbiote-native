@@ -19,6 +19,7 @@ export type IScaffoldLayerOptions = {
   readonly hasSplashScreen: boolean;
   readonly hasSlider: boolean;
   readonly hasReanimated: boolean;
+  readonly hasReactMigrator: boolean;
   // Optional, so a call site that only knows the hand-named features keeps compiling
   readonly expoPackages?: ReadonlySet<IExpoPackageLayerName>;
 };
@@ -105,6 +106,7 @@ export function applyScaffoldLayers(
   if (options.hasSplashScreen) applySplashScreen(root);
   if (options.hasSlider) mergeLayerFragment(root, 'slider');
   if (options.hasReanimated) applyReanimatedLayer(root);
+  if (options.hasReactMigrator) mergeLayerFragment(root, 'react-migrator');
   // Dependency-only like the slider, one fragment each
   for (const layerName of packages) mergeLayerFragment(root, layerName);
   if (options.hasTesting) applyTesting(root, options.framework);

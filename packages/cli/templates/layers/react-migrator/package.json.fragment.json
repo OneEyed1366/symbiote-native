@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "@symbiote-native/react-migrator": "latest"
+  }
+}

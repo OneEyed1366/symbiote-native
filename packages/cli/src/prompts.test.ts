@@ -25,6 +25,7 @@ const NO_FEATURES = {
   hasSplashScreen: false,
   hasSlider: false,
   hasReanimated: false,
+  hasReactMigrator: false,
   expoPackages: new Set<IExpoPackageLayerName>(),
 };
 
@@ -36,6 +37,7 @@ const DEFAULT_FEATURES = {
   hasSplashScreen: false,
   hasSlider: false,
   hasReanimated: false,
+  hasReactMigrator: false,
   expoPackages: new Set(),
 };
 
@@ -91,6 +93,12 @@ describe('prompts in a non-interactive terminal', () => {
     await expect(
       resolveFeatures('react', { ...NO_FEATURES, hasReanimated: true }),
     ).resolves.toEqual({ ...DEFAULT_FEATURES, hasReanimated: true });
+  });
+
+  it('resolveFeatures keeps --react-migrator switched on', async () => {
+    await expect(
+      resolveFeatures('react', { ...NO_FEATURES, hasReactMigrator: true }),
+    ).resolves.toEqual({ ...DEFAULT_FEATURES, hasReactMigrator: true });
   });
 
   // Picking an Expo-backed package (--battery) implies the autolinking wiring

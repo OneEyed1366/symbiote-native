@@ -1,16 +1,18 @@
 ---
 name: symbiote-third-party-native-view
-description: "Symbiote third-party native-VIEW wrapper workflow — read BEFORE making a React-Native library that ships a native VIEW component (@react-native-community/slider, react-native-*, any codegenNativeComponent) usable from a NON-React adapter (Vue/Angular/Svelte/Solid), or building/debugging a @symbiote-native/PKG wrapper package, or deciding where such a wrapper and its native dependency go. This is the realized track of the third_party_rn_packages_are_react_only invariant; the reference implementation is @symbiote-native/slider (packages/slider). Covers: (1) WHY a wrapper at all — the library's default export is a React component (useState/hooks) that throws under a non-React adapter's null dispatcher; you reach the native view through the engine createNode-by-ViewConfig path instead, never by importing the React component. (2) PACKAGE SHAPE — a self-contained packages/PKG package (NOT core/components, NOT an adapter), one framework-agnostic src/core (pure folds + renderX returning a Descriptor) + one thin per-adapter entry (./vue, ./react, ./angular) via the exports map. (3) VIEWCONFIG REGISTRATION — package-level register.ts side-effect imports the codegen native-component SPEC (…/dist/XNativeComponent), pulled by barrels only. (4) ONE-DEPENDENCY NATIVE PROXY PACKAGING — the app lists ONLY @symbiote-native/PKG; @symbiote-native/PKG depends on the native RN library, ships react-native.config.cjs + a proxy podspec + codegenConfig, and autolinking sees @symbiote-native/PKG as the native package. Plain transitive native deps still do NOT autolink; the proxy files are the escape hatch. (5) prop-type split, no-`as` narrowing, headless tests, native simulator verification, and build/wiring checklist. Trigger on: wrap a native library for Vue/Angular, 'use X slider/picker/etc on a non-React adapter', a native view that renders on React but is blank/unlinked elsewhere, or any @symbiote-native/PKG packaging/dependency question."
+description: "Symbiote third-party native-VIEW wrapper workflow — read BEFORE making a React-Native library that ships a native VIEW component (@react-native-community/slider, react-native-*, any codegenNativeComponent) usable from a NON-React adapter (Vue/Angular/Svelte/Solid), or building/debugging a @symbiote-native/PKG wrapper package, or deciding where such a wrapper and its native dependency go. This is the realized track of the third_party_rn_packages_are_react_only invariant; the reference implementation is @symbiote-native/slider (packages/slider). Covers: (1) WHY a wrapper at all — the library's default export is a React component (useState/hooks) that throws under a non-React adapter's null dispatcher; you reach the native view through the engine createNode-by-ViewConfig path instead, never by importing the React component. (2) PACKAGE SHAPE — a self-contained packages/PKG package (NOT core/components, NOT an adapter), one framework-agnostic src/core (pure folds + renderX returning a Descriptor) + one thin per-adapter entry (./vue, ./react, ./angular) via the exports map. (3) VIEWCONFIG REGISTRATION — package-level register.ts side-effect imports the codegen native-component SPEC (…/dist/XNativeComponent), pulled by barrels only. (4) ONE-DEPENDENCY NATIVE PROXY PACKAGING — the app lists ONLY @symbiote-native/PKG; @symbiote-native/PKG depends on the native RN library, ships react-native.config.cjs + a proxy podspec + codegenConfig, and autolinking sees @symbiote-native/PKG as the native package. Plain transitive native deps still do NOT autolink; the proxy files are the escape hatch. (5) prop-type split, no-`as` narrowing, headless tests, native simulator verification, and build/wiring checklist. Trigger on: wrap a native library for Vue/Angular, 'use X slider/picker/etc on a non-React adapter', a native view that renders on React but is blank/unlinked elsewhere, or any @symbiote-native/PKG packaging/dependency question. The same packaging law covers a view-less plain RN TurboModule (see the section 'Delta: native MODULE without a view', reference packages/splash-screen)."
 ---
 
 # Symbiote — wrapping a third-party RN native VIEW for non-React adapters
 
 A third-party RN library that ships a **native view** (a `codegenNativeComponent`, e.g.
-`@react-native-community/slider`'s `RNCSlider`) runs out-of-the-box only under the React
-adapter: its default export is a **React component** whose body calls `useState`/hooks off
-the React dispatcher, so a non-React adapter (Vue/Angular/Svelte/Solid) renders it with a
-null dispatcher and it throws `Cannot read property 'useState' of null`. The
-`third_party_rn_packages_are_react_only` invariant states this; this skill is the realized
+`@react-native-community/slider`'s `RNCSlider`) runs out-of-the-box only under the React adapter.
+
+Its default export is a **React component** whose body calls `useState`/hooks off the React dispatcher.
+A non-React adapter (Vue/Angular/Svelte/Solid) renders it with a null dispatcher.
+It then throws `Cannot read property 'useState' of null`.
+
+The `third_party_rn_packages_are_react_only` invariant states this; this skill is the realized
 way to make such a view work everywhere. Reference: **`@symbiote-native/slider`** (`packages/slider`,
 ). SymbioteNative only makes the *native view* framework-agnostic — never the library's
 React *component*.
@@ -130,14 +132,14 @@ Dependency hygiene (the `symbiote-dependency-catalog` skill): external deps insi
 
 - **Agnostic public prop type in core** (`IXProps extends IAccessibilityProps, IAriaProps`),
   re-exported verbatim by adapters whose surface is fully agnostic (Vue's slider re-exports
-  `ISliderProps` from core). A field that carries a **framework element** is per-adapter: the
-  custom step marker is React `StepMarker?: FC<IStepMarkerProps>` (a prop) vs Vue `#stepMarker`
-  (a scoped slot) — each adapter declares its own flavored `IXProps` under the SAME name
+  `ISliderProps` from core). A field that carries a **framework element** is per-adapter.
+  The custom step marker is React `StepMarker?: FC<IStepMarkerProps>` (a prop) vs Vue `#stepMarker`
+  (a scoped slot). Each adapter declares its own flavored `IXProps` under the SAME name
   (precedent: `IPressableProps`), sharing the agnostic base via an aliased import. The
   marker's INPUT props (`IStepMarkerProps`: plain scalars) live in core.
 - **Internal `IXViewProps` (what renderX paints) types opaque values as `unknown`**, not the
-  precise type — colors (`IColorValue` = string | opaque), `style` (`IStyleProp`), resolved
-  images — because narrowing them off untyped Vue attrs without `as` is painful and pointless
+  precise type: colors (`IColorValue` = string | opaque), `style` (`IStyleProp`), resolved
+  images. Narrowing them off untyped Vue attrs without `as` is painful and pointless
   (the engine processes them). The PUBLIC `IXProps` keeps the precise typing. Only fields the
   logic actually folds are explicit in `IXViewProps`; everything that just passes through
   (other tints, accessibility*, testID, the native event handlers) rides in a `passthrough` bag
@@ -151,13 +153,17 @@ Dependency hygiene (the `symbiote-dependency-catalog` skill): external deps insi
 ## Faithful folds (port the library's React wrapper, do not invent)
 
 Read the library's `Slider.tsx`-equivalent and move its PURE JS into `src/core` so every adapter
-inherits it. For the slider these were: value sanitation (the `!value` quirk → `0`/`NaN` become
-`undefined` so native uses its own initial value), `disabled`/`accessibilityState` resolution,
-limit defaults, `thumbTintColor` → transparent when a custom marker + thumbImage, the
-"pass native thumbImage only when no custom marker" decision, the step-option layout, and the
-event mapping (BOTH native value rails — the bubbling `onChange` AND `onXValueChange` — drive the
-friendly `onValueChange(value)`; sliding start/complete; the accessibility action re-bound to the
-view's custom `onXAccessibilityAction`). Public callbacks (`onValueChange` etc.) are JS-only and
+inherits it. For the slider these were:
+
+- value sanitation (the `!value` quirk: `0`/`NaN` become `undefined` so native uses its own initial value)
+- `disabled`/`accessibilityState` resolution and limit defaults
+- `thumbTintColor` is transparent when a custom marker + thumbImage
+- the "pass native thumbImage only when no custom marker" decision and the step-option layout
+- the event mapping: BOTH native value rails (the bubbling `onChange` AND `onXValueChange`) drive the
+  friendly `onValueChange(value)`, plus sliding start/complete
+- the accessibility action re-bound to the view's custom `onXAccessibilityAction`
+
+Public callbacks (`onValueChange` etc.) are JS-only and
 MUST be stripped from the forwarded attrs — leaking a function prop to Fabric crashes Android.
 
 The native render is `renderXNative(view, platform) -> Descriptor` (the raw native leaf, e.g.
@@ -194,7 +200,7 @@ forwards a native ref via `forwardRef` → the host node.
 - React commits SYNC (assert immediately); Vue commits on a microtask (`await tick()` after mount).
 - Add `packages/**/src/**/*.test.{ts,tsx}` to the root `vitest.config.ts` `include`.
 - Cover: native props pass-through, the value-sanitation quirk, tint processing via the derived
-  processor, BOTH value rails → `onValueChange`, sliding events, disabled-from-accessibilityState,
+  processor, BOTH value rails -> `onValueChange`. Also cover sliding events, disabled-from-accessibilityState,
   the step overlay renders, and that the JS callback does NOT leak to the native node.
 - Native RENDER on device is the final word — headless fakes resolve any name, so a wrong
   native-module name passes every smoke and fails only on a real host (`CLAUDE.md`
@@ -236,13 +242,13 @@ forwards a native ref via `forwardRef` → the host node.
     target — a green `pod install` and a green Xcode build both give zero indication of this; it
     only shows up as a runtime crash. This check is what actually caught the bug in `symbiote-slider`
     that "verified working on-device" wrongly claimed was fixed.
-11. **Standing step for any wrapper that HAS been published — before trusting a `catalog:`-installed
-    copy, verify the tarball actually contains the proxy files.** `npm pack --dry-run` from
-    `packages/<lib>` (or simply `ls` the installed copy under `node_modules/.pnpm/@symbiote-native+<lib>@…`)
-    must show BOTH `react-native.config.cjs` and the `*.podspec` — a workspace-only wrapper never
-    hits this (local source bypasses `files` filtering entirely), so the bug stays dormant until
-    first publish. See the gotcha below; this exact omission shipped in a real `@symbiote-native/slider`
-    release undetected.
+11. **Standing step for a published wrapper.** Before trusting a `catalog:`-installed copy,
+    verify the tarball contains the proxy files.
+    - `npm pack --dry-run` from `packages/<lib>` must show BOTH `react-native.config.cjs` and the `*.podspec`.
+    - Or `ls` the installed copy under `node_modules/.pnpm/@symbiote-native+<lib>@…`.
+    - A workspace-only wrapper never hits this: local source bypasses `files` filtering entirely.
+    - So the bug stays dormant until first publish. See the gotcha below.
+    - This exact omission shipped in a real `@symbiote-native/slider` release undetected.
 
 ## Gotchas hit this session
 
@@ -352,10 +358,27 @@ gotcha_files_allowlist := {
 }
 ```
 
+## Delta: native MODULE without a view (plain RN TurboModule)
+
+Packaging law above is identical. Reference: `packages/splash-screen` wrapping `react-native-bootsplash`.
+
+- `codegenConfig.type` is `"modules"`, not `"components"`. `jsSrcsDir` points at a vendored `codegen-specs/` snapshot inside the proxy. `android.javaPackageName` is copied from upstream.
+- No ViewConfig, no `register.ts`, no Descriptor. Upstream API with no React dependency is re-exported verbatim from `src/core` (`splash-screen/src/core/hide.ts`), adapters re-export core.
+- Only React-tied behaviour (animation controller, hooks) goes to the three-layer split: pure controller in core, per-adapter lifecycle in `hooks/`, `composables/`, `runes/`.
+- Android `react-native.config.cjs` sets `sourceDir` from the proxy root to the upstream `android` dir, found by walking up from `process.cwd()` for pnpm.
+- An upstream CLI hidden by its `exports` map is rebranded by spawning its `cli.js` as a child process (`splash-screen/cli.cjs`).
+- A native package may need a neighbour (mmkv needs NitroModules, firebase-analytics needs RNFBApp). Do NOT proxy the neighbour: upstream names its Gradle project (`:react-native-nitro-modules`, `:react-native-firebase_app`) and its pod.
+- RN derives a Gradle project name from the npm name (`@scope/name` becomes `scope_name`), so a proxy name never matches. The neighbour stays an upstream dependency of the app. Open question, decided after the Firebase pilot.
+- A package with no `codegenConfig` and no Nitro (old bridge, e.g. `react-native-ble-plx`, `react-native-purchases`) still loads on our host. RN's TurboModule interop is on for iOS (`RCTRootViewFactory`) and Android (new-arch flag defaults), and `getNativeModule` falls back to `nativeModuleProxy`.
+- For such a package the spec is a hand-written TS interface for our API, not a codegen snapshot. Legacy views go through RN's iOS interop component, Android resolves any registered ViewManager by name (`ViewManagerRegistry.get`, `RCT` prefix fallback) and sets props via `@ReactProp`. Both are device-only unproven.
+- The engine has no `getViewManagerConfig` path: ViewConfig comes only from a codegen spec. A legacy view (`RTCView`, fbsdk buttons) gets its ViewConfig from a new engine path (D-50): `global.RN$LegacyInterop_UIManager_getConstantsForViewManager(name)`, installed on iOS and Android by default in 0.86. RN already converts those constants in `Libraries/ReactNative/getNativeComponentAttributes.js` (deep import is allowed by the `./*` exports map): import it, do not port it. Not implemented; an experiment must confirm the engine may import RN JS.
+- App-side steps (Info.plist keys, manifest permissions, URL schemes, Gradle plugins, Podfile lines, Babel plugin, AppDelegate snippets) belong in a `symbiote.app-steps.json` shipped by the package, applied by `@symbiote-native/cli`. A per-port patcher like `splash-screen` costs about 1000 LOC with tests and does not scale.
+- Not yet proven, the Firebase pilot must answer: Nitro `install()` on our host, vendor config files (`GoogleService-Info.plist`, `google-services.json`, Gradle plugin), upstream pod scripts that use relative paths (`firebase_spm.rb`).
+
 ## References
 
-- `symbiote-new-package-skeleton` — read FIRST if the package doesn't exist yet at all: resolves
-  whether a brand-new package should start as a bare-skeleton (reserve-the-npm-name only, no
+- `symbiote-new-package-skeleton`: read FIRST if the package doesn't exist yet at all.
+  It resolves whether a brand-new package should start as a bare-skeleton (reserve-the-npm-name only, no
   functional code), core-only, or the full parity this skill otherwise assumes.
 - `packages/slider/**` — the reference implementation (core + vue + react + register + native
   proxy config/podspec + tests).
@@ -369,9 +392,9 @@ gotcha_files_allowlist := {
   this skill.
 - Sibling skills: `symbiote-add-component` (SymbioteNative's OWN components — the contrast),
   `symbiote-dependency-catalog` (catalog rules), `vue-adapter-reactivity` (node identity / async
-  commit), `symbiote-engine-core` (the mutation API + ViewConfig derivation), `symbiote-parity-check`,
-  `symbiote-expo-native-module` (the same wrapper problem for an Expo-modules-core package —
-  native MODULE, zero view, EventEmitter/async surface — not this skill's native VIEW/ViewConfig
-  path).
+  commit), `symbiote-engine-core` (the mutation API + ViewConfig derivation), `symbiote-parity-check`.
+  Also `symbiote-expo-native-module`: the same wrapper problem for an Expo-modules-core package.
+  It is a native MODULE, zero view, EventEmitter/async surface, not this skill's native
+  VIEW/ViewConfig path.
 - Once the wrapper package works, write its docs page per `symbiote-docs-site-package-template`
   (canonical `## API` section, one sub-table per surface group).

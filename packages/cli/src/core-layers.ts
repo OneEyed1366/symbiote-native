@@ -8,7 +8,8 @@ export type ICoreLayerFlag =
   | 'hasTesting'
   | 'hasSplashScreen'
   | 'hasSlider'
-  | 'hasReanimated';
+  | 'hasReanimated'
+  | 'hasReactMigrator';
 
 export const CORE_LAYERS = [
   {
@@ -46,6 +47,12 @@ export const CORE_LAYERS = [
     flag: 'hasReanimated',
     label: 'Reanimated',
     hint: '@symbiote-native/reanimated',
+  },
+  {
+    value: 'react-migrator',
+    flag: 'hasReactMigrator',
+    label: 'React migrator',
+    hint: '@symbiote-native/react-migrator',
   },
 ] as const satisfies ReadonlyArray<{
   readonly value: IAddLayerName;

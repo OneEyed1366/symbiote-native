@@ -60,6 +60,7 @@ const BASE_PARSED: IAddCommand = {
   hasSplashScreen: false,
   hasSlider: false,
   hasReanimated: false,
+  hasReactMigrator: false,
   expoPackages: new Set(),
   hasForce: false,
   packageManager: 'npm',

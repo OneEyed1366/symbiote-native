@@ -1,0 +1,15 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "build",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["."],
+  "exclude": ["build"],
+  "references": [
+    { "path": "../../../core/engine" },
+    { "path": "../../../core/components" }
+  ]
+}

@@ -11,6 +11,7 @@ const LAYER_MARKER_DEPENDENCY: ReadonlyArray<readonly [IAddLayerName, string]> =
     ['slider', '@symbiote-native/slider'],
     ['splash-screen', '@symbiote-native/splash-screen'],
     ['reanimated', '@symbiote-native/reanimated'],
+    ['react-migrator', '@symbiote-native/react-migrator'],
     ...EXPO_PACKAGE_LAYERS.map((layer): readonly [IAddLayerName, string] => [
       layer.id,
       layer.symbiotePackage,

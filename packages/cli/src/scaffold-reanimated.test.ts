@@ -51,6 +51,7 @@ describe('scaffoldApp reanimated option', () => {
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated,
+      hasReactMigrator: false,
       styling: 'css',
       packageManager: 'npm',
     });

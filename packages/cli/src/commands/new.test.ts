@@ -72,6 +72,7 @@ const BASE_PARSED: INewCommand = {
   hasSplashScreen: false,
   hasSlider: false,
   hasReanimated: false,
+  hasReactMigrator: false,
   expoPackages: new Set(),
   styling: undefined,
   packageManager: undefined,
@@ -92,6 +93,7 @@ function mockHappyPath(
     hasSplashScreen: false,
     hasSlider: false,
     hasReanimated,
+    hasReactMigrator: false,
     expoPackages: new Set(expoPackages),
   });
   vi.mocked(resolveStyling).mockResolvedValue('css');

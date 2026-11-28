@@ -16,6 +16,7 @@ const NO_FLAGS = {
   hasSlider: false,
   hasSplashScreen: false,
   hasReanimated: false,
+  hasReactMigrator: false,
 };
 
 const EVERY_CORE_LAYER = [
@@ -25,6 +26,7 @@ const EVERY_CORE_LAYER = [
   'slider',
   'splash-screen',
   'reanimated',
+  'react-migrator',
 ] as const;
 
 describe('add prompts in a non-interactive terminal', () => {
@@ -106,6 +108,12 @@ describe('resolveAddLayers with explicit flags', () => {
     await expect(
       resolveAddLayers({ ...NO_FLAGS, hasReanimated: true }, new Set(), false),
     ).resolves.toEqual(['reanimated']);
+  });
+
+  it('includes react-migrator when explicitly flagged', async () => {
+    await expect(
+      resolveAddLayers({ ...NO_FLAGS, hasReactMigrator: true }, new Set(), false),
+    ).resolves.toEqual(['react-migrator']);
   });
 
   it('drops reanimated when it is already added and --force is absent', async () => {
@@ -204,16 +212,24 @@ describe('buildAddLayerOptions', () => {
     });
   });
 
-  it('groups the 6 hand-named layers under "Core layers" and every Expo package under "Expo packages"', () => {
+  it('offers react-migrator with the package it installs as the hint', () => {
     const groups = buildAddLayerOptions(new Set());
-    expect(groups['Core layers']).toHaveLength(6);
+    expect(findOption(groups, 'react-migrator')).toMatchObject({
+      label: 'React migrator',
+      hint: '@symbiote-native/react-migrator',
+    });
+  });
+
+  it('groups the 7 hand-named layers under "Core layers" and every Expo package under "Expo packages"', () => {
+    const groups = buildAddLayerOptions(new Set());
+    expect(groups['Core layers']).toHaveLength(EVERY_CORE_LAYER.length);
     expect(groups['Expo packages']).toHaveLength(EXPO_PACKAGE_LAYERS.length);
   });
 
   it('lists every layer regardless of what is already added, nothing is filtered out', () => {
     const groups = buildAddLayerOptions(new Set(EVERY_CORE_LAYER));
     expect(Object.values(groups).flat()).toHaveLength(
-      6 + EXPO_PACKAGE_LAYERS.length,
+      EVERY_CORE_LAYER.length + EXPO_PACKAGE_LAYERS.length,
     );
   });
 

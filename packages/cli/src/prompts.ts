@@ -179,6 +179,7 @@ export type IFeatureFlags = {
   hasSplashScreen: boolean;
   hasSlider: boolean;
   hasReanimated: boolean;
+  hasReactMigrator: boolean;
   expoPackages: ReadonlySet<IExpoPackageLayerName>;
 };
 
@@ -245,6 +246,8 @@ function featuresFrom(
     hasSplashScreen: flags.hasSplashScreen || selected.has('splash-screen'),
     hasSlider: flags.hasSlider || selected.has('slider'),
     hasReanimated: flags.hasReanimated || selected.has('reanimated'),
+    hasReactMigrator:
+      flags.hasReactMigrator || selected.has('react-migrator'),
     expoPackages,
   };
 }

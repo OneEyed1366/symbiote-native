@@ -2,7 +2,7 @@
 
 Framework-agnostic optional overlays, applied on top of `native/` + `js/<framework>` by
 `--expo-modules` / `--navigation` / `--testing` / `--splash-screen` / `--slider` / `--reanimated`
-/ one `--<id>` flag per `EXPO_PACKAGE_LAYERS` entry (`src/expo-package-layers.ts`).
+/ `--react-migrator` / one `--<id>` flag per `EXPO_PACKAGE_LAYERS` entry (`src/expo-package-layers.ts`).
 
 `expo-modules` is dependency-only, same regardless of `--framework` (see `packages/cli/README.md`'s
 "Design decisions" section). It carries ONLY the core autolinking bits: `expo` and
@@ -84,6 +84,7 @@ string or a comment of the list is not mistaken for its end.
 | `navigation` | `@symbiote-native/navigation` + a per-framework `app/<dir>/App.<ext>` (Stack + Menu/Details screens) overwriting the base App. |
 | `testing` | `detox` + `jest`/`ts-jest` + a generic `e2e/smoke.test.ts` + `detox.config.js`, always TypeScript regardless of `--javascript`. |
 | `reanimated` | `@symbiote-native/reanimated` + the native peers `react-native-reanimated` and `react-native-worklets` (pinned), plus a text splice (`utils/apply-reanimated-babel-plugin.ts`) that appends `react-native-worklets/plugin` as the last entry of `plugins` in `babel.config.js`. Run `pod install` after. |
+| `react-migrator` | `@symbiote-native/react-migrator` in `devDependencies` only: a tool the app runs, no native code. |
 | `splash-screen` | `@symbiote-native/splash-screen` + the 4 native files (`MainActivity.kt`, `AndroidManifest.xml`, `styles.xml`, `AppDelegate.swift`) that wire `react-native-bootsplash`, plus a JS-side text splice (`utils/apply-splash-screen-hide.ts`) wiring the framework's own `hide()` call into the App entry. The native side alone would freeze every scaffold on the splash screen forever, since nothing ever tells it to hide. |
 
 Every `@symbiote-native/*` version in every fragment (base and layer) is pinned to `"latest"`, not

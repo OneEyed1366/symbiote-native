@@ -17,6 +17,7 @@ const NEW_DEFAULTS = {
   hasSplashScreen: false,
   hasSlider: false,
   hasReanimated: false,
+  hasReactMigrator: false,
   expoPackages: new Set(),
   styling: undefined,
   packageManager: undefined,
@@ -136,6 +137,13 @@ describe('parseArgv', () => {
     });
   });
 
+  it('parses --react-migrator', () => {
+    expect(parseArgv(['new', 'my-app', '--react-migrator'])).toEqual({
+      ...NEW_DEFAULTS,
+      hasReactMigrator: true,
+    });
+  });
+
   it('accepts --flag=value syntax for every value flag (git/npm convention)', () => {
     expect(
       parseArgv([
@@ -199,6 +207,7 @@ describe('parseArgv', () => {
       hasSplashScreen: false,
       hasSlider: false,
       hasReanimated: false,
+      hasReactMigrator: false,
       expoPackages: new Set(),
       hasForce: false,
       packageManager: undefined,

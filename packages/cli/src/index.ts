@@ -16,10 +16,10 @@ Usage:
   npx @symbiote-native/cli new <app-name> [--framework react|vue|angular|solid|svelte] [--vue-flavor tsx|sfc]
                       [--javascript] [--force] [--bundle-id com.example.app]
                       [--styling css|css-modules|scss|less|stylus|stylesheet]
-                      [--navigation] [--expo-modules] [--testing] [--splash-screen] [--slider] [--reanimated]
+                      [--navigation] [--expo-modules] [--testing] [--splash-screen] [--slider] [--reanimated] [--react-migrator]
                       [--pm npm|pnpm|yarn]
                       [--<expo-package> ...]  (one per Expo-backed package, implies --expo-modules)
-  npx @symbiote-native/cli add [--navigation] [--expo-modules] [--testing] [--splash-screen] [--slider] [--reanimated]
+  npx @symbiote-native/cli add [--navigation] [--expo-modules] [--testing] [--splash-screen] [--slider] [--reanimated] [--react-migrator]
                       [--<expo-package> ...] [--force] [--pm npm|pnpm|yarn]
                       (run inside an existing @symbiote-native/* app)
   npx @symbiote-native/cli grant [layer]

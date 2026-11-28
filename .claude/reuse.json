@@ -11,6 +11,10 @@
     {
       "path": "adapters/angular/src/components/{flat-list/flat-list-handle.ts,section-list/index.ts,virtualized-section-list/index.ts}",
       "why": "three lists forward the scroll handle to the list inside each, and extracting a base for the two section lists means rewriting classes that carry their own limits; approved by the user 2026-10-12"
+    },
+    {
+      "path": "packages/react-migrator/fixtures/**",
+      "why": "expected migrator output, one file per framework: the twins are the fixture; approved by the user 2026-11-28"
     }
   ]
 }

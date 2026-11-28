@@ -33,6 +33,7 @@ export type IParsedCommand =
       readonly hasSplashScreen: boolean;
       readonly hasSlider: boolean;
       readonly hasReanimated: boolean;
+      readonly hasReactMigrator: boolean;
       readonly expoPackages: ReadonlySet<IExpoPackageLayerName>;
       readonly styling: IStylingOption | undefined;
       readonly packageManager: IPackageManager | undefined;
@@ -47,6 +48,7 @@ export type IParsedCommand =
       readonly hasSplashScreen: boolean;
       readonly hasSlider: boolean;
       readonly hasReanimated: boolean;
+      readonly hasReactMigrator: boolean;
       readonly expoPackages: ReadonlySet<IExpoPackageLayerName>;
       readonly hasForce: boolean;
       readonly packageManager: IPackageManager | undefined;
@@ -124,6 +126,7 @@ type IParseState = {
   hasSplashScreen: boolean;
   hasSlider: boolean;
   hasReanimated: boolean;
+  hasReactMigrator: boolean;
   expoPackages: Set<IExpoPackageLayerName>;
 };
 
@@ -143,6 +146,7 @@ function createParseState(): IParseState {
     hasSplashScreen: false,
     hasSlider: false,
     hasReanimated: false,
+    hasReactMigrator: false,
     expoPackages: new Set(),
   };
 }
@@ -157,6 +161,7 @@ const BOOLEAN_FLAGS = new Map<string, (state: IParseState) => void>([
   ['--splash-screen', state => void (state.hasSplashScreen = true)],
   ['--slider', state => void (state.hasSlider = true)],
   ['--reanimated', state => void (state.hasReanimated = true)],
+  ['--react-migrator', state => void (state.hasReactMigrator = true)],
 ]);
 
 // `--framework react` and `--framework=react` both land here with the raw value, so a missing
@@ -382,6 +387,7 @@ function layerFields(state: IParseState) {
     hasSplashScreen: state.hasSplashScreen,
     hasSlider: state.hasSlider,
     hasReanimated: state.hasReanimated,
+    hasReactMigrator: state.hasReactMigrator,
     expoPackages: state.expoPackages,
     packageManager: state.packageManager,
   };

@@ -1,0 +1,78 @@
+{
+  "name": "@symbiote-native/react-migrator",
+  "version": "0.0.0",
+  "description": "Research tooling for migrating a React Native package's function components and hooks to SymbioteNative core + adapters.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OneEyed1366/symbiote-native.git",
+    "directory": "packages/react-migrator"
+  },
+  "homepage": "https://github.com/OneEyed1366/symbiote-native/tree/master/packages/react-migrator#readme",
+  "bugs": {
+    "url": "https://github.com/OneEyed1366/symbiote-native/issues"
+  },
+  "author": "Andrey Prokopenko <psevdoproger@gmail.com>",
+  "type": "module",
+  "main": "src/classify-hooks.ts",
+  "module": "src/classify-hooks.ts",
+  "types": "src/classify-hooks.ts",
+  "exports": {
+    ".": "./src/classify-hooks.ts"
+  },
+  "files": [
+    "src",
+    "build",
+    "!src/**/*.test.*",
+    "!src/**/*.spec.*",
+    "!src/**/*.detox.*"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "main": "./build/classify-hooks.js",
+    "module": "./build/classify-hooks.js",
+    "types": "./build/classify-hooks.d.ts",
+    "exports": {
+      ".": {
+        "types": "./build/classify-hooks.d.ts",
+        "default": "./build/classify-hooks.js"
+      }
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "pnpm -C ../.. exec vitest run packages/react-migrator/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
+    "typecheck": "tsc --build . fixtures",
+    "classify-hooks": "node src/classify-hooks.ts",
+    "port:safe-area": "node src/port/port-package.ts node_modules/react-native-safe-area-context/src .ports/react-native-safe-area-context/vue-sfc"
+  },
+  "dependencies": {
+    "@babel/generator": "catalog:",
+    "@babel/parser": "catalog:",
+    "@babel/traverse": "catalog:",
+    "@babel/types": "catalog:"
+  },
+  "devDependencies": {
+    "@angular/core": "catalog:",
+    "@types/babel__generator": "catalog:",
+    "@symbiote-native/components": "workspace:*",
+    "@symbiote-native/engine": "workspace:*",
+    "@symbiote-native/react": "workspace:*",
+    "@symbiote-native/test-utils": "workspace:*",
+    "@symbiote-native/vue": "workspace:*",
+    "@types/babel__traverse": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@vidact/compiler": "catalog:",
+    "@vue/runtime-core": "catalog:",
+    "react": "catalog:",
+    "react-native-keyboard-controller": "catalog:",
+    "react-native-safe-area-context": "catalog:",
+    "solid-js": "catalog:",
+    "svelte": "catalog:",
+    "typescript": "catalog:"
+  }
+}
