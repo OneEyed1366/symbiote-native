@@ -1,5 +1,37 @@
 # @symbiote-native/engine
 
+## 1.9.0
+
+### Minor Changes
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - `engine` adds `registerPreCommit` and `unregisterPreCommit`: a hook that runs as a commit starts, so
+  what it writes still rides that commit.
+
+  A view under `LayoutAnimationConfig` with `skipEntering` no longer leaves an entering config in the
+  native store, which native never released. It also gets no `nativeID` for it, so it can flatten.
+
+  On Angular, `skipEnteringExitingAnimations` and `skipEntering` could miss rows that a render had
+  read before the scope had its props. They are skipped now.
+
+### Patch Changes
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - A removed screen is now freed in two garbage collections instead of one per tree level, so dead
+  screens no longer pile up while an app keeps navigating.
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - The Svelte adapter now drives Svelte's own custom renderer API (`svelte/renderer`) instead of DOM
+  emulation. This needs `svelte >= 5.59.1` and the compiler option `experimental.customRenderer`, and
+  the API is experimental in Svelte itself.
+
+  `bind:`, `on:`, `transition:`, `animate:`, `{@html}` and `<svelte:window|document|body|head>` are now
+  compile errors. Use `{@attach}` for element refs and `onX={...}` props for events.
+
+  Svelte elements are now the engine's own nodes, so a `{@attach}` ref receives an engine node and the
+  DOM-like element class is gone. A DOM-style action that calls `appendChild` or `remove` on its
+  element no longer works, and a `use:portal` action from a community package breaks: use `Portal`.
+
+  The engine now tells a style claim (the CSS animations of Reanimated) about an `animation*` style
+  that follows a class made of claimed keys alone. Before, that style never reached `CSSManager`.
+
 ## 1.8.0
 
 ### Minor Changes

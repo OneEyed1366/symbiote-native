@@ -26,13 +26,15 @@ metro.config.js            sourceExts += 'vue', babelTransformerPath → the SFC
 ```
 
 `App.vue` is an ordinary Vue SFC. Metro has no Vue plugin (unplugin-vue ships
-vite/webpack/esbuild/rollup adapters, not Metro), so `metro-vue-transformer.js` does the
-single-pass compile itself with `@vue/compiler-sfc` — `parse` → `compileScript` with
-`inlineTemplate`, then rewrites every `from 'vue'` to `@symbiote-native/vue/runtime-helpers` (the
-custom, non-DOM renderer needs the compiler helpers from `@vue/runtime-core`, not
-`vue/runtime-dom`; the shim also supplies `vShow`, since `v-show`
-compiles to an import runtime-core alone doesn't export). The compiled module is handed to `@react-native/babel-preset` as `.tsx`
-so it strips the `lang="ts"` types.
+vite/webpack/esbuild/rollup adapters, not Metro), so `metro-vue-transformer.js` compiles the file
+itself with `@vue/compiler-sfc`: `parse`, then `compileScript` with `inlineTemplate`.
+
+It rewrites every `from 'vue'` to `@symbiote-native/vue/runtime-helpers`. The custom, non-DOM
+renderer needs the compiler helpers from `@vue/runtime-core`, not `vue/runtime-dom`. The shim also
+supplies `vShow`, since `v-show` compiles to an import that runtime-core alone doesn't export.
+
+The compiled module is handed to `@react-native/babel-preset` as `.tsx`, so it strips the
+`lang="ts"` types.
 
 Editing the transformer or `metro.config.js` needs a Metro cache reset
 (`npm start -- --reset-cache`); editing `App.vue` does not.
@@ -52,6 +54,11 @@ npm run ios
 npm run android
 # diagnostic logs:  DEBUG=1 npm start -- --reset-cache   (then run ios/android)
 ```
+
+After any reinstall of `node_modules`, run `npm run dev` once and load the app before a Release build.
+Worklets Bundle Mode writes files into `react-native-worklets/.worklets`, and Metro's cache outlives
+them. The build then fails with `ENOENT` on `.worklets/<id>.js`
+([reanimated#11313](https://github.com/software-mansion/react-native-reanimated/issues/11313)).
 
 From the `Menu` screen, push into `Canary` and tap the counter card — that tap re-enters Vue's
 reactivity, which recommits through `@symbiote-native/engine` into Fabric, RN's renderer never

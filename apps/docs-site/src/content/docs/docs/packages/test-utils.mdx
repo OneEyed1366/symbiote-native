@@ -1,28 +1,20 @@
 ---
 title: Test utils
-description: The shared fake-Fabric test harness behind every SymbioteNative headless test — installFabric() records what a renderer committed, with no simulator and no build step.
+description: The headless test harness behind SymbioteNative. installRecordingFabric() records what a renderer asked the engine to build, with no simulator and no build step.
 ---
 
 import { Aside, Tabs, TabItem } from '@astrojs/starlight/components';
 
-`@symbiote-native/test-utils` is the fake Fabric slot [Testing](/docs/testing/) refers to.
-`installFabric()` puts a fake `nativeFabricUIManager` on `globalThis` and returns a recorder
-handle. It records what was created, what was committed and what commands were dispatched. It also
-has a `fireEvent` to push a native event back into the renderer.
+`@symbiote-native/test-utils` is the harness [Testing](/docs/testing/) refers to.
+`installRecordingFabric()` installs a recording tree host in place of the native one and returns a
+handle to it. The handle records the nodes and calls the [engine](/docs/api/core/) produced, and its
+`fireEvent` pushes a native event back into the renderer.
 
-Unlike every other package documented here, such as [slider](/docs/packages/slider/),
-[local auth](/docs/packages/local-auth/) or [system UI](/docs/packages/system-ui/), it wraps no
-native library. It ships nothing your app imports at runtime. It is a `devDependency` test double
-standing in for the native side of the [engine](/docs/api/core/)'s commit path. The co-located
-Vitest suites import it across the engine, all five adapters, the wrapper packages, and the
-example apps.
+The recorder keeps the tree as the renderer authored it and derives nothing. It does not flatten,
+clone or rename views. `createLiveTree(fabric)` reads what is on screen over that recording.
 
-Its persistence semantics are faithful, not simplified. Every clone is a new identity,
-`clone*WithNewProps` merges the engine's minimal diff onto the previous props, and `appendChild`
-throws on an illegal Fabric family reparent.
-
-There is no native code here. The fake slot is plain JavaScript running in Node under Vitest, on
-whatever machine the suite runs on. Each adapter's own suite drives this harness.
+Unlike the wrapper packages documented here, such as [slider](/docs/packages/slider/), it wraps no
+native library. It is a `devDependency` that runs in Node under Vitest, and no app code imports it.
 
 ## Installation
 
@@ -30,115 +22,130 @@ whatever machine the suite runs on. Each adapter's own suite drives this harness
 npm install -D @symbiote-native/test-utils
 ```
 
-A `devDependency`, alongside `vitest` — it never belongs in `dependencies`, since no app code
-imports it. No DOM environment is needed: the harness only touches `globalThis`, so Vitest's
-default `node` environment is enough.
+## Vitest setup
+
+No DOM environment is needed: the tests run in Vitest's `node` environment. The default config is
+not enough, because the engine imports `react-native`. React Native ships Flow source that expects
+Metro and a device, and a bare run stops with `Flow is not supported`. The config has to:
+
+- strip the Flow types from `react-native` and `@react-native/*` sources;
+- resolve their platform files, such as `Platform.ios.js`;
+- stub `TurboModuleRegistry` and `NativeModules`;
+- define `__DEV__` in a setup file;
+- list `@symbiote-native/*` and `react-native` in `server.deps.inline`.
+
+The repository's
+[`vitest.config.ts`](https://github.com/OneEyed1366/symbiote-native/blob/master/vitest.config.ts)
+is a working version of all five.
 
 ## Usage
 
-One shape across all five adapters: install the recorder once at module scope, `reset()` it
-between tests, `mount()` the thing under test, then assert on what reached the fake slot. The
-examples below are trimmed from real suites in this repo — the file each one comes from is named
-under it.
+One shape works on all five adapters:
+
+1. Install the recorder once at module scope.
+2. `reset()` it between tests.
+3. `mount()` the component under test and wait for the first commit.
+4. Fire a native event and assert on what the screen says.
+
+Each example below mounts a switch with a label, flips the switch and reads the label.
 
 <Tabs syncKey="framework">
   <TabItem label="React">
     ```tsx
+    import { useState } from 'react';
     import { afterEach, beforeEach, describe, expect, it } from 'vitest';
     import { mount, unmount } from '@symbiote-native/react';
-    import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
+    import { createLiveTree, installRecordingFabric, waitUntil } from '@symbiote-native/test-utils';
 
     const ROOT_TAG = 190;
 
-    // Installed once, at module scope: the engine binds the slot off `globalThis` on its
-    // first commit and caches it, so a re-install after that is never seen.
-    const fabric = installFabric();
+    const fabric = installRecordingFabric();
+    const live = createLiveTree(fabric);
+    const screen = (): string[] => live.texts(live.appRoot());
+
+    function switchHandle(): object {
+      const handle = fabric.find(node => node.viewName === 'Switch')?.instanceHandle;
+      if (typeof handle !== 'object' || handle === null) {
+        throw new Error('no Switch was created');
+      }
+      return handle;
+    }
+
+    function App() {
+      const [isOn, setOn] = useState(false);
+      return (
+        <view>
+          <switch value={isOn} onValueChange={setOn} />
+          <text>{isOn ? 'on' : 'off'}</text>
+        </view>
+      );
+    }
 
     beforeEach(() => fabric.reset());
     afterEach(() => unmount(ROOT_TAG));
 
-    function switchNode(): IFakeNode {
-      const node = fabric.find(n => n.viewName === 'Switch');
-      if (!node) throw new Error('no Switch was created');
-      return node;
-    }
-
     describe('React Switch on the engine', () => {
-      it('passes value through as a strict boolean', () => {
-        mount(ROOT_TAG, <switch value />);
-        expect(switchNode().props.value).toBe(true);
-      });
+      it('shows the new value after a native change', async () => {
+        mount(ROOT_TAG, <App />);
+        await waitUntil(() => fabric.commits > 0, 'first commit');
+        expect(screen()).toEqual(['off']);
 
-      it('derives onValueChange from nativeEvent.value', () => {
-        let changed: boolean | undefined;
-        mount(
-          ROOT_TAG,
-          <switch
-            value={false}
-            onValueChange={value => {
-              changed = value;
-            }}
-          />,
-        );
-        fabric.fireEvent(switchNode().instanceHandle, 'topChange', { value: true });
-        expect(changed).toBe(true);
+        fabric.fireEvent(switchHandle(), 'topChange', { value: true });
+        await waitUntil(() => screen().includes('on'), 'the switch turns on');
       });
     });
     ```
-
-    Trimmed from `adapters/react/src/components/switch/switch.test.tsx`.
 
   </TabItem>
   <TabItem label="Vue">
     ```ts
-    import { defineComponent, Fragment, h, ref } from '@vue/runtime-core';
+    import { defineComponent, h, ref } from '@vue/runtime-core';
     import { afterEach, beforeEach, describe, expect, it } from 'vitest';
     import { mount, unmount } from '@symbiote-native/vue';
-    import { installFabric } from '@symbiote-native/test-utils';
+    import { createLiveTree, installRecordingFabric, waitUntil } from '@symbiote-native/test-utils';
 
     const ROOT_TAG = 31;
-    const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
 
-    const fabric = installFabric();
-    const rows = ref(['a', 'b']);
+    const fabric = installRecordingFabric();
+    const live = createLiveTree(fabric);
+    const screen = (): string[] => live.texts(live.appRoot());
 
-    // An explicit Fragment is what `v-for` compiles to.
+    function switchHandle(): object {
+      const handle = fabric.find(node => node.viewName === 'Switch')?.instanceHandle;
+      if (typeof handle !== 'object' || handle === null) {
+        throw new Error('no Switch was created');
+      }
+      return handle;
+    }
+
     const App = defineComponent({
-      setup: () => () =>
-        h('view', null, () => [
-          h(
-            Fragment,
-            null,
-            rows.value.map((label, index) => h('text', { key: index }, () => label)),
-          ),
-        ]),
+      setup() {
+        const isOn = ref(false);
+        return () =>
+          h('view', null, [
+            h('switch', {
+              value: isOn.value,
+              onValueChange: (next: boolean) => (isOn.value = next),
+            }),
+            h('text', null, [isOn.value ? 'on' : 'off']),
+          ]);
+      },
     });
 
     beforeEach(() => fabric.reset());
     afterEach(() => unmount(ROOT_TAG));
 
-    describe('Vue list on the engine', () => {
-      it('commits real nodes only, then appends incrementally', async () => {
+    describe('Vue Switch on the engine', () => {
+      it('shows the new value after a native change', async () => {
         mount(ROOT_TAG, App);
-        await tick(); // Vue coalesces commits on a microtask, so assert after a turn
+        await waitUntil(() => fabric.commits > 0, 'first commit');
+        expect(screen()).toEqual(['off']);
 
-        // AppContainer root + View + 2×(Text + raw text) = 6. The Fragment's empty-text
-        // anchors create zero native nodes.
-        expect(fabric.counts.createNode).toBe(6);
-        expect(fabric.counts.completeRoot).toBe(1);
-
-        fabric.reset();
-        rows.value.push('c');
-        await tick();
-
-        // The append clones the changed branch and creates only the new Text + raw text.
-        expect(fabric.counts.createNode).toBe(2);
-        expect(fabric.counts.completeRoot).toBe(1);
+        fabric.fireEvent(switchHandle(), 'topChange', { value: true });
+        await waitUntil(() => screen().includes('on'), 'the switch turns on');
       });
     });
     ```
-
-    Trimmed from `examples/vue-tsx/vue-fragment.test.ts`.
 
   </TabItem>
   <TabItem label="Angular">
@@ -147,256 +154,283 @@ under it.
     import { Component, signal } from '@angular/core';
     import { afterEach, beforeEach, describe, expect, it } from 'vitest';
     import { mount, unmount, SYMBIOTE_ELEMENTS } from '@symbiote-native/angular';
-    import { installFabric } from '@symbiote-native/test-utils';
+    import { createLiveTree, installRecordingFabric, waitUntil } from '@symbiote-native/test-utils';
 
     const ROOT_TAG = 905;
-    const fabric = installFabric();
-    const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+
+    const fabric = installRecordingFabric();
+    const live = createLiveTree(fabric);
+    const screen = (): string[] => live.texts(live.appRoot());
+
+    function switchHandle(): object {
+      const handle = fabric.find(node => node.viewName === 'Switch')?.instanceHandle;
+      if (typeof handle !== 'object' || handle === null) {
+        throw new Error('no Switch was created');
+      }
+      return handle;
+    }
 
     @Component({
-      selector: 'symbiote-activity-indicator-host',
+      selector: 'switch-example',
       standalone: true,
       imports: [SYMBIOTE_ELEMENTS],
       template: `
-        <activity-indicator [size]="size()" [color]="color()" [testID]="'spinner-wrapper'" />
+        <view>
+          <switch [value]="isOn()" (valueChange)="isOn.set($event)"></switch>
+          <text>{{ isOn() ? 'on' : 'off' }}</text>
+        </view>
       `,
     })
-    class ActivityIndicatorHost {
-      readonly size = signal<'small' | 'large' | number>('large');
-      readonly color = signal('#0000ff');
+    class SwitchExample {
+      readonly isOn = signal(false);
     }
 
     beforeEach(() => fabric.reset());
     afterEach(() => unmount(ROOT_TAG));
 
-    describe('Angular ActivityIndicator on the engine', () => {
-      it('commits the wrapper View around the native spinner', async () => {
-        mount(ROOT_TAG, ActivityIndicatorHost);
-        await tick();
+    describe('Angular Switch on the engine', () => {
+      it('shows the new value after a native change', async () => {
+        mount(ROOT_TAG, SwitchExample);
+        await waitUntil(() => fabric.commits > 0, 'first commit');
+        expect(screen()).toEqual(['off']);
 
-        expect(fabric.serialize(fabric.appRoot().children)).toBe('RCTView(ActivityIndicatorView)');
+        fabric.fireEvent(switchHandle(), 'topChange', { value: true });
+        await waitUntil(() => screen().includes('on'), 'the switch turns on');
       });
     });
     ```
 
-    Trimmed from `adapters/angular/src/components/activity-indicator/activity-indicator.test.ts`.
-    Angular components are bound to the harness through the same `mount(rootTag, Component)` the
-    other adapters use — there is no test-utils-specific `TestBed` setup, and no service to
-    `inject()`.
+    There is no test-utils-specific `TestBed` setup and no service to `inject()`. The Vitest config
+    needs decorator support: `oxc: { decorator: { legacy: true } }`.
 
   </TabItem>
   <TabItem label="Svelte">
     ```ts
-    import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-    import { compile } from 'svelte/compiler';
-    import { writeFileSync } from 'node:fs';
+    import { rmSync, writeFileSync } from 'node:fs';
     import { join } from 'node:path';
-    import type { Component } from 'svelte';
-    import { installFabric } from '@symbiote-native/test-utils';
+    import { compile } from 'svelte/compiler';
+    import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
     import { mount, unmount } from '@symbiote-native/svelte';
+    import { createLiveTree, installRecordingFabric, waitUntil } from '@symbiote-native/test-utils';
+
+    // React Native sets both before any app code runs, and Svelte reads them at first mount
+    if (globalThis.window === undefined) {
+      Object.assign(globalThis, { window: globalThis });
+    }
+    if (globalThis.navigator === undefined) {
+      Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
+    }
 
     const ROOT_TAG = 91_001;
-    const fabric = installFabric();
-    const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+    const OUT = join(__dirname, '.compiled-switch-example.mjs');
+
+    const fabric = installRecordingFabric();
+    const live = createLiveTree(fabric);
+    const screen = (): string[] => live.texts(live.appRoot());
+
+    function switchHandle(): object {
+      const handle = fabric.find(node => node.viewName === 'Switch')?.instanceHandle;
+      if (typeof handle !== 'object' || handle === null) {
+        throw new Error('no Switch was created');
+      }
+      return handle;
+    }
+
+    const SOURCE = [
+      '<script>',
+      '  let isOn = $state(false);',
+      '</script>',
+      '<view>',
+      '  <switch value={isOn} onValueChange={next => (isOn = next)}></switch>',
+      "  <text>{isOn ? 'on' : 'off'}</text>",
+      '</view>',
+    ].join('\n');
 
     beforeEach(() => fabric.reset());
     afterEach(() => unmount(ROOT_TAG));
+    afterAll(() => rmSync(OUT, { force: true }));
 
-    // No @sveltejs/vite-plugin-svelte in this repo's vitest config, so real .svelte source is
-    // compiled through the real compiler and dynamic-imported, rather than transformed by a loader.
-    async function compileComponent(source: string, name: string): Promise<Component> {
-      const result = compile(source, {
-        generate: 'client',
-        filename: `${name}.svelte`,
-        fragments: 'tree',
-        css: 'external',
-      });
-      const file = join(__dirname, `${name}.mjs`);
-      writeFileSync(file, result.js.code);
-      const mod = (await import(`file://${file}`)) as { default: Component };
-      return mod.default;
-    }
+    describe('Svelte Switch on the engine', () => {
+      it('shows the new value after a native change', async () => {
+        const { js } = compile(SOURCE, {
+          generate: 'client',
+          filename: 'SwitchExample.svelte',
+          fragments: 'tree',
+          css: 'external',
+          experimental: { customRenderer: '@symbiote-native/svelte/renderer' },
+        });
+        writeFileSync(OUT, js.code);
+        const compiled = await import(`file://${OUT}`);
 
-    describe('Svelte $state mutation on the engine', () => {
-      it('re-commits when a rune changes', async () => {
-        const Counter = await compileComponent(
-          `<script>
-             let count = $state(0);
-             $effect(() => { if (count < 1) count = count + 1; });
-           </script>
-           <symbiote-text p={{}}>count {count}</symbiote-text>`,
-          'Counter',
-        );
+        mount(ROOT_TAG, compiled.default);
+        await waitUntil(() => fabric.commits > 0, 'first commit');
+        expect(screen()).toEqual(['off']);
 
-        mount(ROOT_TAG, Counter);
-        await tick();
-        await tick();
-        await tick();
-
-        expect(fabric.serialize([fabric.appRoot()])).toContain('RCTRawText "count 1"');
+        fabric.fireEvent(switchHandle(), 'topChange', { value: true });
+        await waitUntil(() => screen().includes('on'), 'the switch turns on');
       });
     });
     ```
 
-    Trimmed from `adapters/svelte/src/mount-pipeline.smoke.test.ts`. Svelte is the one adapter
-    whose own suites can't lean on a loader to transform `.svelte` source, as there is no
-    `@sveltejs/vite-plugin-svelte` wired into this repo's Vitest config. So its tests compile
-    real source through `svelte/compiler` by hand before mounting it, unlike the other three tabs.
+    The Vitest config needs `svelte-custom-renderer` in both `resolve.conditions` and
+    `ssr.resolve.conditions`, so Svelte resolves to the build that has `svelte/renderer`.
+
+    The `@symbiote-native/svelte` barrel re-exports `.svelte` components, so the config also needs a
+    transform for `.svelte` files. Give it the same `compile` options as the example.
 
   </TabItem>
   <TabItem label="Solid">
     ```tsx
     import { createSignal } from 'solid-js';
     import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-    import { installFabric, type IFakeNode } from '@symbiote-native/test-utils';
     import { mount, unmount } from '@symbiote-native/solid';
+    import { createLiveTree, installRecordingFabric, waitUntil } from '@symbiote-native/test-utils';
 
     const ROOT_TAG = 812;
-    const fabric = installFabric();
-    const tick = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 0));
+
+    const fabric = installRecordingFabric();
+    const live = createLiveTree(fabric);
+    const screen = (): string[] => live.texts(live.appRoot());
+
+    function switchHandle(): object {
+      const handle = fabric.find(node => node.viewName === 'Switch')?.instanceHandle;
+      if (typeof handle !== 'object' || handle === null) {
+        throw new Error('no Switch was created');
+      }
+      return handle;
+    }
+
+    function App() {
+      const [isOn, setOn] = createSignal(false);
+      return (
+        <view>
+          <switch value={isOn()} onValueChange={setOn} />
+          <text>{isOn() ? 'on' : 'off'}</text>
+        </view>
+      );
+    }
 
     beforeEach(() => fabric.reset());
     afterEach(() => unmount(ROOT_TAG));
 
-    // A controlled re-render clones the node, so an update must be read off the LIVE
-    // committed tree — `find()` only ever sees the pre-clone node it matched at creation.
-    function committedSwitch(): IFakeNode {
-      const found = fabric.committed
-        .flatMap(function walk(n): IFakeNode[] {
-          return [n, ...n.children.flatMap(walk)];
-        })
-        .find(n => n.viewName === 'Switch');
-      if (!found) throw new Error('no Switch was committed');
-      return found;
-    }
-
     describe('Solid Switch on the engine', () => {
-      it('passes value through as a strict boolean', async () => {
-        mount(ROOT_TAG, () => <switch value />);
-        await tick();
-        expect(committedSwitch().props.value).toBe(true);
-      });
+      it('shows the new value after a native change', async () => {
+        mount(ROOT_TAG, () => <App />);
+        await waitUntil(() => fabric.commits > 0, 'first commit');
+        expect(screen()).toEqual(['off']);
 
-      it('derives onValueChange from the topChange event', async () => {
-        const [value, setValue] = createSignal(false);
-        mount(ROOT_TAG, () => <switch value={value()} onValueChange={setValue} />);
-        await tick();
-
-        fabric.fireEvent(committedSwitch().instanceHandle, 'topChange', { value: true });
-        await tick();
-
-        expect(committedSwitch().props.value).toBe(true);
+        fabric.fireEvent(switchHandle(), 'topChange', { value: true });
+        await waitUntil(() => screen().includes('on'), 'the switch turns on');
       });
     });
     ```
 
-    Trimmed from `adapters/solid/src/components/switch/switch.test.tsx`. Suites `await tick()`
-    after every mount/prop change: Solid batches its DOM-less `insert` effects on a microtask,
-    same reason Vue's tab needs the helper.
+    The Vitest config has to compile JSX with `babel-preset-solid`, with the same options as the
+    adapter's `babel-preset` export. It also needs the `browser` condition in both
+    `resolve.conditions` and `ssr.resolve.conditions`, because the server build of `solid-js` throws
+    in `mount()`.
 
   </TabItem>
 </Tabs>
 
 ## API
 
-The package has exactly one runtime export plus three types; everything else is reached through
-the returned recorder.
-
 ### Functions
 
-| Signature                          | Description                                                                                                                                                     |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `installFabric(): IFabricRecorder` | Installs a fresh fake `nativeFabricUIManager` on `globalThis` and returns the recorder handle that observes it. Call it at module scope, before the first mount |
+| Signature | Description |
+| --------- | ----------- |
+| `installRecordingFabric(): IRecordingHost` | Installs the recording host and a minimal `nativeFabricUIManager`. Call it at module scope, before the first mount |
+| `createRecordingHost(): IRecordingHost` | Builds the same host without installing it |
+| `createLiveTree(fabric, options?): ILiveTree` | Reads the tree that is on screen. `keepBlankText: true` keeps empty raw texts |
+| `payloadOf(node): Record<string, unknown>` | The Fabric payload the engine's JS builder makes for a node, with `style` flattened |
+| `censusLive(...roots): ILiveCensus` | Counts a live subtree as `nodes`, `anchors` and `nonAnchors` |
+| `createListHarness(fabric, live): IListHarness` | Drives a virtualized list: layout and scroll events, plus the mounted cells |
+| `trackHostCrossings(host): IHostCrossingTracker` | Counts calls into the tree host, `applyOps` excluded |
+| `waitUntil(condition, label, timeoutMs?)` | Polls once per macrotask and throws with `label` on timeout |
+| `waitForQuiet(sample, label, options?)` | Waits until `sample()` stops changing and returns the settled value |
+| `advanceTicks(count)`, `advanceMs(durationMs?)` | Lets the queue drain for a number of macrotasks or a wall-time window |
+| `emitRnDeviceEvent(eventType, payload)` | Emits a React Native device event |
+| `seedWindowDimensions()`, `emitWindowDimensions(window, screen?)` | Seeds or changes the window size, with `TEST_WINDOW` as the default size |
+| `nativeCallsTo(moduleName)` | Reads the calls your native module stub pushed to `globalThis.__symbioteNativeCalls`, as the repository's config does. The package installs no stub |
 
-### `IFabricRecorder`
+### `IRecordingHost`
 
-| Member                                          | Type                                                                                     | Description                                                                                                                                                                                       |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `committed`                                     | `IFakeNode[]`                                                                            | The child set handed to the most recent `completeRoot` — the currently mounted tree                                                                                                               |
-| `created`                                       | `IFakeNode[]`                                                                            | Every node ever `createNode`'d this run, in creation order; clones are excluded                                                                                                                   |
-| `commands`                                      | `Array<{ node: IFakeNode; commandName: string; args: readonly unknown[] }>`              | Every imperative view command dispatched at a committed node, e.g. `Switch`'s `setValue` snap-back                                                                                                |
-| `counts`                                        | `{ createNode: number; completeRoot: number }`                                           | Call counters, for asserting "exactly N native nodes were created" or "this update committed once"                                                                                                |
-| `appRoot()`                                     | `() => IFakeNode`                                                                        | The synthetic `box-none` AppContainer root RN wraps every commit in; throws unless `committed` holds exactly that one root                                                                        |
-| `find(predicate)`                               | `(predicate: (node: IFakeNode) => boolean) => IFakeNode \| undefined`                    | The first `created` node matching the predicate — e.g. by `viewName` or `props.testID`                                                                                                            |
-| `fireEvent(handle, topLevelType, nativeEvent?)` | `(handle: unknown, topLevelType: string, nativeEvent?: Record<string, unknown>) => void` | Delivers a native event to the handler the renderer registered, the same `instanceHandle` round-trip real Fabric does; throws if no handler is registered yet, and `nativeEvent` defaults to `{}` |
-| `serialize(nodes)`                              | `(nodes: IFakeNode[]) => string`                                                         | Renders a node list as `RCTView(RCTText(RCTRawText "text"))` shorthand — a one-line snapshot instead of walking the tree by hand                                                                  |
-| `reset()`                                       | `() => void`                                                                             | Clears `committed`, `created`, `commands` and zeroes `counts`; the registered event handler survives, so a mounted tree stays drivable                                                            |
+It implements the engine's tree host. These are the members a test reads or calls:
 
-### `IFakeNode`
+| Member | Description |
+| ------ | ----------- |
+| `commits` | How many commits the engine asked for |
+| `commands` | Imperative view commands in order, such as the snap-back of a `Switch` |
+| `responderHandovers`, `accessibilityEvents` | Logs of the matching platform calls |
+| `find(predicate)`, `findAll(predicate)` | Search the nodes created since the last `reset()`, in creation order |
+| `fireEvent(handle, topLevelType, nativeEvent?)` | Delivers a native event to the handler the renderer registered. Throws if none is registered |
+| `answerMeasureLayout(answer)` | Sets what `measureLayout` answers. Without an answer the call fails |
+| `reset()` | Clears the creation list, the counters and the logs. The authored tree survives |
+| `forget()` | Does what `reset()` does and also drops the records of all nodes |
 
-| Field             | Type                      | Description                                                                                                      |
-| ----------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `tag`             | `number`                  | The Fabric react tag the engine minted for this node                                                             |
-| `viewName`        | `string`                  | The native component name, e.g. `RCTView`, `RCTText`, `RCTRawText`, `Switch`, `ActivityIndicatorView`            |
-| `props`           | `Record<string, unknown>` | The props this node was created or cloned with — already flattened by the engine (styles land as top-level keys) |
-| `children`        | `IFakeNode[]`             | The children appended to this node in the commit that produced it                                                |
-| `instanceHandle`  | `unknown`                 | The renderer's own handle for the node, carried onto every clone — pass it to `fireEvent`                        |
-| `parentFamilyTag` | `number \| undefined`     | The tag of the Fabric family this node was appended under; appending it elsewhere throws a reparent error        |
+### `IAuthoredNode`
 
-### `IEventHandler`
+| Field | Description |
+| ----- | ----------- |
+| `handle` | The engine node, to pass back to the engine's own API |
+| `instanceHandle` | What `fireEvent` is aimed at. `undefined` for a raw text or an anchor |
+| `viewName` | The view name as the renderer asked for it. Fabric may commit it under another name |
+| `tagName` | The intrinsic tag of a node with a host behavior, empty for every other node |
+| `props` | The authored props. `style` is still an object |
+| `ownedListeners` | Which event names a behavior owns have an app callback |
+| `underlayShown` | Whether a behavior's press feedback is showing |
 
-| Signature                                                                                       | Description                                                                                                                     |
-| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `(instanceHandle: unknown, topLevelType: string, nativeEvent: Record<string, unknown>) => void` | The shape the renderer passes to `registerEventHandler`; `fireEvent` calls exactly this, so a test rarely names the type itself |
+### `ILiveTree`
+
+| Member | Description |
+| ------ | ----------- |
+| `appRoot()` | The app's own `box-none` root, found in the creation list. Throws when no mount happened since the last `reset()` |
+| `nodeOf(handle)` | One node with its `viewName`, `props`, `payload` and `children` |
+| `findLive(root, predicate)`, `findAllLive(root, predicate)` | Search the nodes that are on screen now |
+| `walkLive(root, visit)` | Visits a subtree in pre-order |
+| `serialize(root)` | One line such as `RCTView(RCTText(RCTRawText "text"))` |
+| `texts(root)` | Every raw text in tree order |
+| `outline(root)` | A depth-indented list of view names |
 
 ## Notes
 
-<Aside
-  type="caution"
-  title="Install once per file, before the first commit — not once per test"
->
-  The fake slot is a `globalThis` singleton, and the engine reads it exactly
-  once: `getSlot()` destructures the slot's methods on its first commit and
-  caches them for the rest of the process. So every suite in this repo calls
-  `installFabric()` a single time at module scope and `reset()`s between tests.
-
-  A second `installFabric()` after anything has committed replaces the global,
-  but the engine keeps writing to the handle it already bound. The new
-  recorder stays silently empty. Vitest isolates test files from one another, so
-  per-file is per-clean-slate. Within a file, `reset()` is what gives each test
-  a clean recorder.
+<Aside type="caution" title="Install once per file, not once per test">
+  The engine binds the Fabric slot once and caches it for the life of the module. Call
+  `installRecordingFabric()` once at module scope and use `reset()` between tests. Vitest isolates
+  test files from one another, so each file still starts clean.
 </Aside>
 
-- **A removed prop arrives as literal `null`, and stays `null`.** The engine sends a minimal
-  diff, and `clone*WithNewProps` **merges** it onto the previous props exactly like native Fabric
-  — it does not replace them. A key the engine drops is sent as `null` and kept as `null` rather
-  than deleted, so a test can tell "explicitly reset to the native default" apart from "never
-  set". The real assertion, from the Angular ActivityIndicator suite after switching `size` from
-  `'large'` to `48`: `expect(spinner.props.size).toBeNull()`.
-- **`find()` searches `created`, not the committed tree.** Clones are fresh objects that never
-  enter `created`, so a found node's `props` and `children` are as of the commit that created it
-  — right after a mount, wrong after an update. Its `instanceHandle` _is_ carried onto every
-  clone, so a handle grabbed once stays valid for `fireEvent` forever; to read updated props,
-  walk `committed` (or assert on `serialize(fabric.committed)`).
-- **The fake implements the mutation, event and command surface — nothing else.** `measure`,
-  `measureInWindow`, `measureLayout` and `sendAccessibilityEvent` are absent. A test that needs
-  one grafts it onto `globalThis.nativeFabricUIManager` before the first mount, which is what
-  `adapters/react/src/components/pressable/pressable.test.tsx` does for `measure` (Pressable
-  measures its responder rect on grant). After the first commit it is too late — see the caution
-  above.
-- **`appendChild` throws on a Fabric family reparent.** Clones keep their tag and family, so
-  moving a committed node under a different parent is illegal in real Fabric. The fake raises it
-  as an error instead of quietly producing a tree that could never exist natively.
-- **This is the headless layer only.** It proves JS-side behavior — reducer logic, render output,
-  adapter lifecycle, commit shape. It does not stand in for a real native host; see
-  [Testing](/docs/testing/) for how this layer and the on-device Detox layer divide the work.
+- **`find()` searches the creation list, not the screen.** A node the app removed still answers it.
+  Ask the live tree whether something is mounted. It follows the engine's current child links and
+  skips anchors, as a commit does.
+- **Keep the root before a `reset()` in the middle of a test.** `reset()` empties the creation list
+  that `appRoot()` searches. Store `const root = live.appRoot()` first, then reset and read `root`.
+- **The payload here is not the whole native payload.** `payloadOf()` runs the engine's JS builder.
+  Platform rules written in C++ do not run, and the engine's `committedPayloadOf()` throws under
+  this host. A test of the committed shape belongs in the native tests under
+  `core/engine/cpp/tests/js`.
+- **Nothing is measured.** No layout runs, so `measure` and `measureInWindow` never call back.
+- **Prefer `waitUntil` to a fixed number of ticks.** A tick count only stands in for "the framework
+  has settled" and breaks on a loaded machine.
+- **This is the headless layer only.** It proves JS-side behavior and does not stand in for a real
+  native host. See [Testing](/docs/testing/) for how it and the on-device Detox layer divide work.
 
-## How the wrapper works
-
-Nothing is wrapped here — there is no upstream library, no native module, and no autolinking
-step. The package is one file implementing Fabric's clone-on-write contract in memory, plus a
-barrel:
+## How the package is laid out
 
 ```
 core/test-utils/src/
-├── index.ts        # the whole public surface — export * from './fake-fabric'
-└── fake-fabric.ts  # installFabric() + IFabricRecorder / IFakeNode / IEventHandler
+├── index.ts              # the public surface
+├── recording-host.ts     # installRecordingFabric(), IRecordingHost, payloadOf()
+├── recorded-tree.ts      # the authored tree the host keeps
+├── live-tree.ts          # createLiveTree(), censusLive()
+├── list-harness.ts       # createListHarness()
+├── host-crossings.ts     # trackHostCrossings()
+├── wait-for.ts           # waitUntil(), waitForQuiet(), advanceTicks(), advanceMs()
+├── native-calls.ts       # nativeCallsTo()
+├── rn-device-event.ts    # emitRnDeviceEvent()
+└── window-dimensions.ts  # the window size helpers
 ```
 
 It lives under `core/`, not `packages/`, because it belongs to the same layer as
-[`@symbiote-native/engine`](/docs/api/core/). It is the test double for the native side that the
-engine's commit path drives.
-
-It has no adapter entry points: one framework-agnostic export that React, Vue, Angular, Svelte, and
-Solid suites all import unchanged. It also has no tests of its own. It _is_ the test double every
-other package's suite runs against, so a regression in it surfaces as a failure there.
+[`@symbiote-native/engine`](/docs/api/core/). It has no adapter entry points: the React, Vue,
+Angular, Svelte and Solid suites import the same module.

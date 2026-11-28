@@ -19,7 +19,7 @@
   let field: unknown = $state.raw(undefined);
   let measured = $state('not measured yet');
 
-  // A tag gives back a shim element, so each animated ref is told the node under it
+  // An attachment gives back the element, so each animated ref is told the node under it
   $effect(() => {
     boxRef(hostInstance(box) ?? null);
   });
@@ -63,10 +63,18 @@
   title="Measure and refs"
   note="useAnimatedRef with measure, setNativeProps and dispatchCommand"
 >
-  <view bind:this={box} testID="ra-measure-box" class="ra-box" />
+  <view
+    {@attach (node: unknown) => {
+      box = node;
+    }}
+    testID="ra-measure-box"
+    class="ra-box"
+  />
   <text class="ra-note">{measured}</text>
   <text-input
-    bind:this={field}
+    {@attach (node: unknown) => {
+      field = node;
+    }}
     testID="ra-measure-field"
     class="ra-field"
     placeholder="a field the UI thread writes to"

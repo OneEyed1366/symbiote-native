@@ -35,6 +35,10 @@ Both directives are opt-in because turning them on for every bundle breaks other
 - Svelte compiles at bundle time with `generate: 'client'`; the server build has no `mount()`. The `browser` condition is the matching half.
 - Vue calls `compileSfc` from `metro-vue-transformer.cjs`, the same function Metro runs in an app. `ts` is the second pass that Metro's babel transformer does there.
 - `@symbiote-native/*` resolves by source through a resolver, not an `alias`, because packages expose subpaths and an alias matches exactly. A path returned from `onResolve` is final, so the candidates are spelled out.
+- A `.svelte.ts` or `.svelte.js` rune module goes through `compileSvelteModuleFile`, the function Metro runs. Without it the bundle keeps a bare `$state` and the first render dies with `Property '$state' doesn't exist`.
+- `packages/navigation` is the one package under `packages/` that resolves by source. A fixture imports past the `navigation/svelte` barrel (`svelte/stack`, `svelte/runes`, `svelte/screen.svelte`).
+- The barrel imports `register`, which loads the `react-native-screens` specs and with them all of `react-native`. Without `@symbiote-platform-extensions` the build fails on missing exports, with it the bundle throws `__fbBatchedBridgeConfig is not set`.
+- One file drains at most 1000 rounds of timers. Past that it ends as `CRASH` with `the test file never settled`, which is the harness limit and not an engine fault: 3000 push and pop trips cross it.
 
 ## Builds and flags
 
@@ -57,9 +61,28 @@ Both directives are opt-in because turning them on for every bundle breaks other
 
 `PLATFORM_PRELUDE` is what a bare JSI runtime lacks and a device gets from `InitializeCore`: `global`, `queueMicrotask`, queued timers, `performance`, `console`, `window`, `navigator`, `URLSearchParams`.
 - Timers are queued, not clocked. A test drains them with `flushTimers` from `js/harness.ts`, so there is no wall-clock race.
+- The `queueMicrotask` polyfill prints a throw as `uncaught in a microtask`. A bare `then` dropped it, so a Svelte component that failed during an update left no line and its test could pass on nothing.
+- It showed `fadeTo` throwing for lack of `requestAnimationFrame` in the Vue and Angular primitive suites, so older `update` timings of `touchable-opacity` read low. The suite now fails on any `console.error`.
 - Hermes needs `setImmediate` by name: its Promise lives in `InternalBytecode.js` and schedules through it, so the first `await` dies with "Property 'setImmediate' doesn't exist".
 - `performance.now` prefers the tester's `steady_clock` in fractional ms. The `Date.now` fallback is whole ms and reads a few-ms phase as 0 or double.
+- Microtasks have no priority over timers. A promise job, the `queueMicrotask` polyfill and `setTimeout(0)` share one queue.
+- A probe printed `timer-0, then-1, microtask, then-2`, while a device runs the timer last. Test "a timer runs after the commit microtask" in vitest.
+
+## Break-testing a retention guard
+
+- With cleanup disabled, frame callbacks and infinite repeats of every visit stay, and each stepped frame runs all of them. The run time grows far faster than the visit count.
+- A break run with 450 visits was still going after 8 minutes. With `[5, 20]` visits it took 2 s and went red (36 nodes per visit).
+- Shrink the visit counts for the break run, give the command a 2 minute timeout, and restore both files by hash.
+
+## Reanimated seams
+
+- `scripts/reanimated-itest-seams.mjs` sends upstream's `../updateProps` to a recorder: the web writer throws on an engine view.
+- The worklets mock keeps `serializableMappingCache` in a `Map`, the native one is a `WeakMap`. Under the mock every `useAnimatedRef` read as a leak of about 1912 B per visit. A guard imports `reanimated-weak-cache` first.
+- No worklets babel plugin runs, so a worklet is marked by hand with `__closure` and `__workletHash`.
 
 ## Scheduling
 
 Testers run concurrently through a limiter that refills a slot the moment one frees. A fixed `Promise.all` batch idles every slot behind its slowest member, and this suite mixes multi-second benchmarks with sub-second unit tests. Printing walks bundles in submission order.
+
+- `adapter-create-cost` gates a `walkMs` ratio in the assert build too. It failed once on a loaded host, and four later cases fell with it as `an earlier arm did not run`.
+- The file alone and the next full sweep passed. On such a failure check `uptime`, run the file alone, then repeat the sweep.

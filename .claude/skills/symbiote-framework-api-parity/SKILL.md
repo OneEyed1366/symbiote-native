@@ -10,12 +10,13 @@ description: "Master tracker for the multi-session initiative to bring every ada
 Goal: every syntax-sugar/API/method documented in a framework's **own official guide** must work
 through our adapter, matching the experience a dev already gets on web with that framework.
 
-- **In scope**: the framework's own guide/API reference in full: reactivity primitives
-  (hooks/composables/signals/runes), template syntax and directives, built-in components
-  (Suspense/Teleport/Transition/KeepAlive/`*ngIf`/`*ngFor`/`ng-content`...), lifecycle,
-  refs, slots/children, context/DI, error boundaries, even parts that don't touch our
-  renderer directly (state-management primitives) get verified, since a broken one would
-  surprise a web-experienced dev porting to native.
+- **In scope**: the framework's own guide/API reference in full.
+  It covers reactivity primitives (hooks/composables/signals/runes), template syntax and directives,
+  and lifecycle.
+  It also covers built-in components (Suspense/Teleport/Transition/KeepAlive/`*ngIf`/`*ngFor`/
+  `ng-content`...), refs, slots/children, context/DI and error boundaries.
+  Parts that don't touch our renderer directly (state-management primitives) get verified too,
+  since a broken one would surprise a web-experienced dev porting to native.
 - **Out of scope**: separate ecosystem packages (React Router, Redux, Vue Router, Pinia,
   Angular Router/HttpClient/NgRx, SolidJS Router, SvelteKit). Those are packages, not the
   framework's own guide.
@@ -48,8 +49,9 @@ Solid/Angular stay queued.
 ## Workflow per framework
 
 1. Build/refresh a static API-surface catalog at `references/<framework>-api-surface.md`
-   (this skill's own `references/` dir) via context7 + WebSearch + `.vendors/<framework>`
-   source, not from memory (training data lags, especially React 19 / Vue 3.5+ / Angular signals).
+   (this skill's own `references/` dir).
+   Use context7 + WebSearch + the framework's upstream source (the `vendor` skill), not memory,
+   as training data lags (especially React 19 / Vue 3.5+ / Angular signals).
 2. Audit the adapter's actual implementation (codegraph first: `codegraph_context`/
    `codegraph_explore` on the adapter package, Grep/Read to confirm specifics).
 3. Diff catalog vs audit into a gap list, each gap tagged: `works` / `broken` / `unverified`
@@ -69,7 +71,7 @@ Solid/Angular stay queued.
 | React | done (2026-09-25) | done (2026-09-25) | done, see `references/react-adapter-gap-list.md` | closed. 2 doc fixes, 2 new regression tests, `ConcurrentRoot` switch kept (harmless, correctness-of-intent). Scheduling turned out to already work (the original "broken" claim was unverified inference). The one real gap, Suspense-for-Image, is upstream RN's own limitation too (not a parity item), left as a documented, accepted limitation |
 | Vue | done (2026-09-25) | done (2026-09-25) | closed, see `references/vue-adapter-gap-list.md` | Full guide surface confirmed working or built: Teleport/Suspense/KeepAlive/v-show/v-model/withModifiers/withKeys/useCssModule/useTemplateRef/useId/useModel/onActivated/onDeactivated/resolveDynamicComponent/v-memo/custom directives all verified; built `Transition`/`TransitionGroup` (opacity fade over Animated, no move-animation, no named effects); `useCssVars` deferred (no runtime-reactive `var()` foundation, dismissed as low value) |
 | Solid | no | no | pending | none |
-| Svelte | done (2026-09-25) | done (2026-09-25) | closed, see `references/svelte-adapter-gap-list.md` | Built `getComputedStyle` (bare global), `Element.animate()` (keyframe replay), `CustomEvent` polyfill, `ShimElement.getBoundingClientRect()` + a new optional synchronous engine export (`core/engine`'s `getBoundingClientRect`, threaded through `ITreeHost`/`INativeEngineBindings`). Fixes `transition:`/`in:`/`out:` (real opacity fade, verified non-vacuously) and `createEventDispatcher` (real parent-listener test) outright. `animate:flip`/`crossfade` no longer crash but need the native C++ binding (RN's own `react::dom::getBoundingClientRect` confirmed to exist, mirrors `measureInWindow`) before real device geometry works - tracked as a named follow-up, not silently dropped. Full monorepo: 6693 tests, `tsc -b` clean |
+| Svelte | done (2026-09-25) | redone (2026-11) | closed, see `references/svelte-adapter-gap-list.md` | `svelte/renderer` replaced the DOM emulation, so `getComputedStyle`, `Element.animate()`, the `CustomEvent` polyfill and `getBoundingClientRect` are gone. `transition:`, `in:`, `out:`, `animate:`, `bind:` and `on:` are compile errors, and `createEventDispatcher` is pinned by a negative test |
 | Angular | no | no | pending | none |
 
 Next ralph-loop iteration: read this table first, resume the first framework that is not

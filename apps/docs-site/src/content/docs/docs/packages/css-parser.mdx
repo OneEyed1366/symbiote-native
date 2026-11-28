@@ -158,6 +158,9 @@ object, not the factory — so no local wrapper file is needed.
     `svelte/compiler`). It also handles a standalone `.css`/`.scss`/`.less`/`.styl` import through
     the same `createCssMetroTransformer` React's transformer uses, and delegates everything else.
 
+    The `unstable_conditionNames` line resolves Svelte's custom renderer build. The rest of the
+    setup, `svelte.config.js` included, is on the [Svelte API](/docs/api/svelte/) page.
+
     ```js
     // metro.config.js
     const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
@@ -169,6 +172,7 @@ object, not the factory — so no local wrapper file is needed.
         babelTransformerPath: require.resolve('@symbiote-native/svelte/metro-svelte-transformer'),
       },
       resolver: {
+        unstable_conditionNames: ['svelte-custom-renderer', 'browser'],
         sourceExts: [
           ...defaultConfig.resolver.sourceExts,
           'svelte',

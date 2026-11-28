@@ -1,22 +1,17 @@
 <script lang="ts">
-  // Imperative host-ref API: the seam reanimated / gesture-handler reach through. `measure`
-  // returns the box's real on-screen frame (only a live host can answer it); `setNativeProps`
-  // recolors the box bypassing Svelte entirely (no state, no re-render); `findNodeHandle` reads
-  // the committed native tag. Port of examples/react/components/RefApiDemo.tsx.
-  //
-  // `bind:this` on a host tag hands back a ShimElement, which `hostInstance()` unwraps into the
-  // engine node carrying measure / setNativeProps (svelte-adapter-dom-shim skill, host-instance.ts
-  // + host-instance.test.ts's tested pattern).
+  // Imperative host-ref API, the seam reanimated and gesture-handler reach through
+  // `{@attach}` hands over the element and `hostInstance()` unwraps the node with `measure`
+  // The React twin is examples/react/components/RefApiDemo.tsx
   import { findNodeHandle, hostInstance } from '@symbiote-native/svelte';
   import ActionButton from './ActionButton.svelte';
 
   let box = $state.raw<unknown>(null);
-  // useRef-equivalent: an imperative-only scratch flag, never meant to drive a re-render itself.
+  // Plain flag like a `useRef`, as it must never drive a re-render
   let flashed = false;
   let frame = $state('tap “Measure”');
   let tag = $state<number | null>(null);
 
-  // The tag exists only after the first commit, so read it once `box` goes live.
+  // The tag exists only after the first commit, so read it once `box` goes live
   $effect(() => {
     if (box === null) return;
     tag = findNodeHandle(box);
@@ -25,11 +20,10 @@
   function onMeasure(): void {
     const instance = hostInstance(box);
     if (instance === undefined) return;
-    // The two halves answer different questions and only one of them moves when you scroll, which
-    // reads as a bug until the labels say so. `measure`'s x/y are the node's offset inside its
-    // PARENT (`DOM.cpp`'s `originRelativeToParent`) — scrolling does not change that — while
-    // pageX/pageY are measured from the root and do.
-    instance.measure((x, y, width, height, pageX, pageY) => {
+    // `x` and `y` are the offset inside the parent, so scrolling leaves them alone
+    // `pageX` and `pageY` are measured from the root, so they move with it
+    instance.measure((...measured) => {
+      const [x, y, width, height, pageX, pageY] = measured;
       frame =
         `in parent x${Math.round(x)} y${Math.round(y)} · ${Math.round(width)}×${Math.round(height)}` +
         ` · from root ${Math.round(pageX)},${Math.round(pageY)}`;
@@ -50,7 +44,13 @@
   <text class="section-label">
     Imperative ref · measure / setNativeProps / findNodeHandle
   </text>
-  <view testID="ref-box" class="ref-box" bind:this={box}>
+  <view
+    testID="ref-box"
+    class="ref-box"
+    {@attach (node: unknown) => {
+      box = node;
+    }}
+  >
     <text class="ref-box-text">{`native tag ${tag ?? '—'}`}</text>
   </view>
   <text testID="measure-frame" class="info-text">{`measure · ${frame}`}</text>

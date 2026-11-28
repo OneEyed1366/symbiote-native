@@ -2,6 +2,7 @@ import { onCleanup, splitProps } from 'solid-js';
 import { createHostNodeHolder } from '@symbiote-native/components';
 import type { ICreateNativeViewController } from '@symbiote-native/components';
 import type { ISymbioteNode } from '@symbiote-native/engine';
+import type { IViewProps } from '../components/view-props';
 import { descriptorToSolid } from '../descriptor-to-solid';
 
 // A Solid component over a package's native view: the props go to the controller, its handle goes
@@ -10,7 +11,8 @@ export function defineNativeViewComponent<THandle, TProps extends object>(
   createController: ICreateNativeViewController<THandle>,
 ) {
   return (
-    props: TProps & { ref?: (handle: THandle) => void },
+    props: TProps &
+      Pick<IViewProps, 'class'> & { ref?: (handle: THandle) => void },
   ): ISymbioteNode | null => {
     const [own, viewProps] = splitProps(props, ['ref']);
     const host = createHostNodeHolder();

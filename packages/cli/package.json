@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/cli",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Create a native iOS/Android app in Vue, Svelte, Solid, Angular or React, on React Native's own Fabric renderer. Scaffolds a new app, or wires SymbioteNative into an existing bare React Native one.",
   "keywords": [
     "react-native",
@@ -55,6 +55,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run packages/cli/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "typecheck": "tsc --build",
     "dev": "tsc --build && node build/index.js",
     "build": "rolldown -c build.config.ts",

@@ -62,7 +62,7 @@ export const CameraTextureScenario = defineComponent(
               testID="gl-camera-view"
               ref={glView}
               class="gl-view"
-              onContextCreate={gl => {
+              onContextCreate={(gl: IExpoWebGLRenderingContext) => {
                 context = gl;
               }}
             />

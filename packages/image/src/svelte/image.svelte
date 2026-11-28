@@ -4,9 +4,10 @@
   import { hostProps } from '@symbiote-native/svelte/native-view-bridge';
   import { useNativeViewController } from '@symbiote-native/svelte/runes/use-native-view-controller';
   import { createImageView } from '../core';
+  import type { IViewProps } from '@symbiote-native/svelte';
   import type { IImageViewProps } from '../core';
 
-  const props: IImageViewProps = $props();
+  const props: IImageViewProps & Pick<IViewProps, 'class'> = $props();
   const view = useNativeViewController(createImageView, () => ({ ...props }));
 
   // The functions of the view are instance members, `bind:this` reaches them

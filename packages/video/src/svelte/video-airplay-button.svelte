@@ -3,9 +3,10 @@
   // so the tag is dynamic
   import { hostProps } from '@symbiote-native/svelte/native-view-bridge';
   import { renderVideoAirPlayButton } from '../core';
+  import type { IViewProps } from '@symbiote-native/svelte';
   import type { IVideoAirPlayButtonProps } from '../core';
 
-  const props: IVideoAirPlayButtonProps = $props();
+  const props: IVideoAirPlayButtonProps & Pick<IViewProps, 'class'> = $props();
   const descriptor = $derived(renderVideoAirPlayButton({ ...props }));
 </script>
 

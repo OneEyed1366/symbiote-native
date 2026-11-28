@@ -102,7 +102,7 @@ export function ShaderScenario(props: { color: string }) {
       <ActionButton testID="gl-snapshot" title="Take snapshot" color={props.color} onPress={() => void capture()} />
       <ResultRow testID="gl-snapshot-result" label="takeSnapshotAsync" value={line()} />
       <Show when={snapshot()}>
-        {shot => <image testID="gl-snapshot-image" source={{ uri: shot().localUri }} class="gl-snapshot" />}
+        {(shot: () => IGLSnapshot) => <image testID="gl-snapshot-image" source={{ uri: shot().localUri }} class="gl-snapshot" />}
       </Show>
     </Scenario>
   );

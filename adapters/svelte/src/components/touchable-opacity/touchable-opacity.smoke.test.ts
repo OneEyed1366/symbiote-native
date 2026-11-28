@@ -1,24 +1,19 @@
-// TouchableOpacity over REAL compiled `.svelte` output — the Svelte twin of
-// adapters/solid/src/components/touchable/touchable.test.tsx's TouchableOpacity group.
-//
-// SCOPE. The press-scheduling machine (computePressOutWait, createTouchableFeedback*) is
-// unit-tested in core/components/src/state/touchable.test.ts, and the press lifecycle underneath
-// it in ../pressable/pressable.smoke.test.ts. What is SVELTE-specific, and therefore what this
-// file is for:
-//   - the runes wiring actually drives a real Animated.Value through a real engine commit (the
-//     component used to fake the fade with a setTimeout tween, which could never be native-driven);
-//   - `restingOpacityFromStyle` reaches BOTH the seed and the deactivate target;
-//   - the update `$effect` re-settles on `disabled` / resting-opacity changes, stays silent at
-//     mount, and — the reason it reads two SEPARATE deriveds — does not fire on an unrelated prop;
-//   - RN's minPressDuration: 0 override, pinned by the one test below that AWAITS NOTHING (a
-//     flush helper burns straight past a timing threshold; .claude/rules/test-harness-false-greens.md §5).
-//
-// NOT covered, honestly: `useNativeDriver: true` (no native module is installed here, so the JS
-// driver runs either way — the flag's effect is a native-thread property nothing headless can
-// see) and `resetAnimation()` on teardown (see the "cancels" test's own note).
-//
-// No Negative group: TouchableOpacity has no rejecting path — a bad prop produces a different
-// visual, never a throw.
+// TouchableOpacity over real compiled `.svelte` output, the Svelte twin of the Solid touchable test
+// The press-scheduling machine is unit-tested in `core/components/src/state/touchable.test.ts`
+// The press lifecycle underneath it is in `../pressable/pressable.smoke.test.ts`
+
+// Svelte-specific, and so the point of this file: the runes wiring drives a real Animated.Value
+// through a real engine commit, and `restingOpacityFromStyle` reaches the seed and the target
+
+// The update `$effect` re-settles on `disabled` and resting-opacity changes
+// It stays silent at mount and on an unrelated prop, as it reads two separate deriveds
+
+// RN's `minPressDuration: 0` override is pinned by the one test that awaits nothing
+
+// Not covered: `useNativeDriver: true`, as no native module is installed here
+// Nor `resetAnimation()` on teardown
+
+// No Negative group, as a bad prop produces a different visual and never a throw
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -53,12 +48,8 @@ const ACTIVE_OPACITY = 0.3;
 const BASE_WIDTH = 10;
 const PRESS_DELAY_MS = 30;
 
-// Every compiled artifact sits NEXT TO its real source: the compiled output's own relative
-// imports ('../../runes/attachments') resolve from where the FILE lives, not from where it was
-// compiled (svelte-adapter-dom-shim §15). The `-own` suffix and the `.smoke-compiled-` prefix are
-// both load-bearing: a name owned by two concurrently-running suites races
-// (.claude/rules/smoke-compiled-artifact-collisions.md), and only `.smoke-compiled-*.mjs` is
-// gitignored.
+// The compiled file sits next to its source, as its relative imports resolve from the file's place
+// The `.smoke-compiled-` prefix is what gitignores it, and a name shared by two suites races
 const PARENT_OUT = join(
   __dirname,
   '.smoke-compiled-touchable-opacity-parent.mjs',
@@ -100,15 +91,13 @@ function installRequestAnimationFrame(): void {
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
-async function flushFrames(): Promise<void> {
-  // A leading tick before the loop: Svelte flushes effects on a MICROtask, so an update that
-  // starts an animation has not requested its first frame yet when this is called, and a bare
-  // `while (pending)` loop would exit immediately and read the pre-update value.
+// A leading tick first, as Svelte flushes effects on a microtask
+// An update that starts an animation has not requested a frame yet, and a bare loop would exit
+async function flushFrames(guard = 1_000): Promise<void> {
   await tick();
-  let guard = 0;
-  while (pendingFrames.size > 0 && guard < 1_000) {
-    guard += 1;
-    await tick();
+  if (pendingFrames.size > 0 && guard > 0) {
+    await flushFrames(guard - 1);
+    return;
   }
   await tick();
 }
@@ -130,21 +119,15 @@ function compileToFile(
   writeFileSync(outPath, code);
 }
 
-interface ILoaded {
+type ILoaded = {
   Parent: Component;
   control: Record<string, unknown>;
-}
+};
 
 async function loadParent(): Promise<ILoaded> {
-  // The BARE TAG, which is now the only spelling — there is no TouchableOpacity component to
-  // compile beside this any more. Everything the wrapper used to hold (the Animated.Value, the
-  // fade, the press scheduling, the re-settle, the teardown) is on the engine node, reached
-  // through `../../register`, so this file exercises the same surface an app writes.
-  //
-  // ONE parent file for every scenario — Node's import() cache would hand back a stale module for
-  // a rewritten path anyway (svelte-adapter-dom-shim §15). Props handed to `mount()` are a plain
-  // object and are NOT reactive, so the two tests that change a prop AFTER mount drive it through
-  // this module-scope `$state` bag instead.
+  // The bare tag is the only spelling, and the fade and press scheduling live on the engine node
+  // One parent file serves every scenario, as Node caches `import()` by path
+  // Props handed to `mount()` are not reactive, so later prop changes go through a `$state` bag
   compileToFile(
     `<script module>
        export const control = $state({ disabled: undefined, label: undefined });
@@ -160,12 +143,7 @@ async function loadParent(): Promise<ILoaded> {
   );
 
   const mod: unknown = await import(`file://${PARENT_OUT}`);
-  if (
-    mod === null ||
-    typeof mod !== 'object' ||
-    !('default' in mod) ||
-    !('control' in mod)
-  ) {
+  if (!isRecord(mod) || !('default' in mod) || !('control' in mod)) {
     throw new Error('Parent.svelte produced no default export / control');
   }
   const control = mod.control;
@@ -196,9 +174,8 @@ afterEach(() => {
   rmSync(PARENT_OUT, { force: true });
 });
 
-// The responder is Pressable's own host view, identified by the testID every mount below sets.
-// Read LIVE, not off the recording's creation log: an Animated frame lands through
-// setNativeProps on the currently committed tree only (svelte-adapter-dom-shim §15).
+// The responder is Pressable's own host view, identified by the `testID` every mount sets
+// Read live, not off the creation log, as an Animated frame lands on the committed tree only
 function responderNode(): ILiveNode {
   const node = live.findLive(live.appRoot(), n => n.payload.testID === TARGET);
   if (node === undefined) throw new Error(`no committed node testID=${TARGET}`);
@@ -209,11 +186,9 @@ function responderHandle(): unknown {
   return responderNode().instanceHandle;
 }
 
-// The responder IS the feedback node. It used to be a child: this component built a `pressable`
-// around a faded `view`, where RN builds one `<Animated.View>` carrying both
-// (TouchableOpacity.js:302). The fade now lands on the same node the responder sits on, through the
-// engine's `touchable-opacity` behavior. opacity/width travel through the style slot, so they only
-// show up in the flattened payload.
+// The responder is the feedback node, as in RN's single `<Animated.View>` (TouchableOpacity.js:302)
+// The fade lands on it through the engine's `touchable-opacity` behavior
+// `opacity` and `width` travel through the style slot, so they show only in the flattened payload
 function feedbackProps(): Record<string, unknown> {
   return responderNode().payload;
 }
@@ -228,9 +203,8 @@ function asNumber(value: unknown, label: string): number {
 }
 
 describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
-  // why: RN drives this feedback with a real Animated.timing, not a discrete style swap. Proves
-  // the fade runs through the engine's Animated graph onto the committed native node and that the
-  // caller's base style survives the per-frame opacity-only diff.
+  // RN drives this feedback with a real `Animated.timing`, not a discrete style swap
+  // The fade must reach the committed node, and the caller's base style must survive each diff
   it('animates opacity to activeOpacity on press-in and back on release', async () => {
     const { Parent } = await loadParent();
     let pressIns = 0;
@@ -341,8 +315,7 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     expect(pressOuts, 'a floor would have deferred this past the tick').toBe(1);
   });
 
-  // why: RN's componentDidUpdate re-settles the view when `disabled` flips, so a Touchable
-  // disabled mid-press does not stay frozen at its active opacity.
+  // RN re-settles the view when `disabled` flips, so a Touchable disabled mid-press is not frozen
   it('re-settles the opacity when disabled flips after a press-in', async () => {
     const { Parent, control } = await loadParent();
     control.disabled = false;
@@ -395,9 +368,8 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     ).toBeCloseTo(ACTIVE_OPACITY, 6);
   });
 
-  // why: RN re-settles on UPDATE only. Without the first-run guard the effect animates over the
-  // value the Animated.Value was just seeded with — invisible in the committed value (it settles
-  // where it started), so the only headless trace is that an animation was STARTED at all.
+  // RN re-settles on update only, and a first-run animation over the seed shows in no value
+  // So the only headless trace is that an animation started at all
   it('starts no animation at mount', async () => {
     const { Parent } = await loadParent();
     mount(ROOT_TAG, Parent, {
@@ -409,9 +381,8 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     expect(frameRequests, 'the update effect fired at mount').toBe(0);
   });
 
-  // why: delayPressIn defers the pressed feedback past a quick swipe-through. Proves the adapter
-  // threads the prop into the shared machine (the machine's own timing math is unit-tested at
-  // core; this is the wiring).
+  // `delayPressIn` defers the pressed feedback past a quick swipe-through
+  // This is the wiring into the shared machine, whose timing math is unit-tested in core
   it('defers onPressIn past touch-down with delayPressIn', async () => {
     const { Parent } = await loadParent();
     let pressIns = 0;
@@ -430,9 +401,8 @@ describe('Svelte TouchableOpacity (real compiled index.svelte)', () => {
     await waitUntil(() => pressIns === 1, 'onPressIn after delayPressIn');
   });
 
-  // why: a press must RE-PROP the feedback node, never rebuild it. A rebuilt subtree lands
-  // between pressIn and the native responder grant and kills the gesture; the node counter is the
-  // only headless trace of that (a fake Fabric has no grant to lose).
+  // A press must re-prop the feedback node, never rebuild it, as a rebuild kills the gesture
+  // The node identity is the only headless trace, as a fake Fabric has no grant to lose
   it('creates no node across a full press cycle', async () => {
     const { Parent } = await loadParent();
     mount(ROOT_TAG, Parent, {

@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/solid",
-  "version": "3.4.0",
+  "version": "3.4.1",
   "description": "SymbioteNative's Solid adapter — a solid-js/universal createRenderer driving real native iOS/Android views through the same engine as every other adapter.",
   "keywords": [
     "react-native",
@@ -72,6 +72,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run adapters/solid/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

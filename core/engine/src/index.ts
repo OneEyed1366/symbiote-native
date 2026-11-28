@@ -153,7 +153,12 @@ export type {
 // A commit reaching `completeRoot` is the one seam that means the same under every adapter
 // React commits synchronously, Vue/Svelte/Angular on a microtask, so after-render hooks fire at
 // different points
-export { registerPostCommit, unregisterPostCommit } from './post-commit';
+export {
+  registerPostCommit,
+  registerPreCommit,
+  unregisterPostCommit,
+  unregisterPreCommit,
+} from './post-commit';
 // The aria/role -> accessibility* fold. Lives here rather than in a component wrapper because a tag
 // has none: `fabricProps` runs it on the way to the payload, so every path gets it.
 // `core/components`' typed `resolveAccessibilityProps` delegates to this one.

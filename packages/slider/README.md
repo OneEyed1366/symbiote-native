@@ -49,7 +49,7 @@ src/register.ts side-effect import of RNCSlider's codegen spec — registers its
                 (never the library's React Slider.tsx)
 src/react/      @symbiote-native/slider/react — forwardRef FC + descriptorToReact
 src/vue/        @symbiote-native/slider/vue   — defineComponent + descriptorToVue
-src/svelte/     @symbiote-native/slider/svelte — .svelte component + the DOM-shim renderer
+src/svelte/     @symbiote-native/slider/svelte — .svelte component over the custom renderer
 src/solid/      @symbiote-native/slider/solid — signals + descriptorToSolid
 src/angular/    @symbiote-native/slider/angular — Angular component + descriptorToAngular
 ```
@@ -131,7 +131,7 @@ import { Slider } from '@symbiote-native/slider/solid';
   onValueChange={setVolume}
   step={0.25}
   StepMarker={marker => (
-    <symbiote-view style={{ opacity: marker().stepMarked ? 1 : 0.3 }} />
+    <view style={{ opacity: marker().stepMarked ? 1 : 0.3 }} />
   )}
 />;
 ```

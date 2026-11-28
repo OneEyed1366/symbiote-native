@@ -2,11 +2,9 @@
 // vue/composables/use-navigation.ts. All pub/sub logic lives in ../../core/navigation-events -
 // this rune only reads the navigation scope off the context and binds identity.
 //
-// `.svelte.ts`, and a BOXED GETTER return (`{ get current() }`) rather than a bare value: runes
-// are only usable outside a component in a `.svelte.ts` file, and Svelte 5 reactivity does not
-// survive being returned as a plain value from a plain function (svelte-adapter-dom-shim skill
-// §21). A caller reads `useNavigation().current` inside a `$derived`/template/`$effect`, exactly
-// like unwrapping Vue's `ComputedRef` via `.value`.
+// `.svelte.ts` and a boxed getter return (`{ get current() }`), as runes work outside a component
+// only in such a file and Svelte 5 reactivity does not survive a plain returned value
+// Read `useNavigation().current` inside `$derived`, a template or `$effect`, like Vue's `.value`
 
 import type {
   INavigationEventListener,
@@ -20,13 +18,9 @@ export type INavigationHandle = IAnyNavigatorHandle & {
     event: INavigationEventName,
     listener: INavigationEventListener,
   ) => () => void;
-  // Walks exactly ONE hop up the scope's `parent` chain to the enclosing navigator's handle -
-  // e.g. a Tab screen nested inside a Stack screen calling getParent() to push a new Stack route.
-  // Callers narrow the union themselves ('push' in parent, etc.). Deliberately NOT
-  // react-navigation's getParent(id) (named/targeted ancestor lookup) or a target-based dispatch
-  // to a specific nested navigator by name - plain immediate-parent walking is v1 scope; multi-hop
-  // ancestry would need each returned handle to carry its own getParent, which the plain
-  // per-navigator handle types (INavigatorHandle/ITabNavigatorHandle/IDrawerNavigatorHandle) don't.
+  // Walks one hop up the `parent` chain to the enclosing navigator's handle, narrowed by callers
+  // Not react-navigation's `getParent(id)`: multi-hop ancestry would need each returned handle
+  // to carry its own `getParent`, which the per-navigator handle types do not
   getParent: () => IAnyNavigatorHandle | undefined;
 };
 

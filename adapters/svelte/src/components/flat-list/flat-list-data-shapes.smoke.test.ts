@@ -4,7 +4,10 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installRecordingFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import '../../register';
 import { mount, unmount } from '../../render';
 
@@ -26,6 +29,7 @@ const FLAT_OUT = join(__dirname, '.smoke-compiled-flat-data-shapes.mjs');
 const ROOT_OUT = join(__dirname, '.smoke-compiled-flat-data-shapes-root.mjs');
 
 const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
 
@@ -101,10 +105,7 @@ describe('Svelte FlatList with data that is not a list', () => {
   it('renders an array-like object by index', async () => {
     await mountWithData({ length: 2, 0: 'a', 1: 'b' }, 1);
 
-    const texts = fabric
-      .findAll(node => node.viewName === 'RCTRawText')
-      .map(node => node.props.text);
-    expect(texts).toEqual(['a', 'b']);
+    expect(live.texts(live.appRoot())).toEqual(['a', 'b']);
   });
 
   it('mounts an empty scroll view for null in a multi column list', async () => {

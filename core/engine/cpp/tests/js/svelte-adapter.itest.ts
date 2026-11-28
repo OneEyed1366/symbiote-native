@@ -1,34 +1,36 @@
-// The FOURTH adapter on the real engine, and the second that needs a compiler.
-//
-// Solid settled that a compile step can live in the bundler. Svelte asks the same question with a
-// different answer shape: its components are whole FILES, not JSX inside a `.tsx`, and its runtime
-// is split by an export condition — the `default`/`worker` side is the SSR build, whose `mount()`
-// throws outright. Both halves are the runner's job (`compile-svelte-components`, and `browser` in
-// the esbuild conditions), and this file is what proves they are right.
-//
-// **The probe is a real `.svelte` file, not a compiled source string.** The vitest suites compile a
-// string at runtime, write a loose `.mjs` and dynamic-import it by path; there is no file system to
-// write to here and no module loader to import with. A file next to the test is also how an app
-// actually builds, so this removes an indirection rather than adding one.
-//
-// Svelte's own currency is ANCHOR NODES — a `{#if}` leaves two — and none of them commit, which is
-// exactly the kind of thing a stand-in tree had to be told and this one simply does.
+// The Svelte adapter on the real engine, proved with a real compiled `.svelte` file
+// The runner compiles it (`compile-svelte-components`) and sets the `browser` export condition
+// Without it `mount()` resolves to the SSR build and throws
 
+import { readSurfaceTelemetry } from '@symbiote-native/engine';
 import { mount, unmount } from '@symbiote-native/svelte';
 
 import {
+  collectGarbage,
   committedShape,
+  committedTexts,
   describe,
   expect,
   flushTimers,
   it,
+  print,
   report,
 } from './harness';
 
-// esbuild resolves this through the `.svelte` loader in `scripts/run-itests.mjs`.
+// esbuild resolves this through the `.svelte` loader in `scripts/run-itests.mjs`
 import Probe from './svelte-probe.svelte';
+import BlankText from './svelte-blank-text-probe.svelte';
+import Navigation from './svelte-navigation-probe.svelte';
 
 const ROOT_TAG = 1;
+const SCREEN_SWAPS = 20;
+// A leak is near two thousand nodes for 30 rows and about eighty for one, a flat tree moves by none
+const SCREEN_SIZES = [
+  { count: 30, slack: 150 },
+  { count: 1, slack: 2 },
+] as const;
+// C++ frees a dropped tree one level per collection, and a screen row is three levels deep
+const COLLECTIONS = 8;
 
 const tick = (): Promise<void> =>
   new Promise(resolve => {
@@ -36,37 +38,93 @@ const tick = (): Promise<void> =>
     flushTimers();
   });
 
-// Svelte commits ONE MORE LEVEL than Vue or React do for the same markup, and it is not an artefact
-// of this harness: `render.ts` mounts into `createRootShimElement(surface)`, a real engine node
-// standing in for the DOM element Svelte's client runtime insists on having as a target. So the
-// nesting below is surface container -> Svelte's shim -> the component's own outer view.
-//
-// Vue's twin of this file reads `RootView(View(View()))` for one element; Svelte reads
-// `RootView(View(View(View())))`. Written out here because the first version of this file guessed
-// Vue's shape, and a shape assertion that has to be corrected downward is exactly the mistake a
-// stand-in tree used to absorb silently.
-const SHIM = (inner: string): string => `RootView(View(View(${inner})))`;
+// Svelte commits one level more than Vue or React, as it mounts into a root view of its own
+// (`createRootElement`), so the shape is container, root view, then the component's outer view
+const underRoot = (inner: string): string => `RootView(View(View(${inner})))`;
 
 describe('the Svelte adapter on the real engine', () => {
-  // why: the smallest proof that a compiled Svelte component reaches Fabric — and the assertion is
-  // on the tree React Native committed, not on what the DOM shim was asked to do.
+  // The smallest proof that a compiled component reaches Fabric, asserted on the committed tree
   it('renders a compiled component into the committed tree', () => {
     mount(ROOT_TAG, Probe).commit();
 
-    expect(committedShape()).toBe(SHIM('View(View())'));
+    expect(committedShape()).toBe(underRoot('View(View())'));
     unmount(ROOT_TAG);
   });
 
-  // why: the `{#if}` branch, which is where Svelte's anchors live. The committed shape must gain
-  // exactly one view — a block leaves anchor nodes behind, and an anchor is not a view.
+  // The `{#if}` branch must add exactly one view, as the anchors it leaves are not views
   it('commits the if-branch and none of the anchors it leaves', async () => {
     const surface = mount(ROOT_TAG, Probe, { expanded: true });
     await tick();
     surface.commit();
 
-    expect(committedShape()).toBe(SHIM('View(View()View())'));
+    expect(committedShape()).toBe(underRoot('View(View()View())'));
     unmount(ROOT_TAG);
   });
+
+  // A gap the compiler keeps (`&nbsp;`) is blanked by the adapter and then dropped by the engine
+  it('commits no raw text for a whitespace-only gap between sibling tags', () => {
+    mount(ROOT_TAG, BlankText).commit();
+
+    expect(committedShape()).toBe(
+      underRoot('View(Paragraph(RawText())Paragraph(RawText()))'),
+    );
+    expect(committedTexts().join('|')).toBe('Ada|tail');
+    unmount(ROOT_TAG);
+  });
+
+  // An expression that empties out keeps its node, and only the committed tree stops painting it
+  it('stops committing a raw text whose expression empties out', async () => {
+    const surface = mount(ROOT_TAG, BlankText, { emptied: true });
+    await tick();
+    surface.commit();
+
+    expect(committedShape()).toBe(
+      underRoot('View(Paragraph()Paragraph(RawText()))'),
+    );
+    expect(committedTexts().join('|')).toBe('tail');
+    unmount(ROOT_TAG);
+  });
+
+  // A screen swapped out by `{#if}` is garbage once nothing names it, and the C++ tree must follow
+  for (const { count, slack } of SCREEN_SIZES) {
+    it(`gives back the screens of ${count} rows it navigated away from`, async () => {
+      const liveNodes = (): number => {
+        for (let pass = 0; pass < COLLECTIONS; pass += 1) collectGarbage();
+        return readSurfaceTelemetry(ROOT_TAG)?.liveNodes ?? -1;
+      };
+      // One swap per tick, so every screen is committed before the next one replaces it
+      const advance = async (
+        surface: { commit(): void },
+        steps: number,
+      ): Promise<void> => {
+        if (steps === 0) return;
+        await tick();
+        surface.commit();
+        await advance(surface, steps - 1);
+      };
+      // `unmount` after the reading: a mount left on the same root adds a constant to the next one
+      const settle = async (cycles: number): Promise<number> => {
+        await advance(
+          mount(ROOT_TAG, Navigation, { cycles, count }),
+          cycles + 2,
+        );
+        const live = liveNodes();
+        unmount(ROOT_TAG);
+        return live;
+      };
+
+      const oneScreen = await settle(0);
+      const afterSwaps = await settle(SCREEN_SWAPS);
+      const afterMore = await settle(SCREEN_SWAPS * 2);
+      print(
+        `x${count}: 0 swaps ${oneScreen}, ${SCREEN_SWAPS} ${afterSwaps}, ${SCREEN_SWAPS * 2} ${afterMore}`,
+      );
+
+      expect(oneScreen).toBeGreaterThan(0);
+      expect(afterSwaps - oneScreen).toBeLessThan(slack + 1);
+      expect(afterMore - afterSwaps).toBeLessThan(slack + 1);
+    });
+  }
 });
 
 report();

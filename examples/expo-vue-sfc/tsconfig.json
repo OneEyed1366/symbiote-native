@@ -2,6 +2,8 @@
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
     "types": [],
+    // The WebGL context type of @symbiote-native/gl comes from the DOM lib, as in expo-react
+    "lib": ["ES2022", "DOM"],
     "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
   },
   // Points vue-tsc/Volar's virtual codegen at OUR package instead of Vue's default "vue" - see

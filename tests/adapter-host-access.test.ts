@@ -1,20 +1,10 @@
-// An adapter must reach an engine node only through the host-access API, never through its fields.
-//
-// A single `node.parent` in the next PR puts an adapter back on the tree's SHAPE, which is what
-// makes the representation impossible to change: `symbiote-fabric-cxx-surface` §9's whole point
-// is that the retained node can become an address, or move onto the framework's own object.
-//
-// TYPE-AWARE, not textual, and that is the difference between this and a grep. The survey that
-// started the narrowing counted `.props` and `.children` across whole adapters and reported 275-453
-// hits per adapter; almost all of them were the FRAMEWORK's props and children — Vue's VNode,
-// Solid's component props, Angular's signals, Svelte's own ShimNode fields. Scoped by resolved TYPE
-// the real number was 8-13 per seam. A regex cannot tell those apart, and an allowlist of receiver
-// names would be the same guess with more steps.
-//
-// It also cannot report a false positive for the legitimate look-alikes, without listing them:
-// `SymbioteSurface.children` resolves to SymbioteSurface, `ShimNode.children` to ShimNode, and a
-// Descriptor's `component` to the components package's own type. None of them is ISymbioteNode, so
-// none of them is reachable by this rule.
+// An adapter reaches an engine node only through the host-access API, never through its fields
+// A single `node.parent` pins the adapter to the tree's shape (`symbiote-fabric-cxx-surface` §9)
+// The audit is type-aware, so the framework's own props and children pass
+
+// A grep counted 275-453 `.props` and `.children` hits per adapter, mostly the framework's own
+// Scoped by resolved type the real number was 8-13 per seam, and a regex cannot tell them apart
+// `SymbioteSurface.children` and a Descriptor's `component` resolve to other types, so they pass
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,9 +15,8 @@ import { adapterNames } from '../scripts/lib/adapter-names.mjs';
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 
-// The engine's own private surface. Each is reachable through host-access.ts instead:
-// parentOf / childrenOf / firstChildOf / nextSiblingOf / componentOf / isTextContainer /
-// isRawTextNode / textOf / propOf, plus committedOf for the commit record.
+// The engine's private fields, each reachable through the host-access API instead
+// (`parentOf`, `childrenOf`, `firstChildOf`, `propOf`, `committedOf` and the rest)
 const PRIVATE_FIELDS = new Set([
   'children',
   'parent',
@@ -37,10 +26,8 @@ const PRIVATE_FIELDS = new Set([
   'listeners',
   'committed',
 ]);
-// `dirty` / `propsDirty` / `structureDirty` used to be listed here. They are no longer FIELDS —
-// the commit's three questions live in `core/engine/src/edit-buffer.ts` — so an adapter naming one
-// is a tsc error rather than a violation this audit could report. Do not re-add them: a name in
-// this set that no type carries is a rule that can never fire, which reads as coverage.
+// `dirty`, `propsDirty` and `structureDirty` are not fields any more, so a use is a tsc error
+// Do not re-add them: a name no type carries is a rule that cannot fire and reads as coverage
 
 const OPTIONS: ts.CompilerOptions = {
   target: ts.ScriptTarget.ESNext,
@@ -49,8 +36,7 @@ const OPTIONS: ts.CompilerOptions = {
   jsx: ts.JsxEmit.Preserve,
   allowJs: false,
   noEmit: true,
-  // The audit needs types resolved, not diagnostics clean — skipping lib checking keeps a run
-  // measured in seconds rather than minutes without changing a single answer.
+  // Types must resolve, diagnostics need not be clean, and skipping lib checks keeps it in seconds
   skipLibCheck: true,
   allowImportingTsExtensions: true,
   strict: true,
@@ -62,16 +48,14 @@ function adapterEntries(): string[] {
     .filter(entry => fs.existsSync(entry));
 }
 
-interface IViolation {
+type IViolation = {
   readonly file: string;
   readonly line: number;
   readonly text: string;
-}
+};
 
-// A property access is a violation when the RECEIVER's type is ISymbioteNode and the property is
-// one of the engine's own fields. `typeToString` rather than a symbol identity comparison because
-// the receiver is routinely a union (`ISymbioteNode | undefined` off a shim, `ISymbioteNode |
-// SymbioteSurface` in a seam) and the union's members are what matter, not the union itself.
+// A property access is a violation when the receiver is an `ISymbioteNode` and the property is
+// an engine field, and the receiver is often a union, so its members are checked, not the union
 function receiverIsEngineNode(
   checker: ts.TypeChecker,
   expression: ts.Expression,
@@ -90,8 +74,7 @@ function collectViolations(
     const rel = path.relative(REPO_ROOT, source.fileName);
     if (!rel.startsWith('adapters' + path.sep)) continue;
     if (rel.includes('node_modules')) continue;
-    // Tests may reach into the engine's shape deliberately — several assert on `node.props` to
-    // prove a commit wrote what it should. They are not the contract this guards.
+    // Tests may reach the engine's shape on purpose, e.g. asserting `node.props` after a commit
     if (/\.(test|spec|bench|probe)\.tsx?$/.test(rel)) continue;
 
     const visit = (node: ts.Node): void => {
@@ -116,9 +99,8 @@ describe('adapters reach an engine node only through host-access', () => {
   const checker = program.getTypeChecker();
 
   it('resolves every adapter entry, so a silent empty run is impossible', () => {
-    // Without this, a moved barrel or a bad tsconfig would give an empty program, zero violations
-    // and a green run that examined nothing — the shape this repo has been bitten by often enough
-    // to write down (.claude/rules/test-harness-false-greens.md).
+    // Without it a moved barrel or a bad tsconfig gives an empty program, zero violations and a
+    // green run that examined nothing (`.claude/rules/test-harness-false-greens.md`)
     expect(entries.length).toBe(adapterNames().length);
     const adapterSources = program
       .getSourceFiles()
@@ -146,10 +128,14 @@ describe('adapters reach an engine node only through host-access', () => {
   });
 
   it('would catch a field access, proven against a synthetic receiver', () => {
-    // The break-test, and it has to be synthetic: the real tree is clean, so nothing in it can
-    // demonstrate the rule fires. A green audit over a clean tree is exactly the result a rule that
-    // matches NOTHING also produces, and the two are indistinguishable without this.
-    const probe = path.join(REPO_ROOT, 'adapters', '__host-access-probe__.ts');
+    // The break-test must be synthetic, as the real tree is clean and cannot show the rule fires
+    // A green audit over a clean tree is also what a rule that matches nothing produces
+    // An `.itest.` name, which the load-time scanner skips while the file exists
+    const probe = path.join(
+      REPO_ROOT,
+      'adapters',
+      '__host-access-probe__.itest.ts',
+    );
     fs.writeFileSync(
       probe,
       `import type { ISymbioteNode } from '@symbiote-native/engine';\n` +

@@ -1,8 +1,7 @@
 <script lang="ts">
-  // Runes section of the API Playground (.docs/framework-api-surface/svelte.md). Covers every
-  // Yes/Partial row except $bindable/$props()/$props.id() (NumberStepper.svelte owns those — see
-  // ApiPlaygroundScreen.svelte's composition) and $host() (No — needs the `customElement`
-  // compiler option and a real HTMLElement dispatch target, neither of which exists here).
+  // Runes section of the API Playground, covering every Yes and Partial row
+  // `$bindable`, `$props` and `$props.id` live in `NumberStepper.svelte`
+  // `$host` is No, as it needs the `customElement` option and a real HTMLElement target
   import { dlog } from '@symbiote-native/engine';
   import ActionButton from '../ActionButton.svelte';
 
@@ -13,9 +12,8 @@
   const doubled = $derived(count * 2);
   const parity = $derived.by(() => (count % 2 === 0 ? 'even' : 'odd'));
 
-  // $state.raw: only a REASSIGNMENT is reactive, a mutation of the object in place is not — the
-  // same identity-preserving discipline Switch/Pressable hold their engine node in (svelte-
-  // adapter-dom-shim skill §15). `mutateRaw` intentionally does nothing visible.
+  // `$state.raw` reacts to a reassignment only, not to an in-place mutation
+  // `mutateRaw` shows nothing on purpose
   let rawBox = $state.raw({ n: 0 });
   function mutateRaw(): void {
     rawBox.n += 1;
@@ -32,27 +30,25 @@
     snapshotText = JSON.stringify(snapshot);
   }
 
-  // $effect — dependency is `count`; the run counter is a plain closure variable so the effect
-  // never reads its own output (reading AND writing the same $state inside one effect is the
-  // self-dependency trap this sidesteps).
+  // `$effect` depends on `count`, and the run counter is a plain closure variable
+  // So the effect never reads its own output, which would make it depend on itself
   let effectRunsRaw = 0;
   let effectRuns = $state(0);
   $effect(() => {
-    count;
+    dlog(`api-playground: $effect saw count=${count}`);
     effectRunsRaw += 1;
     effectRuns = effectRunsRaw;
   });
 
-  // $effect.pre — Partial: runs, but there is no synchronous pre-commit layout value to read the
-  // way a web `clientHeight` would be (Fabric's clone-on-write commit is async).
+  // `$effect.pre` is Partial: it runs, but Fabric's clone-on-write commit is async
+  // So there is no synchronous pre-commit layout value like a web `clientHeight`
   // eslint-disable-next-line svelte/prefer-writable-derived -- this is the $effect.pre demo itself
   let preEffectLog = $state('not run yet');
   $effect.pre(() => {
     preEffectLog = `ran before this update committed (count=${count})`;
   });
 
-  // $effect.root — a manually-destroyed effect scope, outside the normal component-lifecycle
-  // cleanup.
+  // `$effect.root` is a manually destroyed effect scope outside the component lifecycle
   // eslint-disable-next-line svelte/prefer-writable-derived -- this is the $effect.root demo itself
   let rootEffectStatus = $state('not started');
   let destroyRoot: (() => void) | undefined;
@@ -72,14 +68,12 @@
     destroyRoot = undefined;
   }
 
-  // $effect.tracking() — false at top-level script (component init, no tracking context), true
-  // inside a $derived/$effect body.
+  // `$effect.tracking()` is false at the script top level and true inside a derived or effect
   const trackedAtInit = $effect.tracking();
   const trackedInsideDerived = $derived.by(() => $effect.tracking());
 
-  // $inspect / $inspect.with / $inspect.trace — dev-time only, no-op in production builds.
-  // `$inspect(count)` alone logs via Svelte's own console.log on every change (check the Metro
-  // console); `.with(fn)` lets us route that same signal through our own dlog instead.
+  // `$inspect`, `.with` and `.trace` are dev-time only and no-ops in production builds
+  // `$inspect(count)` alone logs to the console on each change, and `.with(fn)` routes it to `dlog`
   let inspectWithLog = $state('not run yet');
   $inspect(count).with((type, value) => {
     dlog(`api-playground: $inspect.with type=${type} value=${value}`);

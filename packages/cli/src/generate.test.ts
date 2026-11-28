@@ -8,28 +8,45 @@ import {
 } from './expo-package-layers.js';
 import { scaffoldApp, type IScaffoldOptions } from './generate.js';
 import type { IFramework, IVueFlavor } from './types.js';
+import { isJsonObject, type IJsonObject } from './utils/json.js';
 import { sanitizeNativeAppName } from './utils/native-identity.js';
 import { isValidPackageName } from './utils/package-name.js';
 
 const BUNDLE_ID = 'com.example.app';
-// applyAppIdentity moves android/app/.../java/com/canary to a path derived from the bundle id
-// (com.example.app -> com/example/app) and renames ios/Canary -> ios/<nativeAppName> — a test
-// reading back from the literal template paths ("com/canary", "ios/Canary") would silently read
-// nothing or the wrong file once identity substitution has already run.
+// `applyAppIdentity` moves the Android package dirs and renames `ios/Canary`
+// A read through the template paths would miss the scaffolded file
 const ANDROID_PACKAGE_PATH = BUNDLE_ID.split('.').join('/');
 
 function readText(root: string, ...segments: string[]): string {
   return fs.readFileSync(path.join(root, ...segments), 'utf8');
 }
 
-// Every scaffolded app's native template (templates/native/{ios,android}) can optionally wire
-// react-native-bootsplash (MainActivity.kt: com.zoontek.rnbootsplash.RNBootSplash,
-// AppDelegate.swift: RNBootSplash) — gated behind hasSplashScreen, same shape as navigation/
-// expo-modules/testing. Off by default: the base native template must compile WITHOUT the
-// @symbiote-native/splash-screen package (no import/init call, no Android theme that extends
-// the plugin's own Theme.BootSplash — that parent style only exists once the plugin's AAR is a
-// Gradle dependency, so leaving AndroidManifest/styles.xml pointed at it without the dependency
-// is an aapt build break, not just a runtime "module not found").
+function readPackageJson(root: string): IJsonObject {
+  const pkg: unknown = JSON.parse(readText(root, 'package.json'));
+  if (!isJsonObject(pkg)) {
+    throw new Error('generated package.json is not a JSON object');
+  }
+  return pkg;
+}
+
+function readPackageSection(root: string, section: string): IJsonObject {
+  const value = readPackageJson(root)[section];
+  if (!isJsonObject(value)) {
+    throw new Error(`generated package.json has no "${section}" object`);
+  }
+  return value;
+}
+
+function readPackageName(root: string): string {
+  const { name } = readPackageJson(root);
+  if (typeof name !== 'string') {
+    throw new Error('generated package.json has no string "name" field');
+  }
+  return name;
+}
+
+// Only `--splash-screen` may wire `react-native-bootsplash` into the native template
+// Without the package, its import or a `Theme.BootSplash` parent breaks the Android build
 describe('scaffoldApp splash-screen option', () => {
   const tmpDirs: string[] = [];
 
@@ -58,6 +75,7 @@ describe('scaffoldApp splash-screen option', () => {
       hasTesting: false,
       hasSplashScreen,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -67,7 +85,6 @@ describe('scaffoldApp splash-screen option', () => {
 
   it('is off by default: no splash-screen dependency, plain theme, no native wiring', () => {
     const root = scaffold(false);
-    const nativeAppName = sanitizeNativeAppName(root);
     const pkg: unknown = JSON.parse(readText(root, 'package.json'));
     if (typeof pkg !== 'object' || pkg === null || !('dependencies' in pkg)) {
       throw new Error('generated package.json has no "dependencies" field');
@@ -91,6 +108,7 @@ describe('scaffoldApp splash-screen option', () => {
     const styles = readText(root, 'android/app/src/main/res/values/styles.xml');
     expect(styles).not.toContain('BootTheme');
 
+    const nativeAppName = sanitizeNativeAppName(root);
     const appDelegate = readText(
       root,
       'ios',
@@ -102,7 +120,6 @@ describe('scaffoldApp splash-screen option', () => {
 
   it('wires bootsplash end to end when opted in, with the app identity substituted throughout', () => {
     const root = scaffold(true);
-    const nativeAppName = sanitizeNativeAppName(root);
     const pkg: unknown = JSON.parse(readText(root, 'package.json'));
     if (typeof pkg !== 'object' || pkg === null || !('dependencies' in pkg)) {
       throw new Error('generated package.json has no "dependencies" field');
@@ -123,10 +140,10 @@ describe('scaffoldApp splash-screen option', () => {
     expect(mainActivity).toContain(
       'RNBootSplash.init(this, R.style.BootTheme)',
     );
-    // The layer file is a full copy of the template's "Canary" placeholder content — prove
-    // applyAppIdentity's substitution pass (which runs AFTER this layer is applied) actually
-    // reaches it too, not just the base template's own files.
+    // The layer file is a full copy of the "Canary" template
+    // The identity pass runs after the layer, so it must reach this file too
     expect(mainActivity).not.toContain('Canary');
+    const nativeAppName = sanitizeNativeAppName(root);
     expect(mainActivity).toContain(
       `getMainComponentName(): String = "${nativeAppName}"`,
     );
@@ -151,10 +168,8 @@ describe('scaffoldApp splash-screen option', () => {
     expect(appDelegate).toContain(`withModuleName: "${nativeAppName}"`);
   });
 
-  // The native/ overlay (MainActivity.kt, AndroidManifest.xml, styles.xml, AppDelegate.swift) is
-  // framework-agnostic — it never touches js/<framework> — but the two tests above only exercise
-  // the react default. Prove the wiring actually lands identically regardless of --framework,
-  // same cross-framework shape as "declares @symbiote-native/android for every framework" below.
+  // The `native/` overlay never touches `js/<framework>`, and the tests above cover only react
+  // So the wiring is proven for every `--framework`
   const frameworksForSplashScreen: ReadonlyArray<
     [IFramework, IVueFlavor | undefined]
   > = [
@@ -184,11 +199,11 @@ describe('scaffoldApp splash-screen option', () => {
         hasTesting: false,
         hasSplashScreen: true,
         hasSlider: false,
+        hasReanimated: false,
         styling: 'css',
         packageManager: 'npm',
       };
       scaffoldApp(options);
-      const nativeAppName = sanitizeNativeAppName(root);
 
       const mainActivity = readText(
         root,
@@ -206,6 +221,7 @@ describe('scaffoldApp splash-screen option', () => {
       );
       expect(manifest).toContain('android:theme="@style/BootTheme"');
 
+      const nativeAppName = sanitizeNativeAppName(root);
       const appDelegate = readText(
         root,
         'ios',
@@ -219,11 +235,8 @@ describe('scaffoldApp splash-screen option', () => {
   );
 });
 
-// react-native-bootsplash's native splash screen never hides itself — it stays up until JS calls
-// hide(). Every real example (examples/react's useEffect, .../vue-sfc's onMounted, .../angular's
-// ngOnInit, .../solid's onMount, .../svelte's bare top-level call) wires this at the App root, but
-// --splash-screen only ever overlaid native/ + the dependency — never the JS side. Without it, a
-// scaffolded --splash-screen app would freeze on the splash screen forever, on every framework.
+// `react-native-bootsplash` keeps the splash screen up until JS calls `hide()`
+// So `--splash-screen` also has to splice that call into each framework's App entry
 describe('scaffoldApp splash-screen option wires hide() into the App entry (real bug)', () => {
   const tmpDirs: string[] = [];
 
@@ -284,6 +297,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
         hasTesting: false,
         hasSplashScreen: true,
         hasSlider: false,
+        hasReanimated: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -311,6 +325,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
         hasTesting: false,
         hasSplashScreen: true,
         hasSlider: false,
+        hasReanimated: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -338,6 +353,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     });
@@ -366,6 +382,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
         hasTesting: false,
         hasSplashScreen: true,
         hasSlider: false,
+        hasReanimated: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -395,6 +412,7 @@ describe('scaffoldApp splash-screen option wires hide() into the App entry (real
         hasTesting: false,
         hasSplashScreen: true,
         hasSlider: false,
+        hasReanimated: false,
         styling,
         packageManager: 'npm',
       });
@@ -434,6 +452,7 @@ describe('scaffoldApp vue-tsx navigation dereferences the ComputedRef with .valu
         hasTesting: false,
         hasSplashScreen: false,
         hasSlider: false,
+        hasReanimated: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -487,6 +506,7 @@ describe('scaffoldApp svelte images use {uri} sources, not require() (real bug)'
         hasTesting: false,
         hasSplashScreen: false,
         hasSlider: false,
+        hasReanimated: false,
         styling: 'css',
         packageManager: 'npm',
       });
@@ -500,15 +520,8 @@ describe('scaffoldApp svelte images use {uri} sources, not require() (real bug)'
   );
 });
 
-// Found via a real `tsc -p tsconfig.json` run against a scaffolded app (not just string-matching
-// the template): react's base tsconfig unconditionally set `types: ["jest"]`, but `@types/jest`
-// is only installed by the OPTIONAL `--testing` layer — every react scaffold WITHOUT --testing
-// failed typecheck immediately with "TS2688: Cannot find type definition file for 'jest'". The
-// same root config also has no reason to typecheck `e2e/**` at all, since the testing layer
-// ships e2e/tsconfig.json as its own separate, complete project — but the root `include` glob
-// (`**/*.ts`) picks up e2e's specs anyway unless explicitly excluded, and e2e's own describe/it/
-// beforeAll globals then read as unresolved names under the root config specifically. Every
-// framework template needs "e2e" in its root exclude for this reason, testing on or off.
+// A root `types` entry must resolve with no optional layer, `jest` ships with `--testing` only
+// `e2e/` is its own tsconfig project, so every root tsconfig excludes it
 describe('scaffoldApp tsconfig correctness (each framework, testing off)', () => {
   const tmpDirs: string[] = [];
 
@@ -536,6 +549,7 @@ describe('scaffoldApp tsconfig correctness (each framework, testing off)', () =>
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -612,13 +626,17 @@ describe('scaffoldApp tsconfig correctness (each framework, testing off)', () =>
     const tsconfig = scaffoldTsconfig('svelte');
     expect(tsconfig.exclude).toContain('e2e');
   });
+
+  // The adapter declares its tags globally, and a fresh `App.svelte` imports nothing from it
+  // Unloaded, svelte-check reads `<image resizeMode>` as the SVG tag and fails the new app
+  it('svelte: loads the adapter tag types without an import from the app', () => {
+    const options = compilerOptions(scaffoldTsconfig('svelte'));
+    expect(options.types).toContain('@symbiote-native/svelte');
+  });
 });
 
-// A directory name the filesystem happily accepts ("My Cool App") is not automatically a valid
-// npm package name (uppercase, spaces) — writing it unsanitized into package.json's "name" field
-// scaffolds fine and only fails later, at `npm install`, with an npm-internal error nowhere near
-// the actual cause. create-vue's own create() has the identical isValidPackageName/
-// toValidPackageName split for exactly this reason (see utils/package-name.ts).
+// A legal directory name ("My Cool App") can be an illegal npm package name
+// Written as is, it fails only at `npm install`, see `utils/package-name.ts`
 describe("scaffoldApp sanitizes package.json's name", () => {
   const tmpDirs: string[] = [];
   const originalCwd = process.cwd();
@@ -629,11 +647,8 @@ describe("scaffoldApp sanitizes package.json's name", () => {
       fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  // scaffoldApp resolves the target dir as `path.resolve(cwd, appName)` — every OTHER describe
-  // block in this file dodges that by passing an absolute tmp path as `appName` itself (which
-  // `path.resolve` then returns unchanged). That trick breaks HERE: it's specifically appName's
-  // own (non-path) string content under test, e.g. "My Cool App", so this scaffolds from inside
-  // a real tmp cwd instead, exactly like the CLI's own real invocation does.
+  // The `appName` string is under test here, so it can't be an absolute tmp path as elsewhere
+  // It scaffolds from inside a real tmp cwd, as the CLI does
   function scaffoldWithAppName(appName: string): string {
     const tmpRoot = fs.mkdtempSync(
       path.join(os.tmpdir(), 'symbiote-cli-scaffold-'),
@@ -651,6 +666,7 @@ describe("scaffoldApp sanitizes package.json's name", () => {
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -659,57 +675,27 @@ describe("scaffoldApp sanitizes package.json's name", () => {
 
   it('writes an already-valid app name through unchanged', () => {
     const root = scaffoldWithAppName('my-cool-app');
-    const pkg: unknown = JSON.parse(readText(root, 'package.json'));
-    if (typeof pkg !== 'object' || pkg === null || !('name' in pkg)) {
-      throw new Error('generated package.json has no "name" field');
-    }
-    expect(pkg.name).toBe('my-cool-app');
+    expect(readPackageName(root)).toBe('my-cool-app');
   });
 
   it('sanitizes a filesystem-legal but npm-illegal app name ("My Cool App")', () => {
-    const root = scaffoldWithAppName('My Cool App');
-    const pkg: unknown = JSON.parse(readText(root, 'package.json'));
-    if (
-      typeof pkg !== 'object' ||
-      pkg === null ||
-      !('name' in pkg) ||
-      typeof pkg.name !== 'string'
-    ) {
-      throw new Error('generated package.json has no string "name" field');
-    }
-    expect(isValidPackageName(pkg.name)).toBe(true);
-    expect(pkg.name).toBe('my-cool-app');
+    const name = readPackageName(scaffoldWithAppName('My Cool App'));
+    expect(isValidPackageName(name)).toBe(true);
+    expect(name).toBe('my-cool-app');
   });
 
-  // create-vue supports `npx create-vue .` (scaffold into the current directory) — a well-known
-  // idiom this CLI's own `path.resolve(cwd, appName)` already handles for FREE (it normalizes to
-  // cwd). But toValidPackageName('.') strips the leading dot and is left with "", an npm-illegal
-  // package.json "name" that fails `npm install` — checked against create-vue's own
-  // toValidPackageName, which has the identical hole and papers over it with a forced interactive
-  // re-prompt (see .vendors/create-vue). This CLI never re-prompts, so the empty string must never
-  // reach package.json in the first place.
+  // `new .` scaffolds into the cwd, and `toValidPackageName('.')` leaves an empty name
+  // An empty "name" fails `npm install`, so the directory name stands in
   it('derives a real package name from the directory when appName is "."', () => {
     const root = scaffoldWithAppName('.');
-    const pkg: unknown = JSON.parse(readText(root, 'package.json'));
-    if (
-      typeof pkg !== 'object' ||
-      pkg === null ||
-      !('name' in pkg) ||
-      typeof pkg.name !== 'string'
-    ) {
-      throw new Error('generated package.json has no string "name" field');
-    }
-    expect(isValidPackageName(pkg.name)).toBe(true);
-    expect(pkg.name).toBe(path.basename(root).toLowerCase());
+    const name = readPackageName(root);
+    expect(isValidPackageName(name)).toBe(true);
+    expect(name).toBe(path.basename(root).toLowerCase());
   });
 });
 
-// Every framework's own metro.config.js does `require('@react-native/metro-config')` and every
-// babel.config.js has `presets: ['module:@react-native/babel-preset']` — these are hard
-// `require()` calls, not optional conveniences, so a scaffold missing either package fails before
-// Metro even boots (`npm start`/`npm run ios`/`npm run android` all go through it). Found via
-// `/vendor`-style direct inspection of each template's own config files against its fragment's
-// devDependencies: vue-sfc and angular required both packages but declared neither.
+// Each template's `metro.config.js` and `babel.config.js` hard-require these two packages
+// A fragment that omits one breaks the app before Metro boots
 describe('scaffoldApp declares the metro/babel packages every framework config requires', () => {
   const tmpDirs: string[] = [];
 
@@ -737,21 +723,12 @@ describe('scaffoldApp declares the metro/babel packages every framework config r
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
     scaffoldApp(options);
-    const pkg: unknown = JSON.parse(readText(root, 'package.json'));
-    if (
-      typeof pkg !== 'object' ||
-      pkg === null ||
-      !('devDependencies' in pkg) ||
-      typeof pkg.devDependencies !== 'object' ||
-      pkg.devDependencies === null
-    ) {
-      throw new Error('generated package.json has no devDependencies object');
-    }
-    return pkg.devDependencies as Record<string, unknown>;
+    return readPackageSection(root, 'devDependencies');
   }
 
   const frameworks: ReadonlyArray<[IFramework, IVueFlavor | undefined]> = [
@@ -770,15 +747,8 @@ describe('scaffoldApp declares the metro/babel packages every framework config r
   });
 });
 
-// Every framework's package.json.fragment.json wires `"lint": "eslint ."`, and `eslint` +
-// `@react-native/eslint-config` are universal devDependencies (templates/native's own fragment)
-// — checked against a `lint`-script-without-a-config regression, since ESLint's flat config
-// needs an actual eslint.config.js file to run at all. `templates/native/eslint.config.js` covers
-// react/angular/vue-tsx for free (their real examples ship that exact 3-line base config
-// verbatim, no framework-specific overrides needed); vue-sfc/solid/svelte's own `templates/js/
-// <fw>/eslint.config.js` then overrides it with the `.vue`/`.svelte` parser wiring their SFC/
-// component format needs (confirmed via `/vendor`-style diff against each framework's real
-// examples/<fw>/eslint.config.js).
+// Every framework wires `eslint .`, and flat config does not run without `eslint.config.js`
+// `templates/native` ships the base one, some `templates/js/<framework>` override it
 describe('scaffoldApp ships an eslint.config.js for every framework', () => {
   const tmpDirs: string[] = [];
 
@@ -803,6 +773,7 @@ describe('scaffoldApp ships an eslint.config.js for every framework', () => {
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -828,10 +799,8 @@ describe('scaffoldApp ships an eslint.config.js for every framework', () => {
   });
 });
 
-// @angular/core declares rxjs as a mandatory (non-optional — checked via peerDependenciesMeta)
-// peerDependency, and @symbiote-native/angular's own peerDependencies list @angular/forms
-// alongside @angular/core — every real Angular app needs both regardless of this project's
-// zoneless choice (zone.js, the one genuinely optional peer here, correctly stays out).
+// `rxjs` is a required peer of `@angular/core`, and our adapter peers `@angular/forms`
+// `zone.js` is the optional one and stays out
 describe('scaffoldApp angular includes rxjs and @angular/forms', () => {
   const tmpDirs: string[] = [];
 
@@ -856,6 +825,7 @@ describe('scaffoldApp angular includes rxjs and @angular/forms', () => {
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -869,15 +839,8 @@ describe('scaffoldApp angular includes rxjs and @angular/forms', () => {
   });
 });
 
-// Every framework gets the same `pretypecheck` (css-dts, generating .module.css.d.ts) +
-// `typecheck` script pair, one per framework's own type-checker — vue-tsc / svelte-check where
-// the framework has a dedicated one, plain tsc (react, solid) or ngc (angular, which already
-// needs the AOT compiler for its real build) otherwise. react/angular's own REAL examples happen
-// not to have this pair, but that's upstream inconsistency, not a reason to omit it here — the
-// scaffolder gives every framework the same story on purpose. Our templates already shipped
-// vue-tsx/vue-sfc's tsconfig.typecheck.json (TYPESCRIPT_ONLY_FILENAMES in render-template.ts
-// already treats it as TS-only) but never wired the scripts or the `vue-tsc`/`svelte-check`
-// devDependency that would make them work — a half-finished feature.
+// Every framework gets `pretypecheck` (`css-dts`) and `typecheck` with its own checker
+// The scripts need that checker declared, as `vue-tsc` or `svelte-check`
 describe('scaffoldApp wires the pretypecheck/typecheck scripts each framework example has', () => {
   const tmpDirs: string[] = [];
 
@@ -905,6 +868,7 @@ describe('scaffoldApp wires the pretypecheck/typecheck scripts each framework ex
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -969,12 +933,8 @@ describe('scaffoldApp wires the pretypecheck/typecheck scripts each framework ex
   });
 });
 
-// examples/vue-tsx's babel.config.js uses @symbiote-native/vue/babel-jsx (the plugin PLUS its
-// isCustomElement option) instead of the bare '@vue/babel-plugin-jsx' string — per that file's
-// own comment, "Either half alone is broken": without isCustomElement, the `<view>`/`<text>`/…
-// intrinsic tags each compile to a Vue COMPONENT INSTANCE instead of their lowered intrinsic
-// element, defeating the host-primitive-lowering optimization this project's whole perf story
-// depends on for Vue. Our template used the bare plugin string.
+// `babel-jsx` of our adapter adds `isCustomElement` to the Vue JSX plugin
+// With the bare plugin each `<view>` compiles to a Vue component instance
 describe('scaffoldApp vue-tsx wires the adapter-provided JSX plugin, not the bare one', () => {
   const tmpDirs: string[] = [];
 
@@ -999,15 +959,14 @@ describe('scaffoldApp vue-tsx wires the adapter-provided JSX plugin, not the bar
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
     scaffoldApp(options);
     const babelConfig = readText(root, 'babel.config.js');
     expect(babelConfig).toContain("require('@symbiote-native/vue/babel-jsx')");
-    // The bare plugin name may still appear in prose (explaining why it's NOT used directly,
-    // exactly like the real reference file's own comment does) — what must never appear is the
-    // bare string actually PLACED in the plugins array.
+    // The bare name may appear in a comment, but never inside the `plugins` array
     expect(babelConfig).not.toMatch(
       /plugins:\s*\[[^\]]*'@vue\/babel-plugin-jsx'/,
     );
@@ -1015,15 +974,8 @@ describe('scaffoldApp vue-tsx wires the adapter-provided JSX plugin, not the bar
   });
 });
 
-// @symbiote-native/expo-modules-link's OWN README documents this as step 2 of "Setup (once per
-// app)", right after `npm install`: without the postinstall hook, its `bin/postinstall.cjs`
-// linker never runs, so the Android `build.gradle` implementation line and the
-// `MainApplication.kt` ModulesProvider entry it writes never happen. The layer's fragment
-// already listed the package and all 20+ @symbiote-native/<expo-module> dependencies, but never
-// wired the script that makes them WORK — every module compiles clean and then throws
-// "Cannot find native module '<Name>'" at runtime, exactly the failure mode the package's own
-// README calls out. examples/expo-react has this wired; the scaffolder's expo-modules layer did
-// not.
+// Without the postinstall hook the `expo-modules-link` linker never runs on Android
+// The app then compiles and throws "Cannot find native module" at runtime
 describe('scaffoldApp expo-modules option wires the postinstall linker', () => {
   const tmpDirs: string[] = [];
 
@@ -1048,6 +1000,7 @@ describe('scaffoldApp expo-modules option wires the postinstall linker', () => {
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1057,36 +1010,21 @@ describe('scaffoldApp expo-modules option wires the postinstall linker', () => {
 
   it('adds the postinstall script when expo-modules is on', () => {
     const root = scaffoldWithExpoModules(true);
-    const pkg: unknown = JSON.parse(readText(root, 'package.json'));
-    if (typeof pkg !== 'object' || pkg === null || !('scripts' in pkg)) {
-      throw new Error('generated package.json has no scripts object');
-    }
-    expect(pkg.scripts).toMatchObject({ postinstall: 'symbiote-expo-link' });
+    expect(readPackageSection(root, 'scripts')).toMatchObject({
+      postinstall: 'symbiote-expo-link',
+    });
   });
 
   it('does not add it when expo-modules is off', () => {
     const root = scaffoldWithExpoModules(false);
-    const pkg: unknown = JSON.parse(readText(root, 'package.json'));
-    if (
-      typeof pkg !== 'object' ||
-      pkg === null ||
-      !('scripts' in pkg) ||
-      typeof pkg.scripts !== 'object' ||
-      pkg.scripts === null
-    ) {
-      throw new Error('generated package.json has no scripts object');
-    }
-    expect(pkg.scripts).not.toHaveProperty('postinstall');
+    expect(readPackageSection(root, 'scripts')).not.toHaveProperty(
+      'postinstall',
+    );
   });
 });
 
-// @symbiote-native/slider is a real dependency of every example (examples/react, vue-sfc, vue-tsx,
-// angular, svelte, solid), yet had zero scaffolder wiring — the one package outside the
-// expo-modules bundle with no option at all. It needs no native/ files of its own: RN autolinking
-// discovers it through the package's own react-native.config.cjs + symbiote-slider.podspec (see
-// packages/slider/README.md, "Packaging — one dependency, not two"), so the whole scaffolder side
-// of "necessary native side" is the dependency declaration itself — `npm install` + the user's own
-// `pod install` do the rest.
+// `slider` needs no `native/` files, as React Native autolinking finds it in the package
+// So the dependency line is all the scaffolder adds, see `packages/slider/README.md`
 describe('scaffoldApp slider option', () => {
   const tmpDirs: string[] = [];
 
@@ -1111,6 +1049,7 @@ describe('scaffoldApp slider option', () => {
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1139,17 +1078,8 @@ describe('scaffoldApp slider option', () => {
   });
 });
 
-// @symbiote-native/android — the Android host-shim re-providing RN host signals (keyboard events,
-// …) that SymbioteNative's Fabric surface bypasses (packages/android/package.json's own
-// description) — is a real dependency of every framework's example (examples/react, vue-sfc,
-// vue-tsx, angular, solid, svelte all pin it), unconditionally, not behind any feature flag. None
-// of the six js/<framework>/package.json.fragment.json base fragments declared it.
-// Each EXPO_PACKAGE_LAYERS entry (battery, sensors, …) is individually selectable — previously
-// they only ever arrived as one all-or-nothing bundle glued to `--expo-modules`, so a battery-only
-// app had no way to avoid also declaring sensors/sms/web-browser/etc. Off by default, and picking
-// ONE implies the same expo/autolinking wiring `--expo-modules` provides on its own — see
-// generate.ts's own `hasExpoModules` derivation comment for why that's computed here, not trusted
-// to the caller.
+// Each `EXPO_PACKAGE_LAYERS` entry is selectable alone and off by default
+// Picking one implies the `--expo-modules` wiring, derived in `generate.ts`
 describe('scaffoldApp expo-package options', () => {
   const tmpDirs: string[] = [];
 
@@ -1176,6 +1106,7 @@ describe('scaffoldApp expo-package options', () => {
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       expoPackages,
       styling: 'css',
       packageManager: 'npm',
@@ -1247,21 +1178,12 @@ describe('scaffoldApp declares @symbiote-native/android for every framework', ()
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
     scaffoldApp(options);
-    const pkg: unknown = JSON.parse(readText(root, 'package.json'));
-    if (
-      typeof pkg !== 'object' ||
-      pkg === null ||
-      !('dependencies' in pkg) ||
-      typeof pkg.dependencies !== 'object' ||
-      pkg.dependencies === null
-    ) {
-      throw new Error('generated package.json has no dependencies object');
-    }
-    return pkg.dependencies as Record<string, unknown>;
+    return readPackageSection(root, 'dependencies');
   }
 
   const frameworks: ReadonlyArray<[IFramework, IVueFlavor | undefined]> = [
@@ -1279,13 +1201,8 @@ describe('scaffoldApp declares @symbiote-native/android for every framework', ()
   });
 });
 
-// examples/expo-react's real Info.plist (the only expo-* example checked into this repo with a
-// native/ios project) carries NSFaceIDUsageDescription (local-auth), NSMotionUsageDescription
-// (sensors), and NSUserTrackingUsageDescription (tracking-transparency) — iOS REJECTS/crashes
-// calling those modules' APIs without the matching usage-description string, App Store review
-// included. The base native/ios/Canary/Info.plist has none of them (it doesn't know about
-// expo-modules at all), and the expo-modules layer only ever wired the package.json fragment +
-// postinstall script — the Info.plist half of "necessary native side" was never covered.
+// iOS crashes `local-auth`, `sensors` and `tracking-transparency` without a usage string
+// The base `Info.plist` has none, so the `--expo-modules` layer adds them
 describe('scaffoldApp expo-modules option adds the iOS usage-description strings its bundled modules need', () => {
   const tmpDirs: string[] = [];
 
@@ -1310,6 +1227,7 @@ describe('scaffoldApp expo-modules option adds the iOS usage-description strings
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1333,18 +1251,8 @@ describe('scaffoldApp expo-modules option adds the iOS usage-description strings
   });
 });
 
-// Same reference (examples/expo-react/android/app/src/main/AndroidManifest.xml) has an Android
-// half too: 4 <uses-permission> the base template lacks (local-auth's biometric prompt, brightness's
-// setSystemBrightnessAsync, cellular's carrier lookups all fail on Android without them) plus two
-// <application> backup-control attributes expo-secure-store's own Android config-plugin
-// (withSecureStore.ts, vendored via /vendor) writes unconditionally — verified via vendoring that
-// the @xml/secure_store_* resources it points at ship INSIDE expo-secure-store's own Android
-// library module (android/src/main/res/xml/), so they resolve through Gradle's cross-module
-// resource merge with no local res/xml/ copy needed; the reference manifest's reference isn't
-// broken. Applied as a text-splice POST-process (like applyAppIdentity) rather than a third
-// AndroidManifest.xml overlay: --expo-modules renders before --splash-screen in generate.ts, and a
-// third full-file overlay would have silently lost splash-screen's BootTheme swap (or vice versa)
-// since renderTemplate overwrites, it doesn't merge.
+// `local-auth`, `brightness` and `cellular` fail on Android without these manifest entries
+// They are spliced as text, as one more full overlay would undo the `--splash-screen` one
 describe('scaffoldApp expo-modules option adds the Android permissions/backup config its bundled modules need', () => {
   const tmpDirs: string[] = [];
 
@@ -1353,10 +1261,13 @@ describe('scaffoldApp expo-modules option adds the Android permissions/backup co
       fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  function scaffoldManifest(
-    hasExpoModules: boolean,
+  function scaffoldManifest({
+    hasExpoModules,
     hasSplashScreen = false,
-  ): string {
+  }: {
+    hasExpoModules: boolean;
+    hasSplashScreen?: boolean;
+  }): string {
     const root = fs.mkdtempSync(
       path.join(os.tmpdir(), 'symbiote-cli-scaffold-'),
     );
@@ -1372,6 +1283,7 @@ describe('scaffoldApp expo-modules option adds the Android permissions/backup co
       hasTesting: false,
       hasSplashScreen,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1380,7 +1292,7 @@ describe('scaffoldApp expo-modules option adds the Android permissions/backup co
   }
 
   it('adds the permissions and backup attributes when opted in', () => {
-    const manifest = scaffoldManifest(true);
+    const manifest = scaffoldManifest({ hasExpoModules: true });
     expect(manifest).toContain('android.permission.USE_FINGERPRINT');
     expect(manifest).toContain('android.permission.USE_BIOMETRIC');
     expect(manifest).toContain('android.permission.WRITE_SETTINGS');
@@ -1394,13 +1306,16 @@ describe('scaffoldApp expo-modules option adds the Android permissions/backup co
   });
 
   it('does not add them when expo-modules is off', () => {
-    const manifest = scaffoldManifest(false);
+    const manifest = scaffoldManifest({ hasExpoModules: false });
     expect(manifest).not.toContain('USE_BIOMETRIC');
     expect(manifest).not.toContain('secure_store');
   });
 
   it('survives stacking with --splash-screen (whichever layer writes the manifest last keeps both)', () => {
-    const manifest = scaffoldManifest(true, true);
+    const manifest = scaffoldManifest({
+      hasExpoModules: true,
+      hasSplashScreen: true,
+    });
     expect(manifest).toContain('android.permission.USE_BIOMETRIC');
     expect(manifest).toContain(
       'android:fullBackupContent="@xml/secure_store_backup_rules"',
@@ -1409,13 +1324,7 @@ describe('scaffoldApp expo-modules option adds the Android permissions/backup co
   });
 });
 
-// @symbiote-native/engine is a peerDependency of EVERY adapter (adapters/{react,vue,svelte,solid,
-// angular}/package.json all list it identically — npm never auto-installs a peer, the consuming
-// app must declare it directly, the same convention CLAUDE.md's
-// <react_native_is_an_explicit_top_level_peer> already documents for react-native itself).
-// vue-sfc/vue-tsx/angular/solid/svelte's js/<framework>/package.json.fragment.json all already
-// declared it — only react's fragment was missing it, an isolated gap found by diffing a full
-// scaffold's dependency set against examples/react's real package.json.
+// Every adapter peers `@symbiote-native/engine`, so the app has to declare it itself
 describe('scaffoldApp declares @symbiote-native/engine as a direct dependency for react', () => {
   const tmpDirs: string[] = [];
 
@@ -1440,6 +1349,7 @@ describe('scaffoldApp declares @symbiote-native/engine as a direct dependency fo
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };
@@ -1452,9 +1362,8 @@ describe('scaffoldApp declares @symbiote-native/engine as a direct dependency fo
   });
 });
 
-// A lockfile is dependency-installer OUTPUT, never scaffolder input: applyAppIdentity's rename
-// of "Canary" inside Podfile changes the SHA1 a checked-in Podfile.lock's checksum records, so
-// `pod install` discards the shipped lock for a fresh resolve that can pick the wrong linkage.
+// The identity pass renames "Canary" in `Podfile`, which breaks a shipped lock's checksum
+// `pod install` would then drop the lock and could resolve the wrong linkage
 describe('scaffoldApp does not ship a lockfile for any package manager', () => {
   const tmpDirs: string[] = [];
 
@@ -1479,6 +1388,7 @@ describe('scaffoldApp does not ship a lockfile for any package manager', () => {
       hasTesting: false,
       hasSplashScreen: false,
       hasSlider: false,
+      hasReanimated: false,
       styling: 'css',
       packageManager: 'npm',
     };

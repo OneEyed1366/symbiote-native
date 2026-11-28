@@ -1,10 +1,5 @@
-// @symbiote-native/svelte: a DOM-shim adapter over @symbiote-native/engine. Stock compiled
-// Svelte output believes it is talking to the real DOM (svelte-adapter-dom-shim skill);
-// underneath, every DOM call routes into the same mutation API every other adapter drives.
-// All Fabric clone-on-write lives in the engine, shared cross-adapter. App code names only
-// @symbiote-native/svelte.
-//
-// Full component parity with React/Vue/Angular, see the `svelte-adapter-dom-shim` skill
+// @symbiote-native/svelte: a custom renderer (`svelte/renderer`) over `@symbiote-native/engine`
+// Every node operation routes into the mutation API every other adapter drives
 // Components are hand-authored markup mirroring `render-*.ts`, so there is no `descriptorToSvelte`
 
 // Bare side-effect import, deliberately NOT a re-export and deliberately not beside one of the
@@ -269,16 +264,10 @@ export type {
   IAccessibilityEventType,
 } from './modules/accessibility-info';
 
-// findNodeHandle: RN's ref -> native reactTag lookup, the Svelte twin of the React/Vue
-// adapters' own (host-instance.ts / host-instance/index.ts). hostInstance: the typed
-// measure/setNativeProps/focus/blur accessor off a `bind:this` ShimElement ref (see
-// host-instance.ts's header — React/Vue get this for free off a plain ref value; Svelte's ref is
-// a ShimElement wrapper, so it needs its own typed unwrap).
+// `findNodeHandle` is the ref to native `reactTag` lookup, as in the React and Vue adapters
+// `hostInstance` is the typed `measure` and `setNativeProps` accessor off an element ref
 export { findNodeHandle, hostInstance } from './host-instance';
 export type { IHostInstance } from './host-instance';
-// `ShimElement` is the `bind:this` type of a raw `symbiote-*` tag, so an app can type its own ref
-// `$state.raw<ShimElement | null>`, see host-instance.ts
-export type { ShimElement } from './dom-shim';
 
 // Type-only, and the re-export is the POINT rather than the `ISymbioteIntrinsicTag` name: it is
 // what makes the checker load `intrinsic-elements.ts`, whose `declare global` is the tag alphabet
@@ -288,7 +277,7 @@ export type {
   ISymbioteHostAttributes,
 } from './intrinsic-elements';
 
-// The Descriptor -> shim-tree bridge is NOT re-exported here, this barrel loads `.svelte` sources
+// The Descriptor to tree bridge is NOT re-exported here, as this barrel loads `.svelte` sources
 // and one unrelated import would load the whole graph, fatal under the plain vitest transform
 // Use `@symbiote-native/svelte/native-view-bridge`, see its header
 

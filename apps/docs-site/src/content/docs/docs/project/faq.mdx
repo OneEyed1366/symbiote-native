@@ -65,11 +65,13 @@ real-device Detox e2e suite, but doesn't yet share the identical
 
 ## Is Svelte a first-class adapter?
 
-Yes. It's a DOM shim over stock compiled Svelte output driving the same
-engine, with full component parity against React, Vue, and Angular, verified
-on-device on iOS and Android (`examples/svelte`). The Slider wrapper package
-ships a Svelte build too, and it's on the landing page's live framework
-switcher, with its own demo clip and [learn guide](/docs/learn/svelte/).
+Yes. It's built on Svelte's experimental custom renderer API (`svelte >= 5.59.1`)
+and drives the same engine, with full component parity against React, Vue, and
+Angular (`examples/svelte`).
+
+The Slider wrapper package ships a Svelte build too, and it's on the landing
+page's live framework switcher, with its own demo clip and
+[learn guide](/docs/learn/svelte/).
 
 ## Can I use Svelte stores, Context, or `svelte/motion`/`svelte/easing` in a SymbioteNative app?
 
@@ -77,7 +79,7 @@ Yes, almost all of Svelte's own runtime works completely unmodified. `svelte/sto
 (`writable`/`readable`/`derived`), `svelte/easing`, `svelte/events`,
 `svelte/attachments`, and nearly all of `svelte/reactivity` (`SvelteMap`, `SvelteSet`,
 `SvelteDate`, `SvelteURL`, `createSubscriber`) are pure JavaScript with zero DOM
-dependency, so the DOM-shim adapter never gets in their way.
+dependency, so the adapter never gets in their way.
 
 `svelte/motion` is the exception, and this page used to list it among the pure ones
 by mistake. `Tween` and `Spring` themselves are pure, but the module's entry point

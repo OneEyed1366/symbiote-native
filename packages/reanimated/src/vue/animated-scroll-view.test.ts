@@ -1,7 +1,8 @@
 import { createLiveTree } from '@symbiote-native/test-utils';
 import { mount, unmount } from '@symbiote-native/vue';
-import { h, nextTick } from '@vue/runtime-core';
+import { defineComponent, h, nextTick } from '@vue/runtime-core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { logger } from 'react-native-reanimated/src/common';
 import { WorkletEventHandler } from 'react-native-reanimated/src/WorkletEventHandler';
 import { installWrapperHost } from '../../test-support/wrapper-host';
 import { settle, workletOf } from '../../test-support/worklet';
@@ -9,7 +10,9 @@ import { createAnimatedRef } from '../core/animated-ref';
 import { createSharedValue } from '../core/shared-value';
 import Animated from './animated';
 import { AnimatedScrollView } from './animated-scroll-view';
+import { useAnimatedRef } from './composables/use-animated-ref';
 import { useAnimatedScrollHandler } from './composables/use-animated-scroll-handler';
+import { useScrollOffset } from './composables/use-scroll-offset';
 import '../register';
 
 type IHandler = WorkletEventHandler<object>;
@@ -95,6 +98,26 @@ describe('Animated.ScrollView with a scrollViewOffset', () => {
     await mountScrollView({});
 
     expect(registered).toHaveLength(0);
+  });
+});
+
+describe('useScrollOffset on the ref of an Animated.ScrollView', () => {
+  it('listens to the view, and reports no ref that is still to get one', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    // The offset is asked for in the parent, before the scroll view that takes the ref exists
+    const OffsetHost = defineComponent(() => {
+      const scroller = useAnimatedRef();
+      useScrollOffset(scroller);
+      return () => h(AnimatedScrollView, { ref: scroller });
+    });
+
+    mount(ROOT_TAG, OffsetHost);
+    await nextTick();
+    await settle();
+
+    expect(registered).toHaveLength(1);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 

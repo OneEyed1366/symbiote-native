@@ -1,17 +1,12 @@
-// Svelte's column of the batch-fragmentation and opcode census. See
-// `adapters/solid/src/read-fragmentation.probe.test.tsx` for the shape and why it exists.
-//
-// Svelte is the last of the five and the one that matters most: the device regression under
-// investigation was measured on `examples/svelte`, and a source census says this adapter never
-// navigates the host tree — so it should be the whole-batch case. That prediction is worth checking
-// rather than trusting, which is exactly what F-19 cost: the quadratic was ruled out on Solid by
-// source AND by measurement, and was sitting in Vue.
-//
-// Real `.svelte` source compiled at run time and dynamic-imported, the same way
-// `anchor-flatten-cost.test.ts` does it and for the same reason: no vite-plugin-svelte is wired into
-// this repo's vitest config, and an each-block hand-written against the runtime would not be the
-// thing under test. The row composes a LOCAL Pressable stub over the raw `view` host tag for the
-// reason that file gives — the adapter's own Pressable is itself a `.svelte` file.
+// Svelte's column of the batch-fragmentation and opcode census
+// The shape and the reason are in `adapters/solid/src/read-fragmentation.probe.test.tsx`
+
+// A source census says this adapter never navigates the host tree
+// So it should be the whole-batch case, and the measurement checks that prediction
+
+// Real `.svelte` source is compiled at run time, as `anchor-flatten-cost.test.ts` does
+// No vite-plugin-svelte is wired into vitest, and a hand-written each-block is no real test
+// The row composes a local Pressable stub over the raw `view` tag
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -36,8 +31,7 @@ import { installRecordingFabric } from '@symbiote-native/test-utils';
 
 import { mount, unmount } from './render';
 
-// The same one-time RN-runtime stand-in every Svelte smoke needs: svelte's `init_operations()` reads
-// both at first mount, and `patchGlobals()` deliberately does not set them.
+// RN sets `window` and `navigator` itself, and `init_operations()` of Svelte reads both at mount
 if (globalThis.window === undefined) {
   Object.assign(globalThis, { window: globalThis });
 }
@@ -45,7 +39,7 @@ if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
-const ROOT_TAG = 8819;
+const ROOT_TAG = 8_819;
 const ROWS = 1_000;
 // Its own subfolder: vitest runs test files in parallel and a shared temp dir lets one file's
 // cleanup delete another's freshly written module.
@@ -291,33 +285,29 @@ describe('how far svelte fragments the batch, and what it emits', () => {
     await flush();
     steps.push(['remove 1000', tally()]);
 
-    writeFileSync(
-      fileURLToPath(
-        new URL(
-          '../../../.docs/read-fragmentation-svelte.txt',
-          import.meta.url,
-        ),
+    const report = [
+      'svelte - one drain per commit is the ideal',
+      '',
+      HEADER,
+      ...steps.map(([name, measured]) => row(name, measured)),
+      '',
+      'ops by opcode',
+      ...steps.map(
+        ([name, measured]) =>
+          `${name.padStart(18)}  ${JSON.stringify(measured.byOpcode)}`,
       ),
-      `${[
-        'svelte — one drain per commit is the ideal',
-        '',
-        HEADER,
-        ...steps.map(([name, measured]) => row(name, measured)),
-        '',
-        'ops by opcode',
-        ...steps.map(
-          ([name, measured]) =>
-            `${name.padStart(18)}  ${JSON.stringify(measured.byOpcode)}`,
-        ),
-        '',
-        'setProp by key=value, create',
-        ...Object.entries(steps[0][1].byPropKey)
-          .sort((left, right) => right[1] - left[1])
-          .slice(0, 12)
-          .map(([key, count]) => `${key.padStart(34)}  ${count}`),
-        '',
-      ].join('\n')}\n`,
+      '',
+      'setProp by key=value, create',
+      ...Object.entries(steps[0][1].byPropKey)
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 12)
+        .map(([key, count]) => `${key.padStart(34)}  ${count}`),
+      '',
+    ].join('\n');
+    const reportPath = fileURLToPath(
+      new URL('../../../.docs/read-fragmentation-svelte.txt', import.meta.url),
     );
+    writeFileSync(reportPath, `${report}\n`);
 
     expect(steps).toHaveLength(4);
     for (const [, measured] of steps)

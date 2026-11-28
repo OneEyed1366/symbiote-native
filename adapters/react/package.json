@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/react",
-  "version": "3.4.1",
+  "version": "3.4.2",
   "description": "SymbioteNative's React adapter — a react-reconciler host config (mutation mode) driving real native iOS/Android views through stock React Native Fabric.",
   "license": "MIT",
   "repository": {
@@ -66,6 +66,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run adapters/react/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "typecheck": "tsc --build",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },

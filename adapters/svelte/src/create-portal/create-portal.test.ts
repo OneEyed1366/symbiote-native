@@ -1,19 +1,8 @@
-// Proves Portal (./index.ts) against the fake Fabric slot, driving REAL compiled Svelte sources
-// (no hand-written stand-ins): content authored in one template position commits under a
-// DIFFERENT node's subtree, as that node's DIRECT child, keeps updating there, moves when `mount`
-// changes, leaves when the Portal unmounts, and refuses a target that is not a host node. The
-// Solid twin (adapters/solid/src/create-portal/create-portal.test.tsx) and the React twin assert
-// the same things.
-//
-// Every parentage assertion reads the LIVE tree (`createLiveTree`, over the engine's own child
-// links), never the creation log: a node the app moved keeps its old parent in the log, so
-// parentage after a move only exists in the live tree (.claude/rules/test-harness-false-greens.md
-// §2). Nodes are matched by `testID`, never by `viewName` — the tree is full of RCTViews and "the
-// first one" is somebody else's (§3 of the same file).
-//
-// Harness shape is ../create-tunnel/create-tunnel.test.ts's: compile the real `.svelte` sources at
-// run time and dynamic-import the output, because no vite-plugin-svelte is wired into this repo's
-// vitest config. `Portal` itself needs none of that — it is plain TS and imports directly.
+// Proves Portal (./index.ts) on the fake Fabric slot with REAL compiled Svelte sources
+// Content authored in one place commits as a DIRECT child of another node and follows `mount`
+
+// Parentage assertions read the LIVE tree (`createLiveTree`), nodes are matched by `testID`
+// (.claude/rules/test-harness-false-greens.md), the harness is the one of create-tunnel.test.ts
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -36,9 +25,8 @@ if (globalThis.navigator === undefined) {
   Object.assign(globalThis, { navigator: { product: 'ReactNative' } });
 }
 
-// A fresh rootTag per case. The engine keeps a per-rootTag root container, so reusing one tag
-// across cases lets an earlier case's leftovers answer a later case's assertion — the
-// accumulating-state trap .claude/rules/test-harness-false-greens.md warns about.
+// A fresh `rootTag` per case, because the engine keeps one root per tag
+// (.claude/rules/test-harness-false-greens.md)
 let nextRootTag = 91_500;
 
 const fabric = installRecordingFabric();
@@ -84,12 +72,11 @@ async function load(
   return component;
 }
 
-// The unmount case reports its target back out so the assertion can read the RETAINED tree, which
-// is the only place a leaked (flattened, never-painted) anchor is visible.
-interface IUnmountControl {
+// The unmount case hands its target out to read the retained tree, where a leaked anchor shows
+type IUnmountControl = {
   hide(): void;
-  target(): { engineNode?: ISymbioteNode } | null;
-}
+  target(): ISymbioteNode | null;
+};
 
 let mounted: number | undefined;
 
@@ -130,11 +117,8 @@ function childTestIDs(node: ILiveNode | undefined): unknown[] {
   return (node?.children ?? []).map(child => child.props.testID);
 }
 
-// Every scenario below hangs a host element off `bind:this` and gates the Portal behind
-// `{#if overlay}`. That gate is not decoration: a Svelte host ref is populated by an EFFECT, so
-// it is still null while the template that reads it first runs — the twin of React's callback-ref
-// timing gotcha and of Solid's `<Show when={overlay()}>`. It is also what Portal's own error
-// message tells the caller to do.
+// Every scenario hangs a host element off `{@attach}` and gates the Portal behind `{#if overlay}`
+// The ref is filled by an effect, so it is still null while the template that reads it first runs
 const OVERLAY_TARGET = `
   let overlay = $state.raw(null);
 `;
@@ -165,7 +149,7 @@ describe('Portal', () => {
              </Portal>
            {/if}
          </view>
-         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+         <view p={{ testID: 'overlay-host' }} {@attach node => { overlay = node; return () => { overlay = null; }; }}></view>
        </view>`,
       'portal-basic',
     );
@@ -198,11 +182,8 @@ describe('Portal', () => {
     ).toBe(false);
   });
 
-  // why: the fragment host is retained-tree bookkeeping only. If the engine ever stopped
-  // flattening an anchor's children into its parent (renderableChildren, commit.ts), the portaled
-  // Text would either vanish or gain a wrapper view. This pins it as a DIRECT Fabric child of the
-  // target, which is what makes the surface match React's createPortal rather than the DOM
-  // community pattern, whose container element always survives the move.
+  // The fragment host is bookkeeping only: if the engine stopped flattening an anchor's children,
+  // the portaled Text would vanish or gain a wrapper view, so it is pinned as a DIRECT child
   it('makes the content a direct child of the target, with no wrapper view', async () => {
     const App = await load(
       `<script>
@@ -215,7 +196,7 @@ describe('Portal', () => {
              {#snippet children()}<text p={{ testID: 'ported' }}>direct</text>{/snippet}
            </Portal>
          {/if}
-         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+         <view p={{ testID: 'overlay-host' }} {@attach node => { overlay = node; return () => { overlay = null; }; }}></view>
        </view>`,
       'portal-direct-child',
     );
@@ -230,15 +211,9 @@ describe('Portal', () => {
     ).toEqual(['ported']);
   });
 
-  // why: the content is created under the Portal's own owner but lives in someone else's subtree.
-  // A reactive update has to keep reaching it there — otherwise the portal is a one-shot move and
-  // every dynamic overlay (a toast with a countdown, a live status line) silently freezes.
-  //
-  // The dynamic part is an {#if} at the PORTAL's own children level, swapping whole elements,
-  // deliberately: putting `{label}` inside one <text> would prove nothing about Portal —
-  // that text node's own template_effect owns the update and would satisfy the assertion even if
-  // Portal had handed its snippet over as a dead snapshot (the trap recorded in
-  // .claude/rules/test-harness-false-greens.md).
+  // A reactive update must keep reaching the content in the target, or dynamic overlays freeze
+  // The `{#if}` swaps whole elements, because a `{label}` inside one `<text>` updates itself
+  // even if Portal handed over a dead snapshot (.claude/rules/test-harness-false-greens.md)
   it('keeps updating the content in place after the move', async () => {
     const App = await load(
       `<script>
@@ -260,7 +235,7 @@ describe('Portal', () => {
              {/snippet}
            </Portal>
          {/if}
-         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+         <view p={{ testID: 'overlay-host' }} {@attach node => { overlay = node; return () => { overlay = null; }; }}></view>
        </view>`,
       'portal-reactive',
     );
@@ -298,10 +273,8 @@ describe('Portal', () => {
     ).toBe(true);
   });
 
-  // why: `mount` is documented as reactive. Untested, the effect could quietly freeze on the
-  // first target and nobody would know until an app moved an overlay host. The A-is-empty half is
-  // what separates MOVED from COPIED — the capability row a tunnel answers the other way, since a
-  // tunnel re-creates its content per outlet instead of relocating nodes.
+  // `mount` is reactive, and an empty host A shows the content relocates instead of being copied
+  // A tunnel re-creates its content per outlet
   it('moves the content when `mount` points at a different target', async () => {
     const App = await load(
       `<script>
@@ -319,8 +292,8 @@ describe('Portal', () => {
              {#snippet children()}<text p={{ testID: 'ported' }}>movable</text>{/snippet}
            </Portal>
          {/if}
-         <view p={{ testID: 'host-a' }} bind:this={hostA}></view>
-         <view p={{ testID: 'host-b' }} bind:this={hostB}></view>
+         <view p={{ testID: 'host-a' }} {@attach node => { hostA = node; return () => { hostA = null; }; }}></view>
+         <view p={{ testID: 'host-b' }} {@attach node => { hostB = node; return () => { hostB = null; }; }}></view>
        </view>`,
       'portal-move',
     );
@@ -353,16 +326,9 @@ describe('Portal', () => {
     ).toEqual([]);
   });
 
-  // why: the effect's cleanup must detach the fragment host from a target the Portal does not own.
-  //
-  // The committed-tree half of this test CANNOT fail on its own, and that is worth stating rather
-  // than counting as coverage: deleting the cleanup entirely still leaves the target painting
-  // nothing, because Svelte's own teardown removes the CONTENT from the host and the host is an
-  // anchor the commit walk flattens away. What actually leaks is the empty anchor, which Fabric
-  // never sees. So the falsifiable assertion is the RETAINED-tree one below — the target's engine
-  // child list — and the target is reported back out through `control` for exactly that reason.
-  // Measured: with `return () => {}` in place of the detach, the committed assertion passed and
-  // the retained one failed.
+  // The effect cleanup must detach the fragment host from a target the Portal does not own
+  // The committed tree cannot fail here: the leaked empty anchor is flattened away before Fabric,
+  // so the falsifiable check is the target's retained child list, reported back through `control`
   it('removes the content from the target when the Portal unmounts', async () => {
     const App = await load(
       `<script>
@@ -378,7 +344,7 @@ describe('Portal', () => {
              {#snippet children()}<text p={{ testID: 'ported' }}>transient</text>{/snippet}
            </Portal>
          {/if}
-         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+         <view p={{ testID: 'overlay-host' }} {@attach node => { overlay = node; return () => { overlay = null; }; }}></view>
        </view>`,
       'portal-unmount',
     );
@@ -406,19 +372,16 @@ describe('Portal', () => {
       childTestIDs(findCommitted(byTestID('overlay-host'))),
       'the target paints nothing again',
     ).toEqual([]);
-    // Through the engine's accessor: a node's desired children are derived from its published
-    // record plus its op log, so there is no `children` field to read.
-    const host = control?.target()?.engineNode;
+    // Through the engine's accessor, as a node's children are derived from its op log
+    const host = control?.target();
     expect(
-      host === undefined ? undefined : childrenOf(host as never).length,
-      'and the fragment host itself left the retained tree — no leaked anchor',
+      host === null || host === undefined ? undefined : childrenOf(host).length,
+      'and the fragment host itself left the retained tree, no leaked anchor',
     ).toBe(0);
   });
 
-  // why: the surface is the other member of IPortalTarget and takes a different branch in
-  // attachHost — `host.makeLive(surface)` plus `surface.appendChild`, instead of handing the host
-  // to a shim parent. Untested, that branch would only fail on a real app portaling to the app
-  // root. This is React's `isSurfaceContainer` branch, same boundary.
+  // The surface is the other `IPortalTarget` member and takes its own branch in `attachHost`
+  // (`host.makeLive(surface)` plus `surface.appendChild`), like React's `isSurfaceContainer`
   it('accepts the surface itself as a target', async () => {
     const App = await load(
       `<script>
@@ -461,11 +424,8 @@ describe('Portal', () => {
     ).toBe(false);
   });
 
-  // why: the third member of IPortalTarget, and the one that makes this boundary the SAME as
-  // React's rather than a narrowed one — React's container type is `ISymbioteNode |
-  // SymbioteSurface`, and `hostInstance()` is how a Svelte author unwraps a host ref into exactly
-  // that raw engine node. It takes its own branch in attachHost, the only one that has to source a
-  // surface from the Portal's own call-site anchor because a raw node carries no back-pointer.
+  // A raw engine node is the third `IPortalTarget` member, the one React's container type has too
+  // `hostInstance()` unwraps a host ref into it, and a raw node has no back-pointer to a surface
   it('accepts a raw engine node (hostInstance) as a target', async () => {
     const App = await load(
       `<script>
@@ -482,7 +442,7 @@ describe('Portal', () => {
              </Portal>
            {/if}
          </view>
-         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+         <view p={{ testID: 'overlay-host' }} {@attach node => { overlay = node; return () => { overlay = null; }; }}></view>
        </view>`,
       'portal-raw-node',
     );
@@ -502,16 +462,9 @@ describe('Portal', () => {
     expect(contains(source, ported), 'and it left the call site').toBe(false);
   });
 
-  // why: the guard exists so a wrong `mount` fails at the call site with a message written in
-  // Svelte's own terms (a null `bind:this` ref, the `{#if}` gate) instead of somewhere inside the
-  // engine's appendChild. JSON.parse is how this repo produces an untyped value without an `as`
-  // cast — the React and Solid twins do the same.
-  //
-  // It is caught through `<svelte:boundary onerror>` rather than `expect(() => mount()).toThrow()`:
-  // the target is validated inside the Portal's own `$effect`, so the throw travels Svelte's error
-  // path, not the caller's stack. Measured — asserting on mount() gave "expected function to throw"
-  // while vitest separately reported the very same message as an Uncaught Exception. A boundary is
-  // both the idiomatic Svelte catch and a real assertion instead of a leaked rejection.
+  // A wrong `mount` must fail at the call site with a message in Svelte's terms (`{#if}` gate)
+  // The target is validated in the Portal's `$effect`, so the throw travels Svelte's error path
+  // and is caught with `<svelte:boundary onerror>`, not with `expect(() => mount()).toThrow()`
   it('throws an actionable error for a target that is not a host node', async () => {
     const App = await load(
       `<script>
@@ -545,11 +498,8 @@ describe('Portal', () => {
   });
 });
 
-// The matched pair the whole "portal is not a tunnel" claim rests on. Both halves render the SAME
-// Consumer component, which reads `getContext('origin')`; the only difference is which mechanism
-// relocates it. Portal answers 'call site', createTunnel answers 'out site' — and no amount of
-// tunnel configuration can produce the first answer, because a tunnel's content is re-created by
-// whoever renders the outlet.
+// Both halves render the SAME Consumer, which reads `getContext('origin')`
+// Portal answers 'call site', `createTunnel` answers 'out site'
 describe('Portal vs createTunnel — where the content’s context resolves', () => {
   const CONSUMER_SOURCE = `<script>
      import { getContext } from 'svelte';
@@ -564,11 +514,8 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
    </script>
    {@render children()}`;
 
-  // why: this is the one capability a tunnel cannot reproduce, so it is pinned rather than
-  // asserted in prose. Portal renders the snippet inside its OWN component context — and <Portal>
-  // is written at the call site — so only host nodes move; context, and anything else resolved
-  // from the component tree, still comes from where the content was authored. The overlay host
-  // sits OUTSIDE the provider on purpose.
+  // The one capability a tunnel cannot reproduce: Portal renders the snippet in its own context,
+  // so only host nodes move and context still comes from where the content was authored
   it('Portal: context resolves from the call site, not from where the content landed', async () => {
     await load(CONSUMER_SOURCE, 'ctx-consumer');
     await load(PROVIDER_SOURCE, 'ctx-provider');
@@ -591,7 +538,7 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
          </Provider>
          <Provider origin="landing site">
            {#snippet children()}
-             <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
+             <view p={{ testID: 'overlay-host' }} {@attach node => { overlay = node; return () => { overlay = null; }; }}></view>
            {/snippet}
          </Provider>
        </view>`,
@@ -612,16 +559,13 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
     ).toBeUndefined();
   });
 
-  // why: the other half of the pair. Identical Consumer, identical two providers — TunnelOut
-  // renders the registered snippet inside ITS own component context, so the same content reads
-  // 'landing site'. Two mechanisms, opposite answers: that is the measurement behind "portal and
-  // tunnel do not overlap", not an opinion about naming.
+  // The other half of the pair: `TunnelOut` renders the snippet in ITS own context, so the same
+  // Consumer reads 'landing site'
   it('createTunnel: context resolves from the Out site instead', async () => {
     await load(CONSUMER_SOURCE, 'ctx-tunnel-consumer');
     await load(PROVIDER_SOURCE, 'ctx-tunnel-provider');
-    // Compiled into create-tunnel/ so their own `./tunnel` import still resolves, and named
-    // `-for-portal` because create-tunnel.test.ts owns the unsuffixed paths and deletes them in
-    // its own afterEach — .claude/rules/smoke-compiled-artifact-collisions.md.
+    // Compiled into create-tunnel/ so `./tunnel` resolves, named `-for-portal` to dodge its deletes
+    // (.claude/rules/smoke-compiled-artifact-collisions.md)
     const TUNNEL_DIR = join(__dirname, '../create-tunnel');
     for (const name of ['tunnel-in', 'tunnel-out']) {
       compileToFile(
@@ -668,74 +612,5 @@ describe('Portal vs createTunnel — where the content’s context resolves', ()
       findCommitted(byText('call site')),
       'and NOT where the content was written',
     ).toBeUndefined();
-  });
-});
-
-// Why Portal exists at all when Svelte already has a community portal idiom, measured rather than
-// asserted. The conventional spelling is an ACTION — `use:portal={target}`, whose body is
-// `target.appendChild(node)` plus a `destroy()` that removes it.
-//
-// Two findings, both from the installed svelte 5.56.8. (1) `use:` is a COMPILE ERROR on a
-// component (`component_invalid_directive`), and app code in this adapter never authors a raw host
-// tag, so the community spelling is unreachable from app code by construction — Svelte's own rule,
-// not a shim gap. `{@attach}` / `fromAction` is the reachable equivalent, and this adapter already
-// forwards attachments onto the host tag (runes/attachments.ts). (2) The action BODY works
-// verbatim over the DOM shim, which is what the test below pins — and it still is not React
-// parity, because what it relocates is the ELEMENT the directive sits on. That element is a
-// wrapper view the target now contains, and an action can never move a fragment of several nodes
-// or content that renders no element at all.
-describe('the community `use:portal` action over the DOM shim', () => {
-  it('moves the element it sits on — proving the shim supports it, and why it is not the portal', async () => {
-    const App = await load(
-      `<script>
-         ${OVERLAY_TARGET}
-         // the community action body, verbatim
-         function portal(node, target) {
-           target.appendChild(node);
-           return { destroy() { node.remove(); } };
-         }
-       </script>
-       <view p={{ testID: 'root' }}>
-         <view p={{ testID: 'source' }}>
-           {#if overlay}
-             <view p={{ testID: 'action-wrapper' }} use:portal={overlay}>
-               <text p={{ testID: 'action-ported' }}>via action</text>
-             </view>
-           {/if}
-         </view>
-         <view p={{ testID: 'overlay-host' }} bind:this={overlay}></view>
-       </view>`,
-      'portal-action',
-    );
-
-    mountApp(App);
-    await tick();
-    await tick();
-
-    const overlayHost = findCommitted(byTestID('overlay-host'));
-    const source = findCommitted(byTestID('source'));
-    const ported = findCommitted(byTestID('action-ported'));
-    expect(overlayHost).toBeDefined();
-    expect(source).toBeDefined();
-    expect(ported).toBeDefined();
-    if (
-      overlayHost === undefined ||
-      source === undefined ||
-      ported === undefined
-    ) {
-      throw new Error('unreachable');
-    }
-
-    expect(
-      contains(overlayHost, ported),
-      'the action body relocated a live subtree through the shim — appendChild/remove are enough',
-    ).toBe(true);
-    expect(contains(source, ported), 'and it left the source subtree').toBe(
-      false,
-    );
-    expect(
-      childTestIDs(overlayHost),
-      'but the target gained a WRAPPER view, not the content itself — the gap Portal closes',
-    ).toEqual(['action-wrapper']);
   });
 });

@@ -4,7 +4,10 @@ import { compile } from 'svelte/compiler';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Component } from 'svelte';
-import { installRecordingFabric } from '@symbiote-native/test-utils';
+import {
+  createLiveTree,
+  installRecordingFabric,
+} from '@symbiote-native/test-utils';
 import '../../register';
 import { mount, unmount } from '../../render';
 
@@ -33,6 +36,7 @@ const BOTH_PRESENT =
 const DATA = [{ key: 'i1' }, { key: 'i2' }, { key: 'i3' }];
 
 const fabric = installRecordingFabric();
+const live = createLiveTree(fabric);
 const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 const tick = (): Promise<void> =>
   new Promise(resolve => setTimeout(resolve, 0));
@@ -110,9 +114,7 @@ async function textsOf(
   mount(ROOT_TAG, await loadRoot(withSnippet), { data: DATA, numColumns });
   await tick();
   await tick();
-  return fabric
-    .findAll(node => node.viewName === 'RCTRawText')
-    .map(node => node.props.text);
+  return live.texts(live.appRoot());
 }
 
 describe('Svelte listItemComponent', () => {

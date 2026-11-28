@@ -1,12 +1,6 @@
-// The guard on the tag alphabet svelte-check reads.
-//
-// It resolves the MERGED `svelteHTML.IntrinsicElements` — our augmentation compiled together with
-// svelte2tsx's own shim — rather than reading our declaration alone, because presence is not the
-// property that matters here. The first version of `intrinsic-elements.ts` declared all 21 tags,
-// was loaded (svelte-check's file count moved 635 -> 636) and changed NOTHING: an own member of a
-// merged interface beats an inherited one, so svelte2tsx's `view: HTMLProps<'view', SVGAttributes>`
-// outranked our `extends Record<…>` base on exactly the four names that needed it. A test that
-// only checked our own declaration would have certified that.
+// The guard on the tag alphabet svelte-check reads
+// It resolves the merged `svelteHTML.IntrinsicElements`, our augmentation plus svelte2tsx typings
+// In a merged interface an own member beats an inherited one, so our file alone proves nothing
 import { describe, expect, it } from 'vitest';
 import ts from 'typescript';
 import { createRequire } from 'node:module';
@@ -16,8 +10,7 @@ const require = createRequire(import.meta.url);
 
 const BARREL = join(__dirname, 'index.ts');
 const DECLARATION = join(__dirname, 'intrinsic-elements.ts');
-// The union is the single source of truth for the tag list — never a literal list here, which
-// could not report a name missing from itself.
+// The union is the single source of the tag list, as a literal list could not report a missing name
 const INTRINSIC_UNION = join(
   __dirname,
   '..',
@@ -29,15 +22,12 @@ const INTRINSIC_UNION = join(
   'component-names',
   'shared.ts',
 );
-// svelte2tsx's shim is what an app is really checked against; svelte-check runs it, we do not
-// depend on it, so a resolution failure must be loud rather than a silently skipped arm.
+// The svelte2tsx typings are what an app is checked against, so a resolution failure must be loud
 const SVELTE_JSX = require.resolve('svelte2tsx/svelte-jsx-v4.d.ts');
 
-// The tag names svelte2tsx declares ITSELF, and therefore the ones our `extends Record<…>` base is
-// outranked on. Derived from where the property is DECLARED, never stated — the shim's element list
-// is not ours to predict, and it was written out as four SVG names until `button` joined the
-// alphabet and made the list wrong by one.
-function shimOwnedTags(
+// The tags svelte2tsx declares itself, which outrank our `extends Record<...>` base
+// Derived from where the property is declared, as their element list is not ours to predict
+function typingsOwnedTags(
   checker: ts.TypeChecker,
   elements: ts.Type,
   tags: readonly string[],
@@ -71,15 +61,14 @@ function symbioteTags(checker: ts.TypeChecker, program: ts.Program): string[] {
     .sort();
 }
 
-// The merged namespace symbol: found on the SHIM's declaration, so what comes back carries both
-// its members and our `declare global` ones.
+// The merged namespace symbol, found on the typings declaration so it carries our members too
 function intrinsicElements(
   checker: ts.TypeChecker,
   program: ts.Program,
 ): ts.Type {
-  const shim = program.getSourceFile(SVELTE_JSX);
-  if (shim === undefined) throw new Error(`could not load ${SVELTE_JSX}`);
-  for (const statement of shim.statements) {
+  const typings = program.getSourceFile(SVELTE_JSX);
+  if (typings === undefined) throw new Error(`could not load ${SVELTE_JSX}`);
+  for (const statement of typings.statements) {
     if (!ts.isModuleDeclaration(statement)) continue;
     if (statement.name.text !== 'svelteHTML') continue;
     const namespaceSymbol = checker.getSymbolAtLocation(statement.name);
@@ -89,7 +78,7 @@ function intrinsicElements(
     if (member === undefined) continue;
     return checker.getDeclaredTypeOfSymbol(member);
   }
-  throw new Error('svelteHTML.IntrinsicElements not found in the shim');
+  throw new Error('svelteHTML.IntrinsicElements not found in the typings');
 }
 
 function attributesOf(
@@ -100,8 +89,8 @@ function attributesOf(
   const property = checker.getPropertyOfType(elements, tag);
   if (property === undefined)
     throw new Error(`svelteHTML.IntrinsicElements has no "${tag}"`);
-  // `getTypeOfSymbol`, not `…AtLocation`: the 17 tags svelte2tsx does not name come from our
-  // `extends Record<ISymbioteIntrinsic, …>` base and are SYNTHESIZED, carrying no declaration.
+  // `getTypeOfSymbol`, not `...AtLocation`, as tags svelte2tsx does not name are synthesized
+  // They come from our `extends Record<ISymbioteIntrinsic, ...>` base and carry no declaration
   return checker.getTypeOfSymbol(property);
 }
 
@@ -116,10 +105,8 @@ describe('the svelteHTML tag alphabet', () => {
   });
   const checker = program.getTypeChecker();
   const tags = symbioteTags(checker, program);
-  const elements = intrinsicElements(checker, program);
 
-  // The premise every row below rests on: a checker that resolved nothing would agree with an
-  // empty list and every comparison would pass vacuously.
+  // The premise of every row below, as a checker that resolved nothing passes them vacuously
   it('resolves a real tag union', () => {
     expect(tags.length).toBeGreaterThan(15);
     expect(tags, 'a name only ISymbioteIntrinsic could supply').toContain(
@@ -127,13 +114,14 @@ describe('the svelteHTML tag alphabet', () => {
     );
   });
 
-  // The reachability half. A declaration an app never loads applies inside this package only —
-  // the failure React's `src/jsx.d.ts` shipped with for months. The program is rooted at the
-  // BARREL, so the file appearing here is the barrel having pulled it in.
+  // A declaration an app never loads applies inside this package only
+  // The program is rooted at the barrel, so the file appearing here means the barrel pulled it in
   it('is reachable from the public barrel', () => {
     const loaded = program.getSourceFiles().map(file => file.fileName);
     expect(loaded).toContain(DECLARATION.split('\\').join('/'));
   });
+
+  const elements = intrinsicElements(checker, program);
 
   it('declares every intrinsic', () => {
     const declared = checker
@@ -142,11 +130,9 @@ describe('the svelteHTML tag alphabet', () => {
     expect(tags.filter(tag => !declared.includes(tag))).toEqual([]);
   });
 
-  // The EFFECT half, and the one the first attempt failed. A tag whose name svelte2tsx also owns
-  // must end up carrying OUR shape: `p` present, and a string index signature, which only appears
-  // once the `Omit<…, keyof SVGAttributes>` — or `keyof HTMLAttributes` — in its entry has erased
-  // the DOM surface.
-  it.each(shimOwnedTags(checker, elements, tags))(
+  // A tag svelte2tsx also owns must end up with our shape: `p` present and a string index signature
+  // The index signature shows once the `Omit<...>` has erased the DOM surface
+  it.each(typingsOwnedTags(checker, elements, tags))(
     "gives %s our attributes rather than the DOM's",
     tag => {
       const attributes = attributesOf(checker, elements, tag);
@@ -161,18 +147,16 @@ describe('the svelteHTML tag alphabet', () => {
     },
   );
 
-  // Without this the row above could pass on a shim that never declared those tags, which is the
-  // world in which the two escape interfaces are dead code rather than the load-bearing seam. BOTH
-  // halves are named: the four SVG-element names went through `SVGAttributes` from the start, and
-  // `button` — the first tag here that is a real HTML element — needed `HTMLAttributes`, the second
-  // empty interface the shim offers one line above it.
-  it('is checked against a shim that really owns those tags, on both seams', () => {
-    const shim = program.getSourceFile(SVELTE_JSX);
-    expect(shim?.text).toContain("view: HTMLProps<'view', SVGAttributes>");
-    expect(shim?.text).toContain("button: HTMLProps<'button', HTMLAttributes>");
-    // A tag alphabet with nothing on one of the two seams leaves that half unproven, and a
-    // reader would take the row above as covering it.
-    expect(shimOwnedTags(checker, elements, tags)).toContain('button');
-    expect(shimOwnedTags(checker, elements, tags)).toContain('view');
+  // Without this the row above could pass on typings that never declared those tags
+  // `view` goes through `SVGAttributes` and `button` through `HTMLAttributes`
+  it('is checked against typings that really own those tags, on both seams', () => {
+    const typings = program.getSourceFile(SVELTE_JSX);
+    expect(typings?.text).toContain("view: HTMLProps<'view', SVGAttributes>");
+    expect(typings?.text).toContain(
+      "button: HTMLProps<'button', HTMLAttributes>",
+    );
+    const owned = typingsOwnedTags(checker, elements, tags);
+    expect(owned).toContain('button');
+    expect(owned).toContain('view');
   });
 });

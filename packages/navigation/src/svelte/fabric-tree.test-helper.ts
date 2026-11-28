@@ -42,12 +42,9 @@ export function createNavigationLiveTree(
     findLiveByTestId: (root, testID) =>
       live.findLive(root, node => node.props.testID === testID),
 
-    // Every raw text under a parent that cannot hold one - an invalid Fabric child. The gap Svelte
-    // leaves between two sibling tags compiles to a ' ' text node, and the shim drops it exactly
-    // when the parent takes no raw text (dom-shim/text.ts, svelte-adapter-dom-shim §16b); inside an
-    // RCTText the same string is a real word separator and must survive. So the parent, not the
-    // string, is what makes a raw text legal, and this returns the ones that are not. Formatted
-    // `viewName > "text"` so a failure names the offender.
+    // Every raw text under a parent that cannot hold one, an invalid Fabric child
+    // The gap between sibling tags is a ' ' text node, blanked unless the parent takes raw text
+    // Inside an `RCTText` it is a word separator and survives
     rawTextsOutsideTextContainer: (root): string[] => {
       const found: string[] = [];
       const visit = (node: ILiveNode, parentName: string | undefined): void => {

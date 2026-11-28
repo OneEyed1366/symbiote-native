@@ -1,5 +1,11 @@
 # @symbiote-native/expo-modules-link
 
+## 0.7.1
+
+### Patch Changes
+
+- [#107](https://github.com/OneEyed1366/symbiote-native/pull/107) [`a820567`](https://github.com/OneEyed1366/symbiote-native/commit/a82056755422000cbc4ff64a50b8d84231187add) Thanks [@OneEyed1366](https://github.com/OneEyed1366)! - Internal cleanup and per-package `test` and `lint` scripts. No change in behaviour.
+
 ## 0.7.0
 
 ### Minor Changes

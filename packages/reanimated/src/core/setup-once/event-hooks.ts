@@ -14,7 +14,7 @@ import {
   type IEventHandlerInternal,
 } from '../event-handlers';
 import { observeHandlers } from '../hook-inputs';
-import { observeScrollOffset } from '../scroll';
+import { observeScrollOffsetFromSetup } from '../scroll';
 import { createUseAnimatedScrollHandler } from '../scroll-handler-hook';
 import { createScrollOffsetHooks } from '../scroll-offset-hooks';
 import { snapshotIfWorklet } from '../worklet-snapshot';
@@ -73,7 +73,7 @@ export function createEventHooks(
       useStable: value => value,
       useObservation: (animatedRef, eventHandler, isObserving) => {
         if (animatedRef && isObserving) {
-          onDispose(observeScrollOffset(animatedRef, eventHandler));
+          onDispose(observeScrollOffsetFromSetup(animatedRef, eventHandler));
         }
       },
     }),

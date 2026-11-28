@@ -77,8 +77,24 @@ function settleClaimedHandles(parts: IClassStyleParts): void {
   settleHandles(parts, [parts.classStyle, rawExplicitStyleOf(parts)]);
 }
 
+// The class and style each node last offered, as a style of claimed keys alone publishes the same
+// nothing every time and the publish guard cannot tell one from the next
+const offeredStyles = new WeakMap<
+  IClassStyleParts,
+  readonly [unknown, unknown]
+>();
+
+function isOfferStale(parts: IClassStyleParts): boolean {
+  const offered = offeredStyles.get(parts);
+  if (offered === undefined) return true;
+  return (
+    offered[0] !== parts.classStyle || offered[1] !== rawExplicitStyleOf(parts)
+  );
+}
+
 function offerClaimedStyle(node: ISymbioteNode, parts: IClassStyleParts): void {
   if (!hasStyleClaims()) return;
+  offeredStyles.set(parts, [parts.classStyle, rawExplicitStyleOf(parts)]);
   offerOwnedStyle(node, {
     ...claimedKeysIn(parts.classStyle),
     ...claimedKeysIn(rawExplicitStyleOf(parts)),
@@ -223,7 +239,10 @@ export function pushClassStyle(
   // An unchanged class still reaches this write, т.к. Solid has no diff. The guard keys off
   // `published`, which `setNativeProps` clears, so an imperative restore still re-publishes
   bindStyleHandles(node, parts);
-  if (isAlreadyPublished(parts)) return;
+  if (isAlreadyPublished(parts)) {
+    if (isOfferStale(parts)) offerClaimedStyle(node, parts);
+    return;
+  }
   offerClaimedStyle(node, parts);
   // Emits NO_VALUE rather than `[undefined, undefined]`, so the host skips a real array with one
   // pointer check instead of building and diffing a `folly::dynamic`

@@ -6,9 +6,10 @@
     contactAccessButtonViewName,
     ensureContactAccessButtonRegistered,
   } from '../core/contact-access-button';
+  import type { IViewProps } from '@symbiote-native/svelte';
   import type { IContactAccessButtonProps } from '../core/contact-access-button';
 
-  const props: IContactAccessButtonProps = $props();
+  const props: IContactAccessButtonProps & Pick<IViewProps, 'class'> = $props();
   const isRegistered = ensureContactAccessButtonRegistered();
   const viewName = contactAccessButtonViewName();
 </script>

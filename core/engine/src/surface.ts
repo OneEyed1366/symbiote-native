@@ -28,7 +28,7 @@ import {
   notifyCommitted,
   registerSurfaceCommit,
 } from './imperative';
-import { runPostCommitHooks } from './post-commit';
+import { runPostCommitHooks, runPreCommitHooks } from './post-commit';
 import { releaseNodeBindings } from './node-binding';
 import {
   appendChild,
@@ -125,6 +125,7 @@ export class SymbioteSurface {
 
     // The teardown half runs after the ops are applied, since a parent read needs the removal.
     // It runs before the root completes, so parting writes ride this commit
+    runPreCommitHooks();
     flushOps();
     // Guarded at the call site, not inside the sweep — this.children is a host read that builds the
     // whole top-level list, and it would run on every commit for a sweep with nothing to do.

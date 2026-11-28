@@ -16,6 +16,10 @@ function inlineDebugFlag({ types: t }) {
   };
 }
 
+// Bundle Mode keeps worklets out of `eval`, which on Hermes V1 costs about 0.5 MB per function
+// It needs `bundleModeMetroConfig` in metro.config.js as well
+const workletsPluginOptions = { bundleMode: true };
+
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
@@ -40,6 +44,6 @@ module.exports = {
     require('@symbiote-native/angular/babel-linker'),
     inlineDebugFlag,
     // Has to stay last in this list
-    'react-native-worklets/plugin',
+    ['react-native-worklets/plugin', workletsPluginOptions],
   ],
 };

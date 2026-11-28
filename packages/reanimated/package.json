@@ -1,6 +1,6 @@
 {
   "name": "@symbiote-native/reanimated",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "react-native-reanimated 4 and react-native-worklets for SymbioteNative — one framework-agnostic core over the upstream hook helpers, reachable from the adapters. Shared values, animated styles, layout animations and CSS animations on the UI thread.",
   "license": "MIT",
   "keywords": [
@@ -83,6 +83,8 @@
     }
   },
   "scripts": {
+    "test": "pnpm -C ../.. exec vitest run packages/reanimated/ --passWithNoTests",
+    "lint": "eslint \"**/*.{ts,tsx}\" package.json --no-error-on-unmatched-pattern",
     "typecheck": "tsc --build",
     "build": "node scripts/rewrite-upstream-declarations.mjs build",
     "clean": "rm -rf build-ngc",
@@ -103,7 +105,7 @@
     "react-native-reanimated": "~4.7.1",
     "react-native-worklets": "~0.13.0",
     "solid-js": ">=1.9.0",
-    "svelte": ">=5.56.0",
+    "svelte": ">=5.59.1",
     "vue": ">=3.5.0"
   },
   "peerDependenciesMeta": {

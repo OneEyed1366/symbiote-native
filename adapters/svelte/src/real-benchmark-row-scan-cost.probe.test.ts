@@ -1,13 +1,9 @@
-// Closes an honest gap in F-83's verification: `each-append-scan-cost.probe.test.ts` used a
-// simplified `<view><text>` stand-in row, not the real `examples/svelte/components/
-// BenchmarkRow.svelte` (10 native views/row: two Pressables with their own children snippets, an
-// unconditional TextInput). A component with a children snippet is exactly the shape CLAUDE.md's
-// own anchor census (`svelte-adapter-dom-shim` §33) flags as anchor-bearing — so this file exists
-// to rule out (or confirm) that BenchmarkRow's extra internal structure pushes the each-block's
-// ref further from the end of the LIST's own `children` array than `TAIL_SCAN_WINDOW` (8) covers,
-// which the simplified stand-in structurally cannot exercise (its row is a single flat element,
-// BenchmarkRow is a whole component instance with its own subtree). Real source, real compiler,
-// no mirror.
+// Scan cost of the each-block against the real `examples/svelte/components/BenchmarkRow.svelte`
+// `each-append-scan-cost.probe.test.ts` uses a flat stand-in row, this one the production row shape
+
+// A row with children snippets is anchor-bearing, so its subtree may push the each-block's anchor
+// further from the end of the list than a flat row does
+// Real source, real compiler, no mirror
 import { afterEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -16,6 +12,7 @@ import type { Component } from 'svelte';
 import { installRecordingFabric } from '@symbiote-native/test-utils';
 import './register';
 import { mount, unmount } from './render';
+import { countLongNodeScans } from './renderer-harness';
 
 if (globalThis.window === undefined)
   Object.assign(globalThis, { window: globalThis });
@@ -25,6 +22,8 @@ if (globalThis.navigator === undefined)
 installRecordingFabric();
 
 const ROOT_TAG = 91_888;
+const STANDING = 1_000;
+const APPENDED = 200;
 const TMP_DIR = join(__dirname, '../build/__smoke__/real-row-scan-cost');
 const ROW_SOURCE_PATH = resolve(
   __dirname,
@@ -54,7 +53,7 @@ function buildRows(
   }));
 }
 
-async function compileFile(source: string, name: string): Promise<Component> {
+function compileToFile(source: string, name: string): string {
   mkdirSync(TMP_DIR, { recursive: true });
   const file = join(TMP_DIR, `${name}.mjs`);
   writeFileSync(
@@ -66,71 +65,62 @@ async function compileFile(source: string, name: string): Promise<Component> {
       css: 'external',
     }).js.code,
   );
-  const { default: exported } = (await import(`file://${file}`)) as {
-    default: Component;
-  };
-  return exported;
+  return file;
 }
 
-describe('real BenchmarkRow.svelte: shim-level scan cost under the actual production row shape', () => {
-  it('appends 200 real rows onto 1000 standing without falling back to a full scan', async () => {
-    const rowSource = readFileSync(ROW_SOURCE_PATH, 'utf8');
-    const RowOut = join(TMP_DIR, 'BenchmarkRow.mjs');
-    mkdirSync(TMP_DIR, { recursive: true });
-    writeFileSync(
-      RowOut,
-      compile(rowSource, {
-        generate: 'client',
-        filename: 'BenchmarkRow.svelte',
-        fragments: 'tree',
-        css: 'external',
-      }).js.code,
+async function loadComponent(file: string): Promise<Component> {
+  const mod: unknown = await import(`file://${file}`);
+  if (mod === null || typeof mod !== 'object' || !('default' in mod))
+    throw new Error(`${file} produced no default export`);
+  const component: unknown = mod.default;
+  if (typeof component !== 'function')
+    throw new Error(`${file} default export is not a component`);
+  return component;
+}
+
+function appendRows(more: unknown): void {
+  const append: unknown = Reflect.get(globalThis, '__appendRows');
+  if (typeof append !== 'function') throw new Error('the probe has no append');
+  append(more);
+}
+
+function appSourceFor(rowFile: string): string {
+  return [
+    '<script>',
+    `  import BenchmarkRow from '${rowFile}';`,
+    '  let { rows: initialRows } = $props();',
+    '  let rows = $state(initialRows);',
+    '  globalThis.__appendRows = (more) => { rows = rows.concat(more); };',
+    '  const noop = () => {};',
+    '</script>',
+    '',
+    '{#each rows as row (row.id)}',
+    '  <BenchmarkRow {row} isSelected={false} onSelect={noop} onRemove={noop} />',
+    '{/each}',
+  ].join('\n');
+}
+
+describe('real BenchmarkRow.svelte: linear node lookups under the production row shape', () => {
+  it('appends 200 real rows onto 1000 standing without a scan of the list', async () => {
+    const rowFile = compileToFile(
+      readFileSync(ROW_SOURCE_PATH, 'utf8'),
+      'BenchmarkRow',
+    );
+    const App = await loadComponent(
+      compileToFile(appSourceFor(rowFile), 'App'),
     );
 
-    const APP_SOURCE = [
-      '<script>',
-      `  import BenchmarkRow from '${RowOut}';`,
-      '  let { rows: initialRows } = $props();',
-      '  let rows = $state(initialRows);',
-      '  globalThis.__appendRows = (more) => { rows = rows.concat(more); };',
-      '  const noop = () => {};',
-      '</script>',
-      '',
-      '{#each rows as row (row.id)}',
-      '  <BenchmarkRow {row} isSelected={false} onSelect={noop} onRemove={noop} />',
-      '{/each}',
-    ].join('\n');
-    const App = await compileFile(APP_SOURCE, 'App');
-
-    const STANDING = 1_000;
-    const APPENDED = 200;
-
+    const mountCounter = countLongNodeScans();
     mount(ROOT_TAG, App, { rows: buildRows(0, STANDING) });
     await settle();
+    const mountScans = mountCounter.stop();
 
-    const { takeShimScanStats } = await import('./dom-shim/shim-node');
-    const mountStats = takeShimScanStats();
-
-    const appendRows = (
-      globalThis as { __appendRows?: (more: unknown) => void }
-    ).__appendRows;
-    expect(typeof appendRows, 'the probe could drive an append').toBe(
-      'function',
-    );
-    appendRows?.(buildRows(STANDING, APPENDED));
+    const appendCounter = countLongNodeScans();
+    appendRows(buildRows(STANDING, APPENDED));
     await settle();
+    const appendScans = appendCounter.stop();
 
-    const appendStats = takeShimScanStats();
-    console.log(
-      `DEBUG real BenchmarkRow: mount(calls=${String(mountStats.calls)} scanned=${String(mountStats.scanned)}) ` +
-        `append(calls=${String(appendStats.calls)} scanned=${String(appendStats.scanned)})`,
-    );
-
-    // THE FINDING this file exists to establish: does a real, fully-featured row (Pressables with
-    // children snippets, an unconditional TextInput) push the each-block's ref further from the
-    // list's own array end than the simplified stand-in did? A nonzero reading here means yes —
-    // `TAIL_SCAN_WINDOW` needs raising, not that the mechanism itself is wrong.
-    expect(mountStats.calls).toBe(0);
-    expect(appendStats.calls).toBe(0);
+    expect(mountScans, 'building the list from empty').toBe(0);
+    expect(appendScans, 'growing the standing list').toBe(0);
   });
 });

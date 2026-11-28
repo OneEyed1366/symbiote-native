@@ -21,8 +21,8 @@ import {
   stopProfiling,
 } from './harness';
 
-// Set by the runner from `SYMBIOTE_PROFILE_DIR`: non-empty samples each tag's CREATE into
-// `<dir>/<arm>-<tag>-create.json`. Never read a PRIM line from such a run.
+// From `SYMBIOTE_PROFILE_DIR`: non-empty samples each tag's CREATE into
+// `<dir>/<arm>-<tag>-create.json`, and a PRIM line of such a run is not a timing
 declare const __SYMBIOTE_PROFILE_DIR__: string;
 declare const __DEV__: boolean;
 const PROFILE_HZ = 10_000;
@@ -36,7 +36,7 @@ export const ITEM_STYLE = { width: 40, height: 20 } as const;
 export const UPDATED_STYLE = { width: 40, height: 20, opacity: 0.5 } as const;
 export const CHILD_STYLE = { width: 10, height: 10 } as const;
 
-/** What an arm renders inside the tag. `label` is the item's text; `view` a styled child view. */
+/** What an arm renders inside the tag: `label` is the item's text, `view` a styled child view */
 export type IPrimitiveChild = 'none' | 'label' | 'view';
 
 export type IPrimitiveSpec = {
@@ -46,7 +46,7 @@ export type IPrimitiveSpec = {
   readonly child: IPrimitiveChild;
   /** A tag the item must sit inside (`refresh-control` is only meaningful under a scroll view). */
   readonly parent?: string;
-  /** Committed nodes per item, pinned. Undefined prints the census and fails. */
+  /** Committed nodes per item, pinned: `undefined` prints the census and fails */
   readonly nodesPerItem: number | undefined;
   /** Items per step when a thousand is not a real workload (a hidden modal each). */
   readonly count?: number;
@@ -117,8 +117,8 @@ export const PRIMITIVE_SPECS: readonly IPrimitiveSpec[] = [
   { tag: 'scroll-view', props: {}, child: 'none', nodesPerItem: 2 },
   { tag: 'horizontal-scroll-view', props: {}, child: 'none', nodesPerItem: 2 },
   { tag: 'safe-area-view', props: {}, child: 'none', nodesPerItem: 1 },
-  // [characterization — behavior not confirmed] QUESTION: RN's Modal.js returns null while not
-  // visible (`Modal.js:280-288`), so stock commits ZERO nodes here; we commit a ModalHostView each.
+  // [characterization - behavior not confirmed] QUESTION: RN's Modal.js returns null while not
+  // visible (`Modal.js:280-288`), so stock commits ZERO nodes here and we a ModalHostView each
   {
     tag: 'modal',
     props: { visible: false },
@@ -284,6 +284,27 @@ function printRun(run: IPrimitiveRun): void {
   );
 }
 
+// Kept apart so the spec loop reads alone: what the steps borrow from the host and give back
+function borrowHost(): () => string[] {
+  const reported: string[] = [];
+  const printError = console.error;
+  console.error = (...parts: unknown[]): void => {
+    reported.push(String(parts[0]).split('\n')[0] ?? '');
+    printError(...parts);
+  };
+  // A device runs the frame after the commit a step times, so a frame asked for here stays pending
+  const requestFrame: unknown = Reflect.get(
+    globalThis,
+    'requestAnimationFrame',
+  );
+  Reflect.set(globalThis, 'requestAnimationFrame', () => 0);
+  return () => {
+    console.error = printError;
+    Reflect.set(globalThis, 'requestAnimationFrame', requestFrame);
+    return reported;
+  };
+}
+
 // Runs the five steps for every spec and prints one line per tag. The grep target is
 // `PRIM <arm> <tag> create=.. update=.. swap=.. remove=.. clear=.. createKB=..`, where each wall
 // clock is a SINGLE run, so a reader takes the minimum across runs
@@ -291,6 +312,7 @@ export async function runPrimitiveSuite(
   driver: IPrimitiveDriver,
   specs: readonly IPrimitiveSpec[] = PRIMITIVE_SPECS,
 ): Promise<void> {
+  const returnHost = borrowHost();
   const unpinned: string[] = [];
   const unbudgeted: string[] = [];
   for (const spec of specs) {
@@ -308,7 +330,9 @@ export async function runPrimitiveSuite(
     if (!gateCreateBytes(driver, spec.tag, run.createBytes))
       unbudgeted.push(spec.tag);
   }
-  // Pinning is a gate, not a note: an unpinned tag fails the file after printing its census.
+  // A step that throws in a commit times less work than a device does
+  expect(returnHost()).toEqual([]);
+  // Pinning is a gate, not a note: an unpinned tag fails the file after printing its census
   expect(unpinned).toEqual([]);
   expect(unbudgeted).toEqual([]);
 }

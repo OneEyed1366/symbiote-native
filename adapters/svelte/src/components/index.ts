@@ -1,13 +1,9 @@
-// `View`, `Text`, `SafeAreaView`, `Pressable`, `Switch`, `TextInput`, `Image`,
-// `InputAccessoryView` and `ActivityIndicator` are NOT here, and there is nothing to import in their place: each is an
-// intrinsic tag an app writes directly (`<view>`, `<text>`, `<pressable>`, …). Their prop types
-// stay — they are what a component forwarding a bag types itself against — and the tag alphabet is
-// declared to svelte-check in `../intrinsic-elements.ts`.
-//
-// What used to live in each wrapper body now lives one layer down: the `id -> nativeID` alias and
-// Text's RN defaults in `foldHostBag` (the shim's `p` setter and `setAttribute` both cross it), the
-// aria/role fold in the engine's `fabricProps`, and the press / controlled-value / switch machines
-// in `core/components/src/behaviors/*`, wired by `../register`.
+// `View`, `Text`, `Pressable`, `Switch`, `TextInput`, `Image` and the like are tags, not components
+// An app writes `<view>` directly, and only their prop types stay, for a component forwarding a bag
+// The tag alphabet is declared to svelte-check in `../intrinsic-elements.ts`
+
+// Their behavior lives one layer down, in the engine's `fabricProps` and `core/components`
+// The `id -> nativeID` alias and Text's defaults are in `foldHostBag`
 export type { IViewProps } from './view-props';
 export type { ITextProps } from './text-props';
 

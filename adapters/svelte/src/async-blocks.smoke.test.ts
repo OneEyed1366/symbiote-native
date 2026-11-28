@@ -1,21 +1,13 @@
-// The DEFERRED half of `{#await}` / `<svelte:boundary>` — the paths that actually allocate
-// `document.createDocumentFragment()` and render OFFSCREEN before splicing the result in.
-//
-// Why this needs its own file: those paths are gated on Svelte's async mode.
-// `should_defer_append()` (dom/operations.js) short-circuits on `async_mode_flag`, so
-// `BranchManager`'s offscreen branch and `<svelte:boundary>`'s `pending` snippet
-// (dom/blocks/boundary.js:272/305 — `createDocumentFragment` + `move_effect`) are UNREACHABLE
-// unless the component was compiled with `experimental: { async: true }`. The sibling
-// await-block/boundary smokes compile with this repo's own svelte.config.js options, which do
-// not set it, so they exercise the synchronous branch path only. That flag is turned on by a
-// module side effect (`svelte/internal/flags/async`, emitted into the compiled output) and is
-// process-wide with no supported way back, hence a separate file — vitest isolates each test
-// file's module registry.
-//
-// This is the §17 shape at full strength: a subtree is rendered into a LIVE parent, moved into an
-// offscreen fragment, and spliced back later. Assertions check the exact committed Fabric child
-// list, because the failure mode is a node that is present twice, or still present after being
-// moved away.
+// The deferred half of `{#await}` and `<svelte:boundary>`, which render offscreen into a fragment
+// and splice the result in
+
+// It needs its own file, as those paths are gated on Svelte's async mode
+// Without `experimental: { async: true }` the offscreen branch is unreachable
+
+// That flag is process-wide with no way back, and vitest isolates each file's module registry
+
+// A subtree is rendered into a live parent, moved into an offscreen fragment and spliced back
+// Assertions check the exact committed child list, as a node may be present twice or left behind
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { compile } from 'svelte/compiler';
@@ -122,26 +114,23 @@ function deferred(): IDeferred {
   return { promise, resolve };
 }
 
-// No Negative group: mount() never throws in async mode either — every scenario below is the
-// offscreen-fragment machinery running correctly, not an input being rejected.
+// No Negative group, as `mount()` never throws in async mode either
 describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', () => {
-  // why: a live branch swap after the first render must route through the offscreen fragment
-  // without leaving a stale or duplicate node — the exact §17-adjacent bug class this repo has
-  // already been bitten by once (detachFromParent never unlinking the engine node).
+  // A live branch swap after the first render goes through the offscreen fragment
+  // It must leave no stale or duplicate node, such as an engine node never unlinked
   it('swaps branches through the OFFSCREEN fragment when a new promise arrives post-mount', async () => {
     const Awaiter = await compileComponent(
       `<script>
          let { control } = $props();
          let current = $state(control.initial);
          control.swap = next => { current = next; };
-       </script>` +
-        `{#await current}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>` +
-        `{:then value}<view p={{ testID: 'then' }}><text p={{}}>{value}</text></view>{/await}`,
+       </script>
+       {#await current}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>
+       {:then value}<view p={{ testID: 'then' }}><text p={{}}>{value}</text></view>{/await}`,
       'DeferredAwaiter',
     );
 
     const first = deferred();
-    const second = deferred();
     const control: {
       initial: Promise<string>;
       swap: (next: Promise<string>) => void;
@@ -160,9 +149,9 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     expect(testIds()).toEqual(['then']);
     expect(serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "one"))');
 
-    // Back to pending, then forward again — each transition now runs inside an effect that has
-    // already fired once, which is exactly the `REACTION_RAN` condition should_defer_append()
-    // tests, so these two swaps take the offscreen-fragment route the first one did not.
+    // Back to pending, then forward again, inside an effect that already fired once
+    // That is the `REACTION_RAN` condition of `should_defer_append()`, so the swaps go offscreen
+    const second = deferred();
     control.swap(second.promise);
     await tick();
     await tick();
@@ -175,22 +164,16 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     expect(serialize(appChildren())).toBe('RCTView(RCTText(RCTRawText "two"))');
   });
 
-  // why: a top-level `await` inside a boundary must render into the live anchor, get moved
-  // offscreen while its promise is pending, and be spliced back exactly once when it settles —
-  // never left visible during the pending window and never committed twice.
+  // A top-level `await` in a boundary is parked offscreen while pending, then spliced back once
+  // It is never visible meanwhile and never committed twice
   it('shows a boundary pending snippet, then splices the awaited child in from its offscreen fragment', async () => {
-    // A component with top-level `await` suspends to the nearest boundary carrying a `pending`
-    // snippet. That drives boundary.js's `#render`: children render into the LIVE anchor first,
-    // then `move_effect` rips them into a fresh DocumentFragment, and `#anchor.before(fragment)`
-    // splices them back once the promise settles. A shim that detaches a node from its shim
-    // parent without also detaching its engine node would leave the child painted the whole time
-    // and then committed twice.
+    // `move_effect` parks the children in a fresh fragment, and the boundary splices them back
+    // A renderer that detaches a node without its engine node would paint the child throughout
     compileToFile(
       `<script>
          let { gate } = $props();
          const label = await gate.promise;
-       </script>` +
-        `<view p={{ testID: 'child' }}><text p={{}}>{label}</text></view>`,
+       </script><view p={{ testID: 'child' }}><text p={{}}>{label}</text></view>`,
       'AwaitingChild',
       AWAITING_CHILD_MODULE,
     );
@@ -199,11 +182,10 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
       `<script>
          import Child from './${AWAITING_CHILD_MODULE}';
          let { gate } = $props();
-       </script>` +
-        `<svelte:boundary>` +
-        `<Child {gate} />` +
-        `{#snippet pending()}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>{/snippet}` +
-        `</svelte:boundary>`,
+       </script>
+       <svelte:boundary><Child {gate} />
+       {#snippet pending()}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>{/snippet}
+       </svelte:boundary>`,
       'PendingBoundary',
     );
 
@@ -212,8 +194,7 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     await tick();
     await tick();
 
-    // Only the pending snippet may be committed: the child's own nodes were built, then moved
-    // offscreen, and must not still be in the native tree.
+    // Only the pending snippet may be committed, as the child's nodes moved offscreen
     expect(testIds()).toEqual(['pending']);
     expect(serialize(appChildren())).toBe(
       'RCTView(RCTText(RCTRawText "loading"))',
@@ -224,29 +205,24 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
     await tick();
     await tick();
 
-    // Exactly one child, once — not the child twice, and not pending plus child.
+    // Exactly one child, once, and not pending plus child
     expect(testIds()).toEqual(['child']);
     expect(serialize(appChildren())).toBe(
       'RCTView(RCTText(RCTRawText "resolved"))',
     );
   });
 
-  // why: a sibling that already committed synchronously must ALSO be genuinely removed from the
-  // native tree when move_effect parks it offscreen — not merely detached from the shim tree
-  // while its engine node keeps painting underneath the pending snippet.
+  // A sibling already committed synchronously must leave the native tree too when `move_effect`
+  // parks it offscreen, not just the renderer's own bookkeeping
   it('hides an ALREADY-PAINTED sibling that move_effect drags into the offscreen fragment', async () => {
-    // The sharpest version of the previous test. Here the boundary's children include a plain
-    // element that renders SYNCHRONOUSLY into the live anchor before the awaiting child bumps the
-    // pending count — so `move_effect` moves a node that already has a committed engine node into
-    // a fragment that has none. `fragment.append(liveNode)` in real DOM takes the node OUT of the
-    // document; the shim must make the same thing true of the engine tree, or the sibling keeps
-    // painting underneath the pending snippet.
+    // The boundary's plain element renders into the live anchor before the awaiting child bumps
+    // the pending count, so `move_effect` moves a node whose engine node is already committed
+    // Appending it to a fragment takes it out of the document, and the engine tree must follow
     compileToFile(
       `<script>
          let { gate } = $props();
          const label = await gate.promise;
-       </script>` +
-        `<view p={{ testID: 'child' }}><text p={{}}>{label}</text></view>`,
+       </script><view p={{ testID: 'child' }}><text p={{}}>{label}</text></view>`,
       'AwaitingChild',
       AWAITING_CHILD_MODULE,
     );
@@ -255,12 +231,11 @@ describe('deferred {#await} / <svelte:boundary pending> (svelte async mode)', ()
       `<script>
          import Child from './${AWAITING_CHILD_MODULE}';
          let { gate } = $props();
-       </script>` +
-        `<svelte:boundary>` +
-        `<view p={{ testID: 'sibling' }}><text p={{}}>sync</text></view>` +
-        `<Child {gate} />` +
-        `{#snippet pending()}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>{/snippet}` +
-        `</svelte:boundary>`,
+       </script>
+       <svelte:boundary><view p={{ testID: 'sibling' }}><text p={{}}>sync</text></view>
+       <Child {gate} />
+       {#snippet pending()}<view p={{ testID: 'pending' }}><text p={{}}>loading</text></view>{/snippet}
+       </svelte:boundary>`,
       'PendingBoundaryWithSibling',
     );
 

@@ -22,8 +22,9 @@ import { registerButtonBehavior, BUTTON_TAG } from './button';
 import { RESTING_OPACITY } from '../state/touchable';
 
 const fabric = installRecordingFabric();
-const live = createLiveTree(fabric);
-let nextRootTag = 7300;
+// The empty-title test is about the label node staying put, not about what is painted
+const live = createLiveTree(fabric, { keepBlankText: true });
+let nextRootTag = 7_300;
 
 // The composed TouchableOpacity fade drives its frame loop off requestAnimationFrame, which Node
 // does not have. The ~16ms setTimeout shim `touchable-opacity.test.ts` installs, verbatim.
@@ -438,27 +439,24 @@ describe('button host behavior', () => {
   // the rename is `routeProp`'s alone now (see `button-android.test.ts` for the Android arm
   // that makes it necessary; iOS passes either way).
   it('folds `id` to `nativeID`, with id winning', async () => {
-    for (const props of [{ id: 'from-id', nativeID: 'losing-value' }]) {
-      vi.useFakeTimers();
-      fabric.reset();
-      clearHostBehaviors();
-      registerButtonBehavior();
-      const node = makeButton();
-      routeProp(node, 'testID', TEST_ID);
-      routeProp(node, 'title', 'Save');
-      for (const [key, value] of Object.entries(props))
-        routeProp(node, key, value);
-      mount(node);
-      await settle();
+    vi.useFakeTimers();
+    fabric.reset();
+    clearHostBehaviors();
+    registerButtonBehavior();
+    const node = makeButton();
+    routeProp(node, 'testID', TEST_ID);
+    routeProp(node, 'title', 'Save');
+    routeProp(node, 'id', 'from-id');
+    routeProp(node, 'nativeID', 'losing-value');
+    mount(node);
+    await settle();
 
-      const { host } = subtreeOf(TEST_ID);
-      // RN gives `id` unconditional priority over `nativeID` (View.js:77-79).
-      expect(host.payload.nativeID).toBe('from-id');
-      // A raw `id` is a key no ViewConfig declares, so Fabric drops it and the label is lost with
-      // nothing red — the strip is only ever visible here.
-      expect(host.payload.id).toBeUndefined();
-      vi.useRealTimers();
-    }
+    const { host } = subtreeOf(TEST_ID);
+    // RN gives `id` unconditional priority over `nativeID` (View.js:77-79)
+    expect(host.payload.nativeID).toBe('from-id');
+    // A raw `id` is a key no ViewConfig declares, so Fabric drops it and the label is lost
+    expect(host.payload.id).toBeUndefined();
+    vi.useRealTimers();
   });
 
   // The control. Without a registration the tag is a bare view: no subtree, no label, no listener —

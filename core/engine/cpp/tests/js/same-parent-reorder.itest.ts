@@ -1,6 +1,5 @@
-// Reproduces shim-node.ts's `insertOne`: `removeChild` from the current parent, then
-// `insertBefore` into that SAME parent, both before one commit, the shape a keyed
-// `{#each}` reorder emits
+// `removeChild` from the current parent, then `insertBefore` into that SAME parent, both before
+// one commit, which is the shape a keyed `{#each}` reorder emits
 
 import {
   appendChild,
@@ -49,24 +48,24 @@ function mountedOrder(): string[] {
 describe('same-parent reorder, remove and insertBefore coalesced into one commit', () => {
   it('commits the new order when a mid child moves before an earlier sibling', () => {
     const parent = createElement('RCTView');
-    const a = tile('a');
-    const b = tile('b');
-    const c = tile('c');
-    const d = tile('d');
-    appendChild(parent, a);
-    appendChild(parent, b);
-    appendChild(parent, c);
-    appendChild(parent, d);
+    const first = tile('a');
+    const second = tile('b');
+    const third = tile('c');
+    const fourth = tile('d');
+    appendChild(parent, first);
+    appendChild(parent, second);
+    appendChild(parent, third);
+    appendChild(parent, fourth);
 
     const surface = createSurface(1);
     surface.appendChild(parent);
     surface.commit();
     expect(order()).toEqual(['a', 'b', 'c', 'd']);
 
-    // mirrors `insertOne(c, b)`: detach records `removeChild`, then the insert records
-    // `insertBefore` into the same parent, both before the next `commit()`
-    removeChild(parent, c);
-    insertBefore(parent, c, b);
+    // detach records `removeChild`, then the insert records `insertBefore` into the same parent,
+    // both before the next `commit()`
+    removeChild(parent, third);
+    insertBefore(parent, third, second);
     surface.commit();
 
     expect(order()).toEqual(['a', 'c', 'b', 'd']);
@@ -79,20 +78,20 @@ describe('same-parent reorder, remove and insertBefore coalesced into one commit
 
   it('commits the new order when a child moves to the tail', () => {
     const parent = createElement('RCTView');
-    const a = tile('a');
-    const b = tile('b');
-    const c = tile('c');
-    appendChild(parent, a);
-    appendChild(parent, b);
-    appendChild(parent, c);
+    const first = tile('a');
+    const second = tile('b');
+    const third = tile('c');
+    appendChild(parent, first);
+    appendChild(parent, second);
+    appendChild(parent, third);
 
     const surface = createSurface(1);
     surface.appendChild(parent);
     surface.commit();
     expect(order()).toEqual(['a', 'b', 'c']);
 
-    removeChild(parent, a);
-    appendChild(parent, a);
+    removeChild(parent, first);
+    appendChild(parent, first);
     surface.commit();
 
     expect(order()).toEqual(['b', 'c', 'a']);

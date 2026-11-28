@@ -73,6 +73,18 @@ export function movedSince(stamps, installed) {
     .map(([name, stamp]) => ({ name, version: stamp.version }));
 }
 
+// Empty when nothing moved. `npm install --no-save` restores what the lockfile pins, so a targeted
+// install also names every package pinned at other bytes, earlier targeted installs among them
+export function packagesToInstall(stamps, installed, pinned) {
+  if (movedSince(stamps, installed).length === 0) return [];
+  return Object.entries(stamps)
+    .filter(
+      ([name, { integrity }]) =>
+        installed[name] !== integrity || pinned[name] !== integrity,
+    )
+    .map(([name, { version }]) => ({ name, version }));
+}
+
 // The example packages a targeted install must replace: those the example declares and that moved
 export function declaredAmong(manifest, changedNames) {
   const declared = {

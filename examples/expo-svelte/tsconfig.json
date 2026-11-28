@@ -1,7 +1,8 @@
 {
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "types": ["node"],
+    // The adapter types the native tags, and a screen may import nothing from it
+    "types": ["node", "@symbiote-native/svelte"],
     "plugins": [{ "name": "@symbiote-native/css-parser/typescript-plugin" }]
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.svelte"],

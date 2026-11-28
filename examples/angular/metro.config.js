@@ -2,22 +2,20 @@ const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
 const {
   withSymbioteAngularMetroConfig,
 } = require('@symbiote-native/angular/metro-config');
+const { bundleModeMetroConfig } = require('react-native-worklets/bundleMode');
 
 const projectRoot = __dirname;
 
 const defaultConfig = getDefaultConfig(projectRoot);
+const angularResolver = withSymbioteAngularMetroConfig(
+  defaultConfig,
+  projectRoot,
+).resolver;
 
 /**
- * Angular is the one adapter that needs a pre-Metro compile step: ngc writes partial-Ivy JS,
- * then Babel's Angular linker plugin (babel.config.js) runs inside Metro and turns that
- * partial output into full Ivy. @symbiote-native/angular and @symbiote-native/slider build this
- * themselves via their own `prepare` script (runs automatically on `npm install`) and point
- * their package.json `exports`'s "react-native" condition straight at it — Metro's own
- * package-exports resolution (on by default: @react-native/metro-config sets
- * unstable_enablePackageExports + conditionNames ['react-native']) picks that up with no
- * custom resolveRequest needed here. @symbiote-native/* resolve as ordinary npm packages from
- * this app's own node_modules (examples/* is a standalone npm install, decoupled from the
- * monorepo's pnpm workspace — see pnpm-workspace.yaml).
+ * Angular needs ngc before Metro, then the Babel linker in babel.config.js finishes the job
+ * @symbiote-native/angular and slider build themselves in `prepare`, `exports` points at that
+ * @symbiote-native/* resolve from this app's own node_modules, outside the pnpm workspace
  *
  * @type {import('@react-native/metro-config').MetroConfig}
  */
@@ -37,8 +35,19 @@ const config = {
   resolver: {
     // sourceExts + the ngc-outDir CSS-redirect resolveRequest — see
     // adapters/angular/metro-config.cjs for the full mechanism.
-    ...withSymbioteAngularMetroConfig(defaultConfig, projectRoot).resolver,
+    ...angularResolver,
+    // Bundle Mode maps worklets files and the RN shim first, anything else goes to the Angular one
+    resolveRequest: (context, moduleName, platform) =>
+      bundleModeMetroConfig.resolver.resolveRequest(
+        {
+          ...context,
+          resolveRequest: (_bundleContext, name, target) =>
+            angularResolver.resolveRequest(context, name, target),
+        },
+        moduleName,
+        platform,
+      ),
   },
 };
 
-module.exports = mergeConfig(defaultConfig, config);
+module.exports = mergeConfig(defaultConfig, bundleModeMetroConfig, config);
